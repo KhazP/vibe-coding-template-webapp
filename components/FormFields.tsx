@@ -17,6 +17,7 @@ interface BaseFieldProps {
   required?: boolean;
   error?: string;
   className?: string;
+  rightLabel?: React.ReactNode;
 }
 
 type TextAreaType = BaseFieldProps & {

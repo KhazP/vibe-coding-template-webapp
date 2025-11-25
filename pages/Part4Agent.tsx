@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { Button, CopyBlock, GenerationLoader, Tooltip, PersonaError, StepNavigation } from '../components/UI';
@@ -311,7 +310,11 @@ const Part4Agent: React.FC = React.memo(() => {
               </div>
               
               <div className="flex-1 min-h-[400px]">
-                 <CopyBlock content={outputs[activeTab]} label={`Preview: ${activeTab}`} />
+                 <CopyBlock 
+                    content={outputs[activeTab]} 
+                    label={`Preview: ${activeTab}`} 
+                    fileName={activeTab.replace('.', '_')} // Pass filename for improved download
+                 />
               </div>
             </div>
            ) : (

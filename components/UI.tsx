@@ -374,10 +374,11 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   tooltip?: string;
   error?: string;
+  rightLabel?: React.ReactNode;
 }
 
-export const Input: React.FC<InputProps> = ({ label, tooltip, error, className = '', ...props }) => (
-  <FieldWrapper label={label} tooltip={tooltip} error={error}>
+export const Input: React.FC<InputProps> = ({ label, tooltip, error, rightLabel, className = '', ...props }) => (
+  <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={rightLabel}>
     <input 
       className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 ${
         error 
@@ -399,6 +400,7 @@ interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
   tooltip?: string;
   error?: string;
   showCount?: boolean;
+  rightLabel?: React.ReactNode;
 }
 
 export const TextArea: React.FC<TextAreaProps> = ({ 
@@ -407,6 +409,7 @@ export const TextArea: React.FC<TextAreaProps> = ({
   error, 
   showCount = true,
   maxLength, 
+  rightLabel,
   className = '', 
   value, 
   onChange,
@@ -424,9 +427,16 @@ export const TextArea: React.FC<TextAreaProps> = ({
       {currentLength}/{maxLength}
     </span>
   ) : null;
+  
+  const displayLabel = (rightLabel || countLabel) ? (
+      <div className="flex items-center gap-2">
+          {rightLabel}
+          {countLabel}
+      </div>
+  ) : undefined;
 
   return (
-    <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={countLabel}>
+    <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={displayLabel}>
       <textarea 
         className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 min-h-[120px] resize-y ${
           error || isOverLimit
@@ -446,10 +456,11 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label: string;
   tooltip?: string;
   error?: string;
+  rightLabel?: React.ReactNode;
 }
 
-export const Select: React.FC<SelectProps> = ({ label, tooltip, error, children, className = '', ...props }) => (
-  <FieldWrapper label={label} tooltip={tooltip} error={error}>
+export const Select: React.FC<SelectProps> = ({ label, tooltip, error, rightLabel, children, className = '', ...props }) => (
+  <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={rightLabel}>
     <select 
       className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 appearance-none ${
          error 

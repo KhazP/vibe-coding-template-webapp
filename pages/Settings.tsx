@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { useProject } from '../context/ProjectContext';
 import { Settings as SettingsIcon } from 'lucide-react';

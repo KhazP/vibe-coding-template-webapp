@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { useProject } from '../context/ProjectContext';
 import { Settings as SettingsIcon, Zap, BrainCircuit, Search } from 'lucide-react';

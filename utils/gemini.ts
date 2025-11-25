@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI } from "@google/genai";
 import { GroundingChunk, GeminiSettings } from "../types";
 
@@ -27,11 +26,16 @@ const retryWithBackoff = async <T>(
         error?.status >= 500 || 
         error?.message?.includes('fetch') || 
         error?.message?.includes('network') ||
-        error?.message?.includes('overloaded');
+        error?.message?.includes('overloaded') ||
+        error?.message?.includes('aborted');
     
     if (retries === 0 || !isRetryable) {
       // Enhance error message if possible
-      const enhancedMessage = error?.message || "Unknown error occurred during Gemini API call.";
+      let enhancedMessage = error?.message || "Unknown error occurred during Gemini API call.";
+      if (error?.status === 400) enhancedMessage = "Invalid request. Please check your prompt or settings.";
+      if (error?.status === 401) enhancedMessage = "Unauthorized. Please check your API key.";
+      if (error?.status === 429) enhancedMessage = "Quota exceeded. Please try again later.";
+      
       console.error(`Gemini API Fatal Error: ${enhancedMessage}`, error);
       throw new Error(enhancedMessage);
     }

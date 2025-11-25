@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Zap, FileText, Cpu, Bot, Terminal, Settings, PlayCircle, Github, Coffee, FolderOpen, Undo2, Redo2, Save, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Zap, FileText, Cpu, Bot, Terminal, Settings, PlayCircle, Github, Coffee, FolderOpen, Undo2, Redo2, Save, Loader2, CheckCircle, AlertCircle, Circle } from 'lucide-react';
 import { motion, LayoutGroup } from 'framer-motion';
 import { useProject } from '../context/ProjectContext';
 import SettingsModal from './SettingsModal';
@@ -12,21 +12,35 @@ const NavItem: React.FC<{
   icon: React.ReactNode; 
   label: string; 
   isActive: boolean;
+  isComplete?: boolean;
   isHovered: boolean;
   onHover: () => void;
   onLeave: () => void;
   onClick?: (e: React.MouseEvent) => void;
-}> = ({ to, icon, label, isActive, isHovered, onHover, onLeave, onClick }) => {
+}> = ({ to, icon, label, isActive, isComplete, isHovered, onHover, onLeave, onClick }) => {
   
   const content = (
-    <div className={`relative flex items-center gap-3 px-6 py-3.5 transition-colors duration-300 z-10 ${
+    <div className={`relative flex items-center justify-between px-6 py-3.5 transition-colors duration-300 z-10 ${
       isActive ? 'text-primary-400' : 'text-slate-500 group-hover:text-slate-200'
     }`}>
-      {React.cloneElement(icon as React.ReactElement<any>, { 
-        size: 18, 
-        className: `transition-colors duration-300 ${isActive ? 'text-primary-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'group-hover:text-primary-400'}` 
-      })}
-      <span className="font-medium tracking-wide text-sm">{label}</span>
+      <div className="flex items-center gap-3">
+        {React.cloneElement(icon as React.ReactElement<any>, { 
+          size: 18, 
+          className: `transition-colors duration-300 ${isActive ? 'text-primary-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'group-hover:text-primary-400'}` 
+        })}
+        <span className="font-medium tracking-wide text-sm">{label}</span>
+      </div>
+      
+      {/* Completion Indicator */}
+      {isComplete !== undefined && (
+        <div className="flex items-center">
+            {isComplete ? (
+                 <CheckCircle size={14} className="text-emerald-500/80 drop-shadow-[0_0_5px_rgba(16,185,129,0.3)]" />
+            ) : (
+                 <Circle size={8} className="text-slate-700 fill-slate-800/50" />
+            )}
+        </div>
+      )}
     </div>
   );
 
@@ -160,23 +174,65 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             <div className="text-xs font-mono text-slate-600 uppercase tracking-widest mb-3 px-6">Pipeline</div>
             
             <nav className="space-y-1">
-              {[
-                { to: "/", icon: <Terminal />, label: "Start" },
-                { to: "/research", icon: <Zap />, label: "1. Research" },
-                { to: "/prd", icon: <FileText />, label: "2. Define (PRD)" },
-                { to: "/tech", icon: <Cpu />, label: "3. Tech Design" },
-                { to: "/agent", icon: <Bot />, label: "4. Agent Config" },
-                { to: "/build", icon: <PlayCircle />, label: "5. Build" },
-              ].map((item) => (
-                <NavItem 
-                  key={item.to}
-                  {...item}
-                  isActive={location.pathname === item.to}
-                  isHovered={hoveredPath === item.to}
-                  onHover={() => setHoveredPath(item.to)}
-                  onLeave={() => setHoveredPath(null)}
-                />
-              ))}
+              <NavItem 
+                to="/" 
+                icon={<Terminal />} 
+                label="Start" 
+                isActive={location.pathname === '/'} 
+                isHovered={hoveredPath === '/'}
+                onHover={() => setHoveredPath('/')}
+                onLeave={() => setHoveredPath(null)}
+              />
+              <NavItem 
+                to="/research" 
+                icon={<Zap />} 
+                label="1. Research" 
+                isActive={location.pathname === '/research'} 
+                isComplete={!!state.researchOutput}
+                isHovered={hoveredPath === '/research'}
+                onHover={() => setHoveredPath('/research')}
+                onLeave={() => setHoveredPath(null)}
+              />
+              <NavItem 
+                to="/prd" 
+                icon={<FileText />} 
+                label="2. Define (PRD)" 
+                isActive={location.pathname === '/prd'} 
+                isComplete={!!state.prdOutput}
+                isHovered={hoveredPath === '/prd'}
+                onHover={() => setHoveredPath('/prd')}
+                onLeave={() => setHoveredPath(null)}
+              />
+              <NavItem 
+                to="/tech" 
+                icon={<Cpu />} 
+                label="3. Tech Design" 
+                isActive={location.pathname === '/tech'} 
+                isComplete={!!state.techOutput}
+                isHovered={hoveredPath === '/tech'}
+                onHover={() => setHoveredPath('/tech')}
+                onLeave={() => setHoveredPath(null)}
+              />
+              <NavItem 
+                to="/agent" 
+                icon={<Bot />} 
+                label="4. Agent Config" 
+                isActive={location.pathname === '/agent'} 
+                isComplete={Object.keys(state.agentOutputs).length > 0}
+                isHovered={hoveredPath === '/agent'}
+                onHover={() => setHoveredPath('/agent')}
+                onLeave={() => setHoveredPath(null)}
+              />
+              <NavItem 
+                to="/build" 
+                icon={<PlayCircle />} 
+                label="5. Build" 
+                isActive={location.pathname === '/build'} 
+                isComplete={!!state.buildPlan}
+                isHovered={hoveredPath === '/build'}
+                onHover={() => setHoveredPath('/build')}
+                onLeave={() => setHoveredPath(null)}
+              />
             </nav>
           </LayoutGroup>
         </div>

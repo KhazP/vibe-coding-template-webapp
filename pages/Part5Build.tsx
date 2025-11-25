@@ -1,19 +1,20 @@
 
-
 import React, { useState } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { CopyBlock, GlassCard, Button, TextArea, PersonaError, StepNavigation } from '../components/UI';
 import { ArtifactSection } from '../components/ArtifactSection';
 import { Link } from 'react-router-dom';
-import { Terminal, Zap, GitMerge, Loader2, Play, AlertTriangle, LifeBuoy, CheckCircle2, Sparkles, FolderTree } from 'lucide-react';
+import { Terminal, Zap, GitMerge, Loader2, Play, AlertTriangle, LifeBuoy, CheckCircle2, Sparkles, FolderTree, Lock } from 'lucide-react';
 import { ModelStatus } from '../components/ModelStatus';
 import { generateBuildPlanPrompt, generatePhasePrompt, generateTroubleshootPrompt, getBuildPlanSystemInstruction } from '../utils/templates';
 import { Persona } from '../types';
 import { TOOL_IDS, FILE_NAMES } from '../utils/constants';
+import { useToast } from '../components/Toast';
 
 const Part5Build: React.FC = React.memo(() => {
   const { state, performGeminiBuildPlan, queryGemini } = useProject();
   const { tools, answers, persona, prdOutput, techOutput, buildPlan, isGenerating } = state;
+  const { addToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'kickoff' | 'guided'>('kickoff');
   const [selectedPhase, setSelectedPhase] = useState<string>('Phase 1: Project Scaffolding');
@@ -35,7 +36,10 @@ const Part5Build: React.FC = React.memo(() => {
   };
 
   const handleGeneratePhasePrompt = async () => {
-      if (!buildPlan) return;
+      if (!buildPlan) {
+        addToast('You must generate a Master Build Plan first!', 'error');
+        return;
+      }
       setIsPhaseLoading(true);
       try {
           const prompt = generatePhasePrompt(persona, answers, buildPlan, selectedPhase);
@@ -138,8 +142,8 @@ const Part5Build: React.FC = React.memo(() => {
       {/* Step 1: Master Build Plan */}
       <section className="space-y-4">
         <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center border border-blue-500/20 text-blue-400">
-                <GitMerge size={18} />
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center border transition-colors ${buildPlan ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-blue-500/10 border-blue-500/20 text-blue-400'}`}>
+                {buildPlan ? <CheckCircle2 size={18} /> : <GitMerge size={18} />}
             </div>
             <h3 className="text-xl font-bold text-slate-200">Step 1: Master Build Plan & File Tree</h3>
         </div>
@@ -152,7 +156,7 @@ const Part5Build: React.FC = React.memo(() => {
                     <p className="text-slate-400 text-sm max-w-md mx-auto mb-8">
                         We need a map before we drive. This step generates a <strong>complete File Tree</strong> and step-by-step dependency plan.
                         <br/><br/>
-                        <span className="text-primary-400 text-xs uppercase tracking-widest">Required for Step 2</span>
+                        <span className="text-primary-400 text-xs uppercase tracking-widest font-bold">Required for Step 2</span>
                     </p>
                     <Button 
                         onClick={handleGenerateBuildPlan} 
@@ -172,9 +176,8 @@ const Part5Build: React.FC = React.memo(() => {
         </GlassCard>
       </section>
 
-      {/* Step 2: Agent Kickoff */}
-      {buildPlan && (
-      <section className="space-y-6 animate-fade-in">
+      {/* Step 2: Agent Kickoff (Visible but Locked if Step 1 Incomplete) */}
+      <section className="space-y-6 animate-fade-in relative">
         <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-primary-500/10 rounded-lg flex items-center justify-center border border-primary-500/20 text-primary-400">
                 <Terminal size={18} />
@@ -182,8 +185,63 @@ const Part5Build: React.FC = React.memo(() => {
             <h3 className="text-xl font-bold text-slate-200">Step 2: Phase Execution</h3>
         </div>
 
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+        <div className={`bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden relative transition-all duration-500 ${!buildPlan ? 'opacity-60 grayscale' : 'opacity-100'}`}>
+            
+            {/* Locked Overlay */}
+            {!buildPlan && (
+                <div className="absolute inset-0 z-20 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center flex-col">
+                    <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4 border border-white/10">
+                        <Lock size={32} className="text-slate-400" />
+                    </div>
+                    <h4 className="text-xl font-bold text-white mb-2">Build Plan Required</h4>
+                    <p className="text-slate-400 max-w-sm text-center mb-6">You must generate the Master Build Plan in Step 1 before you can start executing phases with your AI agent.</p>
+                    <Button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} variant="secondary">
+                         Go to Step 1
+                    </Button>
+                </div>
+            )}
+
             {/* Tabs */}
+            <div className="flex border-b border-slate-800 pointer-events-none">
+                <button 
+                    onClick={() => setActiveTab('kickoff')}
+                    className={`flex-1 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${activeTab === 'kickoff' ? 'bg-slate-800 text-white' : 'text-slate-500'}`}
+                >
+                    <Zap size={16} /> Auto-Pilot (One-Shot)
+                </button>
+                <button 
+                    onClick={() => setActiveTab('guided')}
+                    className={`flex-1 py-4 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${activeTab === 'guided' ? 'bg-slate-800 text-white' : 'text-slate-500'}`}
+                >
+                    <Play size={16} /> Guided (Step-by-Step)
+                </button>
+            </div>
+
+            <div className="p-6 pointer-events-none filter blur-[2px]">
+                {/* Visual placeholder for disabled content to show user what's coming */}
+                <div className="grid md:grid-cols-2 gap-6">
+                    <div className="bg-black/30 border border-white/5 rounded-xl p-5">
+                         <div className="flex items-center gap-3 mb-4">
+                            <Terminal size={16} className="text-primary-400"/>
+                            <h3 className="font-bold text-white text-sm">Agent Kickoff</h3>
+                        </div>
+                        <div className="h-20 bg-black/50 rounded-lg"></div>
+                    </div>
+                    <div className="bg-black/30 border border-white/5 rounded-xl p-5">
+                         <div className="flex items-center gap-3 mb-4">
+                            <Terminal size={16} className="text-primary-400"/>
+                            <h3 className="font-bold text-white text-sm">Agent Kickoff</h3>
+                        </div>
+                        <div className="h-20 bg-black/50 rounded-lg"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {/* Real Step 2 Content (Only rendered if built) */}
+        {buildPlan && (
+            <div className="absolute top-[52px] left-0 w-full h-full bg-slate-900 rounded-xl overflow-hidden border border-slate-800 z-10">
+                 {/* Tabs */}
             <div className="flex border-b border-slate-800">
                 <button 
                     onClick={() => setActiveTab('kickoff')}
@@ -293,9 +351,9 @@ const Part5Build: React.FC = React.memo(() => {
                     </div>
                 )}
             </div>
-        </div>
+            </div>
+        )}
       </section>
-      )}
 
       {/* Step 3: Troubleshooting */}
       {buildPlan && (

@@ -1,10 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { Button, PersonaError, StepNavigation } from '../components/UI';
 import { ProjectInput, ProjectTextArea } from '../components/FormFields';
 import { ArtifactSection } from '../components/ArtifactSection';
 import { generatePRDPrompt } from '../utils/templates';
-import { Sparkles, CheckCircle, AlertCircle, Edit2, Loader2 } from 'lucide-react';
+import { Sparkles, CheckCircle, AlertCircle, Edit2, Loader2, Link } from 'lucide-react';
 import { ModelStatus } from '../components/ModelStatus';
 import { Persona } from '../types';
 import { useToast } from '../components/Toast';
@@ -100,6 +101,7 @@ const Part2PRD: React.FC = React.memo(() => {
   };
 
   const hasIdea = !!answers['project_description'];
+  const fromResearchBadge = <span className="text-[10px] text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-500/20 flex items-center gap-1"><Link size={8}/> From Research</span>;
 
   if (!persona) return <PersonaError />;
 
@@ -145,6 +147,7 @@ const Part2PRD: React.FC = React.memo(() => {
                    tooltip="The elevator pitch." 
                    maxLength={1000}
                    required
+                   rightLabel={answers['project_description'] ? fromResearchBadge : undefined}
                  />
                )}
 
@@ -163,6 +166,7 @@ const Part2PRD: React.FC = React.memo(() => {
                   tooltip="Detailed user persona." 
                   maxLength={1000}
                   required
+                  rightLabel={answers['research_vibe_who'] ? fromResearchBadge : undefined}
                />
                
                <ProjectTextArea 
@@ -180,6 +184,7 @@ const Part2PRD: React.FC = React.memo(() => {
                   tooltip="MVP Requirements." 
                   maxLength={2000}
                   required
+                  rightLabel={answers['research_vibe_features'] ? fromResearchBadge : undefined}
                />
                
                <ProjectTextArea 
@@ -228,6 +233,7 @@ const Part2PRD: React.FC = React.memo(() => {
                  tooltip="Concise value prop (Pre-filled from Research Context)." 
                  maxLength={500}
                  required
+                 rightLabel={answers['project_description'] ? fromResearchBadge : undefined}
                />
                
                <ProjectInput 
@@ -270,6 +276,7 @@ const Part2PRD: React.FC = React.memo(() => {
                  label={answers['research_dev_constraints'] ? "8. Refine Technical & UX Requirements" : "8. Technical & UX Requirements"} 
                  placeholder="Performance, Accessibility, Platform support, Design system." 
                  tooltip="Non-functional requirements (Pre-filled from Research)." 
+                 rightLabel={answers['research_dev_constraints'] ? fromResearchBadge : undefined}
                />
                
                <ProjectTextArea 
@@ -290,6 +297,7 @@ const Part2PRD: React.FC = React.memo(() => {
                  label={answers['research_dev_context'] ? "11. Refine Business model & constraints" : "11. Business model & constraints"} 
                  placeholder="Monetization, Budget, Corporate policies." 
                  tooltip="Business constraints (Pre-filled from Research Context)." 
+                 rightLabel={answers['research_dev_context'] ? fromResearchBadge : undefined}
                />
             </>
           )}
@@ -311,6 +319,7 @@ const Part2PRD: React.FC = React.memo(() => {
                  tooltip="Purpose statement (Pre-filled from Research)." 
                  maxLength={1000}
                  required
+                 rightLabel={answers['project_description'] ? fromResearchBadge : undefined}
                />
                
                <ProjectInput 
@@ -325,6 +334,7 @@ const Part2PRD: React.FC = React.memo(() => {
                  label={answers['research_mid_problem'] ? "4. Refine Target Users & Needs" : "4. Who are your target users and what do they need?"} 
                  placeholder="Primary user type, main problem, current workaround." 
                  tooltip="Target user definition (Pre-filled from Research)." 
+                 rightLabel={answers['research_mid_problem'] ? fromResearchBadge : undefined}
                />
                
                <ProjectTextArea 
@@ -356,6 +366,7 @@ const Part2PRD: React.FC = React.memo(() => {
                  label={answers['research_mid_timeline'] ? "8. Refine Success Metrics" : "8. How will you measure success?"} 
                  placeholder="Short-term (1 month) and Medium-term (3 months) metrics." 
                  tooltip="Success definitions." 
+                 rightLabel={answers['research_mid_timeline'] ? fromResearchBadge : undefined}
                />
                
                <ProjectTextArea 

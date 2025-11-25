@@ -1,10 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { Button, PersonaError, StepNavigation } from '../components/UI';
 import { ProjectInput, ProjectTextArea, ProjectSelect } from '../components/FormFields';
 import { ArtifactSection } from '../components/ArtifactSection';
 import { generateTechDesignPrompt } from '../utils/templates';
-import { Sparkles, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Sparkles, CheckCircle, AlertCircle, Loader2, Link } from 'lucide-react';
 import { ModelStatus } from '../components/ModelStatus';
 import { Persona } from '../types';
 import { useToast } from '../components/Toast';
@@ -124,6 +125,8 @@ const Part3Tech: React.FC = React.memo(() => {
     }
   };
 
+  const contextBadge = <span className="text-[10px] text-purple-400 bg-purple-900/30 px-1.5 py-0.5 rounded border border-purple-500/20 flex items-center gap-1"><Link size={8}/> From Research/PRD</span>;
+
   if (!persona) return <PersonaError />;
 
   return (
@@ -240,6 +243,7 @@ const Part3Tech: React.FC = React.memo(() => {
                   tooltip="Preferred libraries and frameworks (Pre-filled from Research)." 
                   maxLength={1000}
                   required
+                  rightLabel={answers['research_dev_stack_specifics'] ? contextBadge : undefined}
                 />
                 
                 <ProjectInput 
@@ -284,6 +288,7 @@ const Part3Tech: React.FC = React.memo(() => {
                   label={answers['prd_dev_compliance'] ? "9. Refine Security & Compliance" : "9. Security & Compliance"} 
                   placeholder="Data sensitivity, GDPR, Auth, API security." 
                   tooltip="Security posture (Pre-filled from PRD)." 
+                  rightLabel={answers['prd_dev_compliance'] ? contextBadge : undefined}
                 />
             </>
           )}
@@ -310,6 +315,7 @@ const Part3Tech: React.FC = React.memo(() => {
                   label={answers['research_mid_comfort'] ? "2. Refine Technical Comfort Zone" : "2. Technical Comfort Zone"} 
                   placeholder="Languages known, frameworks tried, comfortable areas." 
                   tooltip="Your current skill set (Pre-filled from Research)." 
+                  rightLabel={answers['research_mid_comfort'] ? contextBadge : undefined}
                 />
 
                 <ProjectSelect
@@ -364,6 +370,7 @@ const Part3Tech: React.FC = React.memo(() => {
                   label={answers['research_mid_timeline'] ? "7. Refine Realistic Timeline" : "7. Realistic Timeline"} 
                   placeholder="Hours per week? Launch date? Beta user count?" 
                   tooltip="Time availability (Pre-filled from Research)." 
+                  rightLabel={answers['research_mid_timeline'] ? contextBadge : undefined}
                 />
              </>
           )}
