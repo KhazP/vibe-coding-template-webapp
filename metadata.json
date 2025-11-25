@@ -1,0 +1,5 @@
+{
+  "name": "Vibe-Coding Workflow",
+  "description": "An automated workflow tool for generating PRDs, Technical Designs, and AI Agent configurations based on the Vibe-Coding methodology.",
+  "requestFramePermissions": []
+}
