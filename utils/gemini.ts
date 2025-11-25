@@ -2,9 +2,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { GroundingChunk, GeminiSettings } from "../types";
 
-// Initialize Gemini API with environment variable as strictly required
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 /**
  * Retries an asynchronous operation with exponential backoff.
  * 
@@ -60,6 +57,9 @@ export const streamDeepResearch = async (
   onChunk: (text: string) => void
 ): Promise<{ text: string; sources: GroundingChunk[] }> => {
   try {
+    // Initialize Gemini API with environment variable inside the function to avoid crash on load
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
     const researchPrompt = `You are an expert product researcher and technical architect. 
 Please conduct a deep research analysis based on the following request. 
 Use Google Search to find real-time information, competitors, and technical tools.
@@ -139,6 +139,9 @@ export const streamArtifact = async (
   onChunk: (text: string) => void
 ): Promise<string> => {
     try {
+        // Initialize Gemini API with environment variable inside the function to avoid crash on load
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
         const tools: any[] = [];
         if (settings.useGrounding) {
             tools.push({ googleSearch: {} });
