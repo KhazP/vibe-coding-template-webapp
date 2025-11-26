@@ -26,15 +26,22 @@ const retryWithBackoff = async <T>(
         error?.message?.includes('overloaded') ||
         error?.message?.includes('aborted');
     
-    if (retries === 0 || !isRetryable) {
+    // Auth errors should NOT be retried
+    const isAuthError = error?.status === 400 || error?.status === 401 || error?.status === 403;
+
+    if (retries === 0 || !isRetryable || isAuthError) {
       // Enhance error message if possible
       let enhancedMessage = error?.message || "Unknown error occurred during Gemini API call.";
-      if (error?.status === 400) enhancedMessage = "Invalid request. Please check your prompt or settings.";
-      if (error?.status === 401) enhancedMessage = "Unauthorized. Please check your API key.";
+      if (error?.status === 400) enhancedMessage = "Invalid request or API Key (400).";
+      if (error?.status === 401) enhancedMessage = "Unauthorized. Please check your API key (401).";
+      if (error?.status === 403) enhancedMessage = "Permission denied. Check API key scope (403).";
       if (error?.status === 429) enhancedMessage = "Quota exceeded. Please try again later.";
       
       console.error(`Gemini API Fatal Error: ${enhancedMessage}`, error);
-      throw new Error(enhancedMessage);
+      // Propagate error with original status attached for context handling
+      const finalError: any = new Error(enhancedMessage);
+      finalError.status = error?.status;
+      throw finalError;
     }
 
     console.warn(`Gemini API Error (Retrying in ${baseDelay}ms...):`, error.message);

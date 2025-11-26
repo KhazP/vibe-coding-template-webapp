@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Zap, FileText, Cpu, Bot, Terminal, Settings, PlayCircle, Github, Coffee, FolderOpen, Undo2, Redo2, Save, Loader2, CheckCircle, AlertCircle, Circle } from 'lucide-react';
+import { Zap, FileText, Cpu, Bot, Terminal, Settings, PlayCircle, Github, Coffee, FolderOpen, Undo2, Redo2, Save, Loader2, CheckCircle, AlertCircle, Circle, Key } from 'lucide-react';
 import { motion, LayoutGroup } from 'framer-motion';
 import { useProject } from '../context/ProjectContext';
 import SettingsModal from './SettingsModal';
@@ -97,7 +97,7 @@ const NavItem: React.FC<{
 
 export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
-  const { state, setIsSettingsOpen, undo, redo, canUndo, canRedo, saveProject, saveStatus } = useProject();
+  const { state, setIsSettingsOpen, setIsApiKeyModalOpen, undo, redo, canUndo, canRedo, saveProject, saveStatus } = useProject();
   const [hoveredPath, setHoveredPath] = useState<string | null>(null);
 
   // Pipeline Progress Logic
@@ -293,6 +293,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                   onHover={() => setHoveredPath('settings')}
                   onLeave={() => setHoveredPath(null)}
                   onClick={() => setIsSettingsOpen(true)}
+               />
+               
+               {/* Escape Hatch: API Key Button */}
+               <NavItem 
+                  to="api-key-gate" 
+                  icon={<Key />} 
+                  label="API Key" 
+                  isActive={false}
+                  isHovered={hoveredPath === 'apikey'}
+                  onHover={() => setHoveredPath('apikey')}
+                  onLeave={() => setHoveredPath(null)}
+                  onClick={() => setIsApiKeyModalOpen(true)}
                />
              </LayoutGroup>
              <div className="text-[10px] text-slate-600 mt-4 text-center font-mono opacity-50">
