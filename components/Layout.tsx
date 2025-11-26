@@ -6,6 +6,7 @@ import { motion, LayoutGroup } from 'framer-motion';
 import { useProject } from '../context/ProjectContext';
 import SettingsModal from './SettingsModal';
 import { Tooltip, Breadcrumbs, Button } from './UI';
+import { ApiKeyGate } from './ApiKeyGate';
 
 const NavItem: React.FC<{ 
   to: string; 
@@ -128,6 +129,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   return (
     <div className="min-h-screen flex text-slate-200 overflow-hidden relative selection:bg-primary-500/30">
+      <ApiKeyGate />
       
       {/* Ambient Background Effects (AMOLED Green) */}
       <div className="fixed inset-0 z-0 pointer-events-none bg-background">

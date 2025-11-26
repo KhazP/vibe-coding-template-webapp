@@ -48,17 +48,20 @@ const retryWithBackoff = async <T>(
  * 
  * @param prompt - The user prompt for research.
  * @param settings - Gemini configuration settings.
+ * @param apiKey - The Google API Key.
  * @param onChunk - Callback function triggered on each stream chunk.
  * @returns Object containing the full text and grounding sources.
  */
 export const streamDeepResearch = async (
   prompt: string, 
   settings: GeminiSettings,
+  apiKey: string,
   onChunk: (text: string) => void
 ): Promise<{ text: string; sources: GroundingChunk[] }> => {
   try {
-    // Initialize Gemini API with environment variable inside the function to avoid crash on load
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    if (!apiKey) throw new Error("API Key is missing. Please provide a valid Gemini API Key.");
+
+    const ai = new GoogleGenAI({ apiKey });
 
     const researchPrompt = `You are an expert product researcher and technical architect. 
 Please conduct a deep research analysis based on the following request. 
@@ -90,7 +93,7 @@ ${prompt}`;
       model: settings.modelName,
       contents: researchPrompt,
       config: config,
-    }));
+    })) as any;
 
     let fullText = "";
     let finalSources: GroundingChunk[] = [];
@@ -119,8 +122,8 @@ ${prompt}`;
  * Runs deep research in a non-streaming fashion (awaits full completion).
  * Wrapper around `streamDeepResearch`.
  */
-export const runDeepResearch = async (prompt: string, settings: GeminiSettings): Promise<{ text: string; sources: GroundingChunk[] }> => {
-  return streamDeepResearch(prompt, settings, () => {});
+export const runDeepResearch = async (prompt: string, settings: GeminiSettings, apiKey: string): Promise<{ text: string; sources: GroundingChunk[] }> => {
+  return streamDeepResearch(prompt, settings, apiKey, () => {});
 };
 
 /**
@@ -129,6 +132,7 @@ export const runDeepResearch = async (prompt: string, settings: GeminiSettings):
  * @param systemInstruction - The persona/role definition for the AI.
  * @param prompt - The specific task or user input.
  * @param settings - Gemini configuration settings.
+ * @param apiKey - The Google API Key.
  * @param onChunk - Callback function triggered on each stream chunk.
  * @returns The full generated text.
  */
@@ -136,11 +140,13 @@ export const streamArtifact = async (
   systemInstruction: string, 
   prompt: string, 
   settings: GeminiSettings,
+  apiKey: string,
   onChunk: (text: string) => void
 ): Promise<string> => {
     try {
-        // Initialize Gemini API with environment variable inside the function to avoid crash on load
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        if (!apiKey) throw new Error("API Key is missing. Please provide a valid Gemini API Key.");
+
+        const ai = new GoogleGenAI({ apiKey });
 
         const tools: any[] = [];
         if (settings.useGrounding) {
@@ -165,7 +171,7 @@ export const streamArtifact = async (
             model: settings.modelName,
             contents: prompt,
             config: config
-        }));
+        })) as any;
 
         let fullText = "";
         for await (const chunk of responseStream) {
@@ -185,6 +191,6 @@ export const streamArtifact = async (
  * Generates an artifact in a non-streaming fashion.
  * Wrapper around `streamArtifact`.
  */
-export const generateArtifact = async (systemInstruction: string, prompt: string, settings: GeminiSettings): Promise<string> => {
-     return streamArtifact(systemInstruction, prompt, settings, () => {});
+export const generateArtifact = async (systemInstruction: string, prompt: string, settings: GeminiSettings, apiKey: string): Promise<string> => {
+     return streamArtifact(systemInstruction, prompt, settings, apiKey, () => {});
 }

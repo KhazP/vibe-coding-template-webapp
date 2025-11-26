@@ -60,6 +60,12 @@ const getGlobalSettings = (): GeminiSettings => {
     return defaultSettings;
 };
 
+// Helper to get API Key securely
+const getApiKey = () => {
+    const key = localStorage.getItem('VIBE_GEMINI_API_KEY');
+    return key || '';
+};
+
 const createNewProjectState = (): ProjectState => ({
   id: crypto.randomUUID(),
   name: 'Untitled Project',
@@ -250,7 +256,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // --- History Management (Undo/Redo) ---
   const [history, setHistory] = useState<{ past: ProjectState[], future: ProjectState[] }>({ past: [], future: [] });
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset history when switching projects
   useEffect(() => {
@@ -496,25 +502,25 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const setResearchOutput = useCallback((researchOutput: string) => {
       const current = state.projects[state.currentId];
-      const sectionTimestamps = { ...(current?.sectionTimestamps || {}), research: Date.now() };
+      const sectionTimestamps = { ...((current?.sectionTimestamps || {}) as Record<string, number>), research: Date.now() };
       updateCurrentProject({ researchOutput, sectionTimestamps });
   }, [updateCurrentProject, state.projects, state.currentId]);
 
   const setPrdOutput = useCallback((prdOutput: string) => {
       const current = state.projects[state.currentId];
-      const sectionTimestamps = { ...(current?.sectionTimestamps || {}), prd: Date.now() };
+      const sectionTimestamps = { ...((current?.sectionTimestamps || {}) as Record<string, number>), prd: Date.now() };
       updateCurrentProject({ prdOutput, sectionTimestamps });
   }, [updateCurrentProject, state.projects, state.currentId]);
 
   const setTechOutput = useCallback((techOutput: string) => {
       const current = state.projects[state.currentId];
-      const sectionTimestamps = { ...(current?.sectionTimestamps || {}), tech: Date.now() };
+      const sectionTimestamps = { ...((current?.sectionTimestamps || {}) as Record<string, number>), tech: Date.now() };
       updateCurrentProject({ techOutput, sectionTimestamps });
   }, [updateCurrentProject, state.projects, state.currentId]);
 
   const setBuildPlan = useCallback((buildPlan: string) => {
       const current = state.projects[state.currentId];
-      const sectionTimestamps = { ...(current?.sectionTimestamps || {}), build: Date.now() };
+      const sectionTimestamps = { ...((current?.sectionTimestamps || {}) as Record<string, number>), build: Date.now() };
       updateCurrentProject({ buildPlan, sectionTimestamps });
   }, [updateCurrentProject, state.projects, state.currentId]);
 
@@ -543,12 +549,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const performGeminiResearch = useCallback(async (prompt: string) => {
     const proj = state.projects[state.currentId];
     if (!proj) return;
+    const apiKey = getApiKey();
 
     updateCurrentProject({ isGenerating: true, researchOutput: '', researchSources: [] });
     let accumulatedText = '';
     
     try {
-      const { text, sources } = await streamDeepResearch(prompt, proj.settings, (chunk) => {
+      const { text, sources } = await streamDeepResearch(prompt, proj.settings, apiKey, (chunk) => {
         accumulatedText += chunk;
         dispatch({ 
             type: 'UPDATE_PROJECT', 
@@ -578,11 +585,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const performGeminiPRD = useCallback(async (prompt: string) => {
     const proj = state.projects[state.currentId];
     if (!proj) return;
+    const apiKey = getApiKey();
 
     updateCurrentProject({ isGenerating: true, prdOutput: '' });
     let accumulatedText = '';
     try {
-        await streamArtifact(getPRDSystemInstruction(), prompt, proj.settings, (chunk) => {
+        await streamArtifact(getPRDSystemInstruction(), prompt, proj.settings, apiKey, (chunk) => {
             accumulatedText += chunk;
             dispatch({ type: 'UPDATE_PROJECT', payload: { prdOutput: accumulatedText } });
         });
@@ -598,11 +606,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const performGeminiTech = useCallback(async (prompt: string) => {
     const proj = state.projects[state.currentId];
     if (!proj) return;
+    const apiKey = getApiKey();
 
     updateCurrentProject({ isGenerating: true, techOutput: '' });
     let accumulatedText = '';
     try {
-        await streamArtifact(getTechDesignSystemInstruction(), prompt, proj.settings, (chunk) => {
+        await streamArtifact(getTechDesignSystemInstruction(), prompt, proj.settings, apiKey, (chunk) => {
             accumulatedText += chunk;
             dispatch({ type: 'UPDATE_PROJECT', payload: { techOutput: accumulatedText } });
         });
@@ -618,11 +627,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const performGeminiBuildPlan = useCallback(async (prompt: string) => {
     const proj = state.projects[state.currentId];
     if (!proj) return;
+    const apiKey = getApiKey();
 
     updateCurrentProject({ isGenerating: true, buildPlan: '' });
     let accumulatedText = '';
     try {
-        await streamArtifact(getBuildPlanSystemInstruction(), prompt, proj.settings, (chunk) => {
+        await streamArtifact(getBuildPlanSystemInstruction(), prompt, proj.settings, apiKey, (chunk) => {
             accumulatedText += chunk;
             dispatch({ type: 'UPDATE_PROJECT', payload: { buildPlan: accumulatedText } });
         });
@@ -638,10 +648,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const performGeminiAgent = useCallback(async (prompt: string) => {
       const proj = state.projects[state.currentId];
       if (!proj) return "";
+      const apiKey = getApiKey();
 
       updateCurrentProject({ isGenerating: true });
       try {
-          const text = await generateArtifact(getAgentSystemInstruction(), prompt, proj.settings);
+          const text = await generateArtifact(getAgentSystemInstruction(), prompt, proj.settings, apiKey);
           updateCurrentProject({ isGenerating: false });
           addToast('Agent config generated', 'success');
           return text;
@@ -656,6 +667,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateCurrentProject({ isGenerating: true });
     
     const currentProj = state.projects[state.currentId];
+    const apiKey = getApiKey();
     let currentContent = '';
     if (type === 'research') currentContent = currentProj.researchOutput;
     if (type === 'prd') currentContent = currentProj.prdOutput;
@@ -666,7 +678,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let accumulatedText = '';
 
     try {
-      await streamArtifact(getRefineSystemInstruction(), prompt, currentProj.settings, (chunk) => {
+      await streamArtifact(getRefineSystemInstruction(), prompt, currentProj.settings, apiKey, (chunk) => {
           accumulatedText += chunk;
           const update: any = {};
           if (type === 'research') update.researchOutput = accumulatedText;
@@ -705,7 +717,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const queryGemini = useCallback(async (prompt: string, systemInstruction?: string) => {
      try {
-         return await generateArtifact(systemInstruction || "You are a helpful AI assistant.", prompt, state.projects[state.currentId].settings);
+         const apiKey = getApiKey();
+         return await generateArtifact(systemInstruction || "You are a helpful AI assistant.", prompt, state.projects[state.currentId].settings, apiKey);
      } catch (error: any) {
          addToast(`Query Failed: ${error?.message}`, 'error');
          throw error;
@@ -717,7 +730,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Memoize the projects array
   const sortedProjects = useMemo(() => {
-    return Object.values(state.projects).sort((a,b) => b.lastModified - a.lastModified);
+    return Object.values(state.projects).sort((a: ProjectState, b: ProjectState) => b.lastModified - a.lastModified);
   }, [state.projects]);
 
   // Memoize the context value
