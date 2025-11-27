@@ -64,7 +64,8 @@ const defaultSettings: GeminiSettings = {
   temperature: DEFAULT_SETTINGS.TEMPERATURE,
   topK: DEFAULT_SETTINGS.TOP_K,
   topP: DEFAULT_SETTINGS.TOP_P,
-  preset: 'thorough'
+  preset: 'thorough',
+  enableAnalytics: true
 };
 
 const getGlobalSettings = (): GeminiSettings => {
@@ -242,6 +243,57 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     sessionStorage.setItem('VIBE_SESSION_ID', sessionIdRef.current);
   }, []);
 
+  // Initialize Reducer first to make state available
+  const [state, dispatch] = useReducer(projectReducer, { projects: {}, currentId: '' } as StorageData, (initial): StorageData => {
+    try {
+        // 1. Try load V2
+        const savedV2 = localStorage.getItem(STORAGE_KEYS.V2);
+        if (savedV2) {
+          const parsed = JSON.parse(savedV2);
+          if (parsed.projects && parsed.currentId) {
+            // Ensure sectionTimestamps & validationErrors exists for old V2 data
+            Object.values(parsed.projects).forEach((p: any) => {
+              if (!p.sectionTimestamps) p.sectionTimestamps = {};
+              if (!p.validationErrors) p.validationErrors = {};
+              if (!p.settings) p.settings = { ...defaultSettings };
+              else p.settings = { ...defaultSettings, ...p.settings }; // Merge defaults
+              
+              if (!p.settings.preset) p.settings.preset = 'thorough'; // Migration for existing projects
+              if (!p.toolSettings) p.toolSettings = { claudeAdapterMode: false, geminiAdapterMode: false, antigravityAdapterMode: false }; // Migration
+              // Ensure Antigravity key exists if not present
+              if (p.toolSettings && !('antigravityAdapterMode' in p.toolSettings)) {
+                  p.toolSettings.antigravityAdapterMode = false;
+              }
+            });
+            return { projects: parsed.projects, currentId: parsed.currentId } as StorageData;
+          }
+        }
+  
+        // 2. Try load V1 (Migration)
+        const savedV1 = localStorage.getItem(STORAGE_KEYS.V1);
+        if (savedV1) {
+          const parsedV1 = JSON.parse(savedV1);
+          const newProject = {
+            ...createNewProjectState(),
+            ...(parsedV1 as Partial<ProjectState>),
+            isGenerating: false,
+            settings: { ...defaultSettings, ...(parsedV1.settings || {}) },
+            sectionTimestamps: {}
+          };
+          const derivedName = parsedV1.answers?.['project_description'] || parsedV1.answers?.['prd_vibe_name'] || 'Legacy Project';
+          newProject.name = derivedName.length > 30 ? derivedName.substring(0, 30) + '...' : derivedName;
+  
+          return { projects: { [newProject.id]: newProject }, currentId: newProject.id };
+        }
+      } catch (e) {
+        console.warn("Failed to load state", e);
+      }
+      
+      // 3. Default
+      const defaultProject = createNewProjectState();
+      return { projects: { [defaultProject.id]: defaultProject }, currentId: defaultProject.id };
+  });
+
   // Analytics Engine
   const logEvent = useCallback(async (eventName: AnalyticsEvent['eventName'], data?: any) => {
     // 1. Log to Local Storage (Backup / Immediate Client Access)
@@ -262,6 +314,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.warn('Local Analytics Error:', e);
     }
 
+    // Check Analytics Setting
+    const currentProj = state.projects[state.currentId];
+    // Default to true if undefined
+    const analyticsEnabled = currentProj?.settings?.enableAnalytics ?? true;
+
+    if (!analyticsEnabled) return;
+
     // 2. Log to Supabase (Primary Source of Truth)
     if (supabase) {
         try {
@@ -279,7 +338,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             console.warn('Supabase Connection Error:', e);
         }
     }
-  }, []);
+  }, [state.projects, state.currentId]);
 
   // Auto-open modal if no key on mount
   useEffect(() => {
@@ -317,56 +376,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addToast(msg || 'An unexpected error occurred.', 'error');
     }
   }, [clearApiKey, addToast]);
-
-
-  // Initialize Reducer
-  const [state, dispatch] = useReducer(projectReducer, { projects: {}, currentId: '' } as StorageData, (initial): StorageData => {
-    try {
-        // 1. Try load V2
-        const savedV2 = localStorage.getItem(STORAGE_KEYS.V2);
-        if (savedV2) {
-          const parsed = JSON.parse(savedV2);
-          if (parsed.projects && parsed.currentId) {
-            // Ensure sectionTimestamps & validationErrors exists for old V2 data
-            Object.values(parsed.projects).forEach((p: any) => {
-              if (!p.sectionTimestamps) p.sectionTimestamps = {};
-              if (!p.validationErrors) p.validationErrors = {};
-              if (!p.settings) p.settings = { ...defaultSettings };
-              if (!p.settings.preset) p.settings.preset = 'thorough'; // Migration for existing projects
-              if (!p.toolSettings) p.toolSettings = { claudeAdapterMode: false, geminiAdapterMode: false, antigravityAdapterMode: false }; // Migration
-              // Ensure Antigravity key exists if not present
-              if (p.toolSettings && !('antigravityAdapterMode' in p.toolSettings)) {
-                  p.toolSettings.antigravityAdapterMode = false;
-              }
-            });
-            return { projects: parsed.projects, currentId: parsed.currentId } as StorageData;
-          }
-        }
-  
-        // 2. Try load V1 (Migration)
-        const savedV1 = localStorage.getItem(STORAGE_KEYS.V1);
-        if (savedV1) {
-          const parsedV1 = JSON.parse(savedV1);
-          const newProject = {
-            ...createNewProjectState(),
-            ...(parsedV1 as Partial<ProjectState>),
-            isGenerating: false,
-            settings: { ...defaultSettings, ...(parsedV1.settings || {}) },
-            sectionTimestamps: {}
-          };
-          const derivedName = parsedV1.answers?.['project_description'] || parsedV1.answers?.['prd_vibe_name'] || 'Legacy Project';
-          newProject.name = derivedName.length > 30 ? derivedName.substring(0, 30) + '...' : derivedName;
-  
-          return { projects: { [newProject.id]: newProject }, currentId: newProject.id };
-        }
-      } catch (e) {
-        console.warn("Failed to load state", e);
-      }
-      
-      // 3. Default
-      const defaultProject = createNewProjectState();
-      return { projects: { [defaultProject.id]: defaultProject }, currentId: defaultProject.id };
-  });
 
   // --- History Management (Undo/Redo) ---
   const [history, setHistory] = useState<{ past: ProjectState[], future: ProjectState[] }>({ past: [], future: [] });

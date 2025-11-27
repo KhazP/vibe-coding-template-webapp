@@ -1,6 +1,6 @@
 import React from 'react';
 import { useProject } from '../context/ProjectContext';
-import { Settings as SettingsIcon, Zap, BrainCircuit, Search, Gauge, ChevronDown, Check } from 'lucide-react';
+import { Settings as SettingsIcon, Zap, BrainCircuit, Search, Gauge, ChevronDown, Check, Activity } from 'lucide-react';
 import { Modal, Tooltip, Select, Button } from './UI';
 import { MODEL_CONFIGS, PRESETS } from '../utils/constants';
 import { PresetMode } from '../types';
@@ -107,6 +107,28 @@ const SettingsModal: React.FC = () => {
                     );
                 })}
             </div>
+        </div>
+
+        {/* Analytics Toggle */}
+        <div className="flex items-center justify-between p-4 bg-slate-950 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors">
+            <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                    <Activity size={20} className="text-emerald-400" />
+                </div>
+                <div>
+                    <label className="font-medium text-slate-300 block">Usage Analytics</label>
+                    <p className="text-xs text-slate-500">Help improve Vibe Coding by sharing usage stats anonymously.</p>
+                </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+                <input 
+                    type="checkbox" 
+                    checked={settings.enableAnalytics ?? true} 
+                    onChange={(e) => updateSettings({ enableAnalytics: e.target.checked })}
+                    className="sr-only peer" 
+                />
+                <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+            </label>
         </div>
 
         {/* Advanced Accordion */}

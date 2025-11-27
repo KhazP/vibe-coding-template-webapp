@@ -51,6 +51,7 @@ export interface GeminiSettings {
   topK?: number;
   topP?: number;
   preset?: PresetMode;
+  enableAnalytics?: boolean;
 }
 
 export interface ToolSettings {

@@ -4,6 +4,7 @@ declare global {
   interface ImportMetaEnv {
     readonly VITE_SUPABASE_URL: string;
     readonly VITE_SUPABASE_ANON_KEY: string;
+    readonly VITE_ADMIN_PASSWORD?: string;
   }
 
   interface ImportMeta {
@@ -15,10 +16,6 @@ declare global {
 // We use optional chaining so that if 'env' is missing, these become undefined instead of throwing.
 const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env?.VITE_SUPABASE_ANON_KEY;
-
-// Debugging logs to confirm what the app sees at runtime
-console.log('supabaseUrl at runtime:', supabaseUrl);
-console.log('supabaseKey at runtime:', supabaseKey);
 
 if (!supabaseUrl || !supabaseKey) {
   console.warn('Supabase configuration missing (VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY). Analytics will default to local storage.');
