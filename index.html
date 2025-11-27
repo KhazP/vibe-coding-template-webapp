@@ -38,6 +38,8 @@
             animation: {
               'blob': 'blob 10s infinite',
               'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'satin-slow': 'satin-flow 15s ease-in-out infinite',
+              'satin-slow-reverse': 'satin-flow-reverse 20s ease-in-out infinite',
             },
             keyframes: {
               blob: {
@@ -45,6 +47,14 @@
                 '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
                 '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
                 '100%': { transform: 'translate(0px, 0px) scale(1)' },
+              },
+              'satin-flow': {
+                '0%, 100%': { transform: 'translateY(0) scale(1) skewY(0deg)' },
+                '50%': { transform: 'translateY(-30px) scale(1.05) skewY(2deg)' },
+              },
+              'satin-flow-reverse': {
+                '0%, 100%': { transform: 'translateY(0) scale(1) skewY(0deg)' },
+                '50%': { transform: 'translateY(30px) scale(1.05) skewY(-2deg)' },
               }
             }
           }
@@ -72,7 +82,7 @@
 
       body {
         font-family: 'Inter', sans-serif;
-        background-color: #020202;
+        background-color: #050505;
         overflow-x: hidden;
         color: #e2e8f0;
         transition: color 0.5s ease;
@@ -80,19 +90,6 @@
       
       h1, h2, h3, h4, h5, h6 {
         font-family: 'Space Grotesk', sans-serif;
-      }
-
-      /* Cinematic Noise Overlay */
-      .bg-noise {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        pointer-events: none;
-        z-index: 50;
-        opacity: 0.04;
-        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
       }
 
       /* Custom Scrollbar */
@@ -121,13 +118,13 @@
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
     "jszip": "https://aistudiocdn.com/jszip@^3.10.1",
-    "framer-motion": "https://aistudiocdn.com/framer-motion@^11.0.8"
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^11.0.8",
+    "p5": "https://esm.sh/p5@1.9.0"
   }
 }
 </script>
 </head>
-  <body class="bg-background text-slate-200 antialiased selection:bg-primary-500/30 selection:text-white">
-    <div class="bg-noise"></div>
+  <body class="bg-[#050505] text-slate-200 antialiased selection:bg-primary-500/30 selection:text-white">
     <div id="root" class="relative z-10"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

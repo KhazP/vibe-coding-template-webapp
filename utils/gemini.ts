@@ -57,16 +57,22 @@ const retryWithBackoff = async <T>(
  * @param settings - Gemini configuration settings.
  * @param apiKey - The Google API Key.
  * @param onChunk - Callback function triggered on each stream chunk.
+ * @param onStatusUpdate - Callback for status messages (Thinking, Searching, etc).
+ * @param signal - AbortSignal for cancellation.
  * @returns Object containing the full text and grounding sources.
  */
 export const streamDeepResearch = async (
   prompt: string, 
   settings: GeminiSettings,
   apiKey: string,
-  onChunk: (text: string) => void
+  onChunk: (text: string) => void,
+  onStatusUpdate?: (status: string) => void,
+  signal?: AbortSignal
 ): Promise<{ text: string; sources: GroundingChunk[] }> => {
   try {
     if (!apiKey) throw new Error("API Key is missing. Please provide a valid Gemini API Key.");
+
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
     const ai = new GoogleGenAI({ apiKey });
 
@@ -95,6 +101,15 @@ ${prompt}`;
       };
     }
 
+    // Determine initial status based on config
+    if (settings.thinkingBudget > 0) {
+        onStatusUpdate?.("Thinking (Deep Reasoning)...");
+    } else if (settings.useGrounding) {
+        onStatusUpdate?.("Searching Google (Grounding)...");
+    } else {
+        onStatusUpdate?.("Initializing AI...");
+    }
+
     // Wrap the stream creation in retry logic
     const responseStream = await retryWithBackoff(() => ai.models.generateContentStream({
       model: settings.modelName,
@@ -104,8 +119,19 @@ ${prompt}`;
 
     let fullText = "";
     let finalSources: GroundingChunk[] = [];
+    let isFirstChunk = true;
 
     for await (const chunk of responseStream) {
+       // Check cancellation signal in the loop
+       if (signal?.aborted) {
+           throw new DOMException("Aborted", "AbortError");
+       }
+
+       if (isFirstChunk) {
+           isFirstChunk = false;
+           onStatusUpdate?.("Generating Report...");
+       }
+
        const textPart = chunk.text;
        if (textPart) {
          fullText += textPart;
@@ -120,7 +146,6 @@ ${prompt}`;
 
     return { text: fullText, sources: finalSources };
   } catch (error) {
-    // Re-throw to be caught by the calling component's toast handler
     throw error;
   }
 };
@@ -141,6 +166,8 @@ export const runDeepResearch = async (prompt: string, settings: GeminiSettings, 
  * @param settings - Gemini configuration settings.
  * @param apiKey - The Google API Key.
  * @param onChunk - Callback function triggered on each stream chunk.
+ * @param onStatusUpdate - Callback for status messages.
+ * @param signal - AbortSignal for cancellation.
  * @returns The full generated text.
  */
 export const streamArtifact = async (
@@ -148,10 +175,14 @@ export const streamArtifact = async (
   prompt: string, 
   settings: GeminiSettings,
   apiKey: string,
-  onChunk: (text: string) => void
+  onChunk: (text: string) => void,
+  onStatusUpdate?: (status: string) => void,
+  signal?: AbortSignal
 ): Promise<string> => {
     try {
         if (!apiKey) throw new Error("API Key is missing. Please provide a valid Gemini API Key.");
+
+        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
         const ai = new GoogleGenAI({ apiKey });
 
@@ -174,6 +205,14 @@ export const streamArtifact = async (
             };
         }
 
+        if (settings.thinkingBudget > 0) {
+            onStatusUpdate?.("Thinking (Deep Reasoning)...");
+        } else if (settings.useGrounding) {
+            onStatusUpdate?.("Accessing Knowledge Base...");
+        } else {
+            onStatusUpdate?.("Initializing AI...");
+        }
+
         const responseStream = await retryWithBackoff(() => ai.models.generateContentStream({
             model: settings.modelName,
             contents: prompt,
@@ -181,7 +220,18 @@ export const streamArtifact = async (
         })) as any;
 
         let fullText = "";
+        let isFirstChunk = true;
+
         for await (const chunk of responseStream) {
+            if (signal?.aborted) {
+               throw new DOMException("Aborted", "AbortError");
+            }
+
+            if (isFirstChunk) {
+                isFirstChunk = false;
+                onStatusUpdate?.("Streaming Response...");
+            }
+
             const textPart = chunk.text;
             if (textPart) {
                 fullText += textPart;

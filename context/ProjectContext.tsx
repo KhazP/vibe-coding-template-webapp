@@ -1,6 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect, useReducer, useRef, useCallback, useMemo } from 'react';
-import { Persona, ProjectState, GeminiSettings, GroundingChunk, ProjectFieldKey } from '../types';
+import { Persona, ProjectState, GeminiSettings, GroundingChunk, ProjectFieldKey, ToolSettings } from '../types';
 import { runDeepResearch, generateArtifact, streamArtifact, streamDeepResearch } from '../utils/gemini';
 import { getPRDSystemInstruction, getTechDesignSystemInstruction, getAgentSystemInstruction, getRefineSystemInstruction, generateRefinePrompt, getBuildPlanSystemInstruction } from '../utils/templates';
 import { useToast } from '../components/Toast';
@@ -21,7 +20,9 @@ interface ProjectContextType {
   setPrdOutput: (s: string) => void;
   setTechOutput: (s: string) => void;
   setBuildPlan: (s: string) => void;
+  setAgentOutputs: (outputs: Record<string, string>) => void;
   updateSettings: (settings: Partial<GeminiSettings>) => void;
+  updateToolSettings: (settings: Partial<ToolSettings>) => void;
   generateAgentOutputs: () => void;
   toggleTool: (toolId: string) => void;
   performGeminiResearch: (prompt: string) => Promise<void>;
@@ -40,6 +41,10 @@ interface ProjectContextType {
   saveProject: () => void;
   saveStatus: 'saved' | 'saving' | 'unsaved';
   
+  // Generation Status & Cancellation
+  generationPhase: string;
+  cancelGeneration: () => void;
+
   // API Key Management
   apiKey: string | null;
   setApiKey: (key: string) => void;
@@ -54,13 +59,14 @@ const defaultSettings: GeminiSettings = {
   useGrounding: true,
   temperature: DEFAULT_SETTINGS.TEMPERATURE,
   topK: DEFAULT_SETTINGS.TOP_K,
-  topP: DEFAULT_SETTINGS.TOP_P
+  topP: DEFAULT_SETTINGS.TOP_P,
+  preset: 'thorough'
 };
 
 const getGlobalSettings = (): GeminiSettings => {
     try {
         const stored = localStorage.getItem(STORAGE_KEYS.GLOBAL_SETTINGS);
-        if (stored) return JSON.parse(stored);
+        if (stored) return { ...defaultSettings, ...JSON.parse(stored) };
     } catch (e) {
         console.warn("Failed to load global settings", e);
     }
@@ -81,6 +87,7 @@ const createNewProjectState = (): ProjectState => ({
   agentOutputs: {},
   buildPlan: '',
   tools: ['cursor'],
+  toolSettings: { claudeAdapterMode: false, geminiAdapterMode: false, antigravityAdapterMode: false },
   isGenerating: false,
   settings: getGlobalSettings(),
   sectionTimestamps: {}
@@ -214,6 +221,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const { addToast } = useToast();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+  
+  // Generation Status & Cancellation State
+  const [generationPhase, setGenerationPhase] = useState<string>('');
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // API Key State
   const [apiKey, setApiKeyState] = useState<string | null>(() => localStorage.getItem(API_KEY_STORAGE));
@@ -241,6 +252,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const handleApiError = useCallback((error: any) => {
     const msg = error?.message || '';
+    
+    // Ignore abort errors
+    if (msg.includes('Aborted') || msg.includes('AbortError') || error.name === 'AbortError') {
+       return;
+    }
+
     // The "Rebound" Logic: If key is bad, wipe it and show modal
     if (msg.includes('400') || msg.includes('401') || msg.includes('403') || msg.includes('API key') || msg.includes('valid')) {
       clearApiKey();
@@ -263,6 +280,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             Object.values(parsed.projects).forEach((p: any) => {
               if (!p.sectionTimestamps) p.sectionTimestamps = {};
               if (!p.validationErrors) p.validationErrors = {};
+              if (!p.settings) p.settings = { ...defaultSettings };
+              if (!p.settings.preset) p.settings.preset = 'thorough'; // Migration for existing projects
+              if (!p.toolSettings) p.toolSettings = { claudeAdapterMode: false, geminiAdapterMode: false, antigravityAdapterMode: false }; // Migration
+              // Ensure Antigravity key exists if not present
+              if (p.toolSettings && !('antigravityAdapterMode' in p.toolSettings)) {
+                  p.toolSettings.antigravityAdapterMode = false;
+              }
             });
             return { projects: parsed.projects, currentId: parsed.currentId } as StorageData;
           }
@@ -274,7 +298,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           const parsedV1 = JSON.parse(savedV1);
           const newProject = {
             ...createNewProjectState(),
-            ...parsedV1,
+            ...(parsedV1 as Partial<ProjectState>),
             isGenerating: false,
             settings: { ...defaultSettings, ...(parsedV1.settings || {}) },
             sectionTimestamps: {}
@@ -318,6 +342,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const newPast = history.past.slice(0, -1);
     const current = state.projects[state.currentId];
     
+    if (!current) return;
+
     // Sanitize current before pushing to future
     const safeCurrent = { ...current, isGenerating: false };
 
@@ -335,6 +361,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const next = history.future[0];
     const newFuture = history.future.slice(1);
     const current = state.projects[state.currentId];
+
+    if (!current) return;
 
     const safeCurrent = { ...current, isGenerating: false };
 
@@ -415,7 +443,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       try {
         // Ensure we don't persist 'isGenerating: true'
         const projectsToSave = Object.entries(state.projects).reduce((acc, [id, proj]) => {
-          acc[id] = { ...proj, isGenerating: false };
+          acc[id] = { ...(proj as any), isGenerating: false };
           return acc;
         }, {} as Record<string, ProjectState>);
 
@@ -451,7 +479,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSaveStatus('saving');
     try {
         const projectsToSave = Object.entries(state.projects).reduce((acc, [id, proj]) => {
-          acc[id] = { ...proj, isGenerating: false };
+          acc[id] = { ...(proj as any), isGenerating: false };
           return acc;
         }, {} as Record<string, ProjectState>);
 
@@ -519,8 +547,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const clearValidationError = useCallback((key: ProjectFieldKey) => {
       const current = state.projects[state.currentId];
-      if (current?.validationErrors?.[key]) {
-          const newErrors = { ...current.validationErrors };
+      // Safely access validationErrors
+      const validationErrors = current?.validationErrors;
+      if (validationErrors?.[key]) {
+          const newErrors = { ...validationErrors };
           delete newErrors[key];
           updateCurrentProject({ validationErrors: newErrors }, { snapshot: false });
       }
@@ -537,26 +567,42 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const setResearchOutput = useCallback((researchOutput: string) => {
       const current = state.projects[state.currentId];
-      const sectionTimestamps = { ...(current?.sectionTimestamps || {}), research: Date.now() };
+      if (!current) return;
+      const currentTimestamps = current.sectionTimestamps || {};
+      const sectionTimestamps = { ...currentTimestamps, research: Date.now() };
       updateCurrentProject({ researchOutput, sectionTimestamps });
   }, [updateCurrentProject, state.projects, state.currentId]);
 
   const setPrdOutput = useCallback((prdOutput: string) => {
       const current = state.projects[state.currentId];
-      const sectionTimestamps = { ...(current?.sectionTimestamps || {}), prd: Date.now() };
+      if (!current) return;
+      const currentTimestamps = current.sectionTimestamps || {};
+      const sectionTimestamps = { ...currentTimestamps, prd: Date.now() };
       updateCurrentProject({ prdOutput, sectionTimestamps });
   }, [updateCurrentProject, state.projects, state.currentId]);
 
   const setTechOutput = useCallback((techOutput: string) => {
       const current = state.projects[state.currentId];
-      const sectionTimestamps = { ...(current?.sectionTimestamps || {}), tech: Date.now() };
+      if (!current) return;
+      const currentTimestamps = current.sectionTimestamps || {};
+      const sectionTimestamps = { ...currentTimestamps, tech: Date.now() };
       updateCurrentProject({ techOutput, sectionTimestamps });
   }, [updateCurrentProject, state.projects, state.currentId]);
 
   const setBuildPlan = useCallback((buildPlan: string) => {
       const current = state.projects[state.currentId];
-      const sectionTimestamps = { ...(current?.sectionTimestamps || {}), build: Date.now() };
+      if (!current) return;
+      const currentTimestamps = current.sectionTimestamps || {};
+      const sectionTimestamps = { ...currentTimestamps, build: Date.now() };
       updateCurrentProject({ buildPlan, sectionTimestamps });
+  }, [updateCurrentProject, state.projects, state.currentId]);
+
+  const setAgentOutputs = useCallback((agentOutputs: Record<string, string>) => {
+      const current = state.projects[state.currentId];
+      if (!current) return;
+      const currentTimestamps = current.sectionTimestamps || {};
+      const sectionTimestamps = { ...currentTimestamps, agent: Date.now() };
+      updateCurrentProject({ agentOutputs, sectionTimestamps });
   }, [updateCurrentProject, state.projects, state.currentId]);
 
   const updateSettingsWrapper = useCallback((newSettings: Partial<GeminiSettings>) => {
@@ -565,8 +611,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateCurrentProject({ settings: updated });
     
     localStorage.setItem(STORAGE_KEYS.GLOBAL_SETTINGS, JSON.stringify(updated));
-    addToast('Settings updated', 'info');
-  }, [state.projects, state.currentId, updateCurrentProject, addToast]);
+    // Toast handled in UI or silent
+  }, [state.projects, state.currentId, updateCurrentProject]);
+  
+  const updateToolSettings = useCallback((settings: Partial<ToolSettings>) => {
+    const current = state.projects[state.currentId];
+    if (!current) return;
+    const currentSettings = current.toolSettings || { claudeAdapterMode: false, geminiAdapterMode: false, antigravityAdapterMode: false };
+    updateCurrentProject({ toolSettings: { ...currentSettings, ...settings } });
+  }, [state.projects, state.currentId, updateCurrentProject]);
 
   const toggleTool = useCallback((toolId: string) => {
     const currentTools = state.projects[state.currentId]?.tools || [];
@@ -578,6 +631,17 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const generateAgentOutputs = useCallback(() => { /* Component handled */ }, []);
 
+  // --- Cancellation Logic ---
+  const cancelGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+    }
+    updateCurrentProject({ isGenerating: false });
+    setGenerationPhase('');
+    addToast('Generation cancelled', 'info');
+  }, [updateCurrentProject, addToast]);
+
   // --- Gemini Actions with Streaming ---
 
   const performGeminiResearch = useCallback(async (prompt: string) => {
@@ -588,34 +652,52 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return;
     }
 
+    // Reset abort controller
+    abortControllerRef.current = new AbortController();
+    
     updateCurrentProject({ isGenerating: true, researchOutput: '', researchSources: [] });
+    setGenerationPhase('Initializing AI...');
     let accumulatedText = '';
     
     try {
-      const { text, sources } = await streamDeepResearch(prompt, proj.settings, apiKey, (chunk) => {
-        accumulatedText += chunk;
-        dispatch({ 
-            type: 'UPDATE_PROJECT', 
-            payload: { researchOutput: accumulatedText } 
-        });
-      });
+      const { text, sources } = await streamDeepResearch(
+        prompt, 
+        proj.settings, 
+        apiKey, 
+        (chunk) => {
+            accumulatedText += chunk;
+            dispatch({ 
+                type: 'UPDATE_PROJECT', 
+                payload: { researchOutput: accumulatedText } 
+            });
+        },
+        (status) => setGenerationPhase(status),
+        abortControllerRef.current.signal
+      );
 
-      const sectionTimestamps = { ...proj.sectionTimestamps, research: Date.now() };
+      const currentTimestamps = proj.sectionTimestamps || {};
+      const sectionTimestamps = { ...currentTimestamps, research: Date.now() };
       updateCurrentProject({ 
           researchOutput: text, 
           researchSources: sources, 
-          isGenerating: false,
+          isGenerating: false, 
           sectionTimestamps
       });
+      setGenerationPhase('');
       addToast('Research completed', 'success');
 
     } catch (error: any) {
       handleApiError(error);
       const errorMessage = error?.message || "Unknown error";
-      updateCurrentProject({ 
-        researchOutput: accumulatedText + `\n\n[Generation Failed: ${errorMessage}]`, 
-        isGenerating: false 
-      });
+      
+      // Don't overwrite if aborted
+      if (!errorMessage.includes("Aborted")) {
+          updateCurrentProject({ 
+            researchOutput: accumulatedText + `\n\n[Generation Failed: ${errorMessage}]`, 
+            isGenerating: false 
+          });
+      }
+      setGenerationPhase('');
     }
   }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError]);
 
@@ -627,19 +709,36 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return;
     }
 
+    abortControllerRef.current = new AbortController();
     updateCurrentProject({ isGenerating: true, prdOutput: '' });
+    setGenerationPhase('Initializing AI...');
+
     let accumulatedText = '';
     try {
-        await streamArtifact(getPRDSystemInstruction(), prompt, proj.settings, apiKey, (chunk) => {
-            accumulatedText += chunk;
-            dispatch({ type: 'UPDATE_PROJECT', payload: { prdOutput: accumulatedText } });
-        });
-        const sectionTimestamps = { ...proj.sectionTimestamps, prd: Date.now() };
+        await streamArtifact(
+            getPRDSystemInstruction(), 
+            prompt, 
+            proj.settings, 
+            apiKey, 
+            (chunk) => {
+                accumulatedText += chunk;
+                dispatch({ type: 'UPDATE_PROJECT', payload: { prdOutput: accumulatedText } });
+            },
+            (status) => setGenerationPhase(status),
+            abortControllerRef.current.signal
+        );
+        
+        const currentTimestamps = proj.sectionTimestamps || {};
+        const sectionTimestamps = { ...currentTimestamps, prd: Date.now() };
         updateCurrentProject({ prdOutput: accumulatedText, isGenerating: false, sectionTimestamps });
+        setGenerationPhase('');
         addToast('PRD generated', 'success');
     } catch (error: any) {
         handleApiError(error);
-        updateCurrentProject({ isGenerating: false });
+        if (!error?.message?.includes('Aborted')) {
+            updateCurrentProject({ isGenerating: false });
+        }
+        setGenerationPhase('');
     }
   }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError]);
 
@@ -651,43 +750,36 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return;
     }
 
+    abortControllerRef.current = new AbortController();
     updateCurrentProject({ isGenerating: true, techOutput: '' });
+    setGenerationPhase('Initializing AI...');
+
     let accumulatedText = '';
     try {
-        await streamArtifact(getTechDesignSystemInstruction(), prompt, proj.settings, apiKey, (chunk) => {
-            accumulatedText += chunk;
-            dispatch({ type: 'UPDATE_PROJECT', payload: { techOutput: accumulatedText } });
-        });
-        const sectionTimestamps = { ...proj.sectionTimestamps, tech: Date.now() };
+        await streamArtifact(
+            getTechDesignSystemInstruction(), 
+            prompt, 
+            proj.settings, 
+            apiKey, 
+            (chunk) => {
+                accumulatedText += chunk;
+                dispatch({ type: 'UPDATE_PROJECT', payload: { techOutput: accumulatedText } });
+            },
+            (status) => setGenerationPhase(status),
+            abortControllerRef.current.signal
+        );
+        
+        const currentTimestamps = proj.sectionTimestamps || {};
+        const sectionTimestamps = { ...currentTimestamps, tech: Date.now() };
         updateCurrentProject({ techOutput: accumulatedText, isGenerating: false, sectionTimestamps });
+        setGenerationPhase('');
         addToast('Tech Design generated', 'success');
     } catch (error: any) {
         handleApiError(error);
-        updateCurrentProject({ isGenerating: false });
-    }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError]);
-
-  const performGeminiBuildPlan = useCallback(async (prompt: string) => {
-    const proj = state.projects[state.currentId];
-    if (!proj) return;
-    if (!apiKey) {
-      setIsApiKeyModalOpen(true);
-      return;
-    }
-
-    updateCurrentProject({ isGenerating: true, buildPlan: '' });
-    let accumulatedText = '';
-    try {
-        await streamArtifact(getBuildPlanSystemInstruction(), prompt, proj.settings, apiKey, (chunk) => {
-            accumulatedText += chunk;
-            dispatch({ type: 'UPDATE_PROJECT', payload: { buildPlan: accumulatedText } });
-        });
-        const sectionTimestamps = { ...proj.sectionTimestamps, build: Date.now() };
-        updateCurrentProject({ buildPlan: accumulatedText, isGenerating: false, sectionTimestamps });
-        addToast('Build Plan generated', 'success');
-    } catch (error: any) {
-        handleApiError(error);
-        updateCurrentProject({ isGenerating: false });
+        if (!error?.message?.includes('Aborted')) {
+            updateCurrentProject({ isGenerating: false });
+        }
+        setGenerationPhase('');
     }
   }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError]);
 
@@ -700,16 +792,62 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
 
       updateCurrentProject({ isGenerating: true });
+      setGenerationPhase('Generating Agent Config...');
       try {
+          // Agent generation is usually fast/single-shot, so using non-streaming is fine, 
+          // but we still want standard error handling.
           const text = await generateArtifact(getAgentSystemInstruction(), prompt, proj.settings, apiKey);
           updateCurrentProject({ isGenerating: false });
+          setGenerationPhase('');
           addToast('Agent config generated', 'success');
           return text;
       } catch (error: any) {
           handleApiError(error);
           updateCurrentProject({ isGenerating: false });
+          setGenerationPhase('');
           return "";
       }
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError]);
+
+  const performGeminiBuildPlan = useCallback(async (prompt: string) => {
+    const proj = state.projects[state.currentId];
+    if (!proj) return;
+    if (!apiKey) {
+      setIsApiKeyModalOpen(true);
+      return;
+    }
+
+    abortControllerRef.current = new AbortController();
+    updateCurrentProject({ isGenerating: true, buildPlan: '' });
+    setGenerationPhase('Initializing AI...');
+
+    let accumulatedText = '';
+    try {
+        await streamArtifact(
+            getBuildPlanSystemInstruction(), 
+            prompt, 
+            proj.settings, 
+            apiKey, 
+            (chunk) => {
+                accumulatedText += chunk;
+                dispatch({ type: 'UPDATE_PROJECT', payload: { buildPlan: accumulatedText } });
+            },
+            (status) => setGenerationPhase(status),
+            abortControllerRef.current.signal
+        );
+        
+        const currentTimestamps = proj.sectionTimestamps || {};
+        const sectionTimestamps = { ...currentTimestamps, build: Date.now() };
+        updateCurrentProject({ buildPlan: accumulatedText, isGenerating: false, sectionTimestamps });
+        setGenerationPhase('');
+        addToast('Build Plan generated', 'success');
+    } catch (error: any) {
+        handleApiError(error);
+        if (!error?.message?.includes('Aborted')) {
+            updateCurrentProject({ isGenerating: false });
+        }
+        setGenerationPhase('');
+    }
   }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError]);
 
   const performRefinement = useCallback(async (type: 'research' | 'prd' | 'tech' | 'build', instruction: string) => {
@@ -723,6 +861,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return;
     }
 
+    abortControllerRef.current = new AbortController();
+    setGenerationPhase('Refining Content...');
+
     let currentContent = '';
     if (type === 'research') currentContent = currentProj.researchOutput;
     if (type === 'prd') currentContent = currentProj.prdOutput;
@@ -733,17 +874,27 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let accumulatedText = '';
 
     try {
-      await streamArtifact(getRefineSystemInstruction(), prompt, currentProj.settings, apiKey, (chunk) => {
-          accumulatedText += chunk;
-          const update: any = {};
-          if (type === 'research') update.researchOutput = accumulatedText;
-          if (type === 'prd') update.prdOutput = accumulatedText;
-          if (type === 'tech') update.techOutput = accumulatedText;
-          if (type === 'build') update.buildPlan = accumulatedText;
-          dispatch({ type: 'UPDATE_PROJECT', payload: update });
-      });
+      await streamArtifact(
+          getRefineSystemInstruction(), 
+          prompt, 
+          currentProj.settings, 
+          apiKey, 
+          (chunk) => {
+              accumulatedText += chunk;
+              const update: any = {};
+              if (type === 'research') update.researchOutput = accumulatedText;
+              if (type === 'prd') update.prdOutput = accumulatedText;
+              if (type === 'tech') update.techOutput = accumulatedText;
+              if (type === 'build') update.buildPlan = accumulatedText;
+              dispatch({ type: 'UPDATE_PROJECT', payload: update });
+          },
+          (status) => setGenerationPhase(status),
+          abortControllerRef.current.signal
+      );
       
-      const finalUpdate: any = { isGenerating: false, sectionTimestamps: { ...currentProj.sectionTimestamps } };
+      const currentTimestamps = currentProj.sectionTimestamps || {};
+      const finalUpdate: any = { isGenerating: false, sectionTimestamps: { ...currentTimestamps } };
+      
       if (type === 'research') {
         finalUpdate.researchOutput = accumulatedText;
         finalUpdate.sectionTimestamps.research = Date.now();
@@ -762,11 +913,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       
       updateCurrentProject(finalUpdate);
+      setGenerationPhase('');
       addToast('Content refined', 'success');
 
     } catch (error: any) {
       handleApiError(error);
-      updateCurrentProject({ isGenerating: false });
+      if (!error?.message?.includes('Aborted')) {
+          updateCurrentProject({ isGenerating: false });
+      }
+      setGenerationPhase('');
     }
   }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError]);
 
@@ -807,7 +962,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setPrdOutput,
     setTechOutput,
     setBuildPlan,
+    setAgentOutputs,
     updateSettings: updateSettingsWrapper,
+    updateToolSettings,
     generateAgentOutputs,
     toggleTool,
     performGeminiResearch,
@@ -829,7 +986,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setApiKey,
     clearApiKey,
     isApiKeyModalOpen,
-    setIsApiKeyModalOpen
+    setIsApiKeyModalOpen,
+    generationPhase,
+    cancelGeneration
   }), [
     activeProjectState, 
     sortedProjects, 
@@ -845,7 +1004,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setPrdOutput,
     setTechOutput,
     setBuildPlan,
+    setAgentOutputs,
     updateSettingsWrapper,
+    updateToolSettings,
     generateAgentOutputs,
     toggleTool,
     performGeminiResearch,
@@ -865,7 +1026,9 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     apiKey,
     setApiKey,
     clearApiKey,
-    isApiKeyModalOpen
+    isApiKeyModalOpen,
+    generationPhase,
+    cancelGeneration
   ]);
 
   return (

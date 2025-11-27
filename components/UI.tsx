@@ -1,6 +1,5 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { Clipboard, Check, X, Info, ChevronDown, Sparkles, Send, Loader2, AlertTriangle, AlertCircle, Download, Printer, Edit2, Save, FileText, FileJson, Clock, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Clipboard, Check, X, Info, ChevronDown, Sparkles, Send, Loader2, AlertTriangle, AlertCircle, Download, Printer, Edit2, Save, FileText, FileJson, Clock, ArrowLeft, ArrowRight, CheckCircle, StopCircle } from 'lucide-react';
 import { motion, AnimatePresence, HTMLMotionProps } from 'framer-motion';
 import { Link } from 'react-router-dom';
 
@@ -23,7 +22,7 @@ export const Skeleton: React.FC<{ className?: string }> = ({ className = "" }) =
   <div className={`animate-pulse bg-white/5 rounded ${className}`} />
 );
 
-export const GenerationLoader: React.FC<{ label?: string }> = ({ label = "AI is thinking..." }) => (
+export const GenerationLoader: React.FC<{ label?: string; onCancel?: () => void }> = ({ label = "AI is thinking...", onCancel }) => (
   <div className="h-full min-h-[400px] flex flex-col items-center justify-center p-8 bg-surface/30 border border-white/5 rounded-2xl relative overflow-hidden backdrop-blur-sm">
      <div className="absolute inset-0 bg-gradient-to-b from-primary-500/5 to-transparent animate-pulse"></div>
      
@@ -35,7 +34,9 @@ export const GenerationLoader: React.FC<{ label?: string }> = ({ label = "AI is 
         <Sparkles className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary-400" size={24} />
      </div>
 
-     <h3 className="text-lg font-display font-bold text-white mb-2 tracking-wide">{label}</h3>
+     <h3 className="text-lg font-display font-bold text-white mb-2 tracking-wide animate-pulse text-center">{label}</h3>
+     
+     {/* Progress Dots */}
      <div className="flex gap-1.5 mb-8">
         <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
         <div className="w-2 h-2 bg-primary-500 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
@@ -48,13 +49,22 @@ export const GenerationLoader: React.FC<{ label?: string }> = ({ label = "AI is 
         <Skeleton className="h-3 w-[95%]" />
         <Skeleton className="h-3 w-[80%]" />
      </div>
+
+     {onCancel && (
+        <button 
+          onClick={onCancel}
+          className="mt-8 flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-medium rounded-lg border border-red-500/20 transition-colors z-10"
+        >
+           <StopCircle size={14} /> Cancel Generation
+        </button>
+     )}
   </div>
 );
 
 // --- Components ---
 
 export const Breadcrumbs: React.FC<{ items: { label: string; path?: string }[] }> = ({ items }) => (
-  <nav className="flex items-center text-xs font-mono text-slate-500 mb-6 uppercase tracking-wider">
+  <nav className="flex items-center text-xs font-mono text-slate-500 mb-6 uppercase tracking-wider overflow-x-auto whitespace-nowrap pb-1">
     {items.map((item, index) => (
       <React.Fragment key={index}>
         {index > 0 && <span className="mx-2 text-slate-700">/</span>}
@@ -75,24 +85,24 @@ export const StepNavigation: React.FC<{
   next?: { label: string; path: string; disabled?: boolean };
   onPrefetchNext?: () => void;
 }> = ({ prev, next, onPrefetchNext }) => (
-  <div className="flex justify-between items-center mt-12 pt-6 border-t border-white/5">
+  <div className="flex justify-between items-center mt-12 pt-6 border-t border-white/5 flex-wrap gap-4">
     {prev ? (
-      <Link to={prev.path}>
-        <Button variant="secondary" className="group pl-3">
+      <Link to={prev.path} className="flex-1 md:flex-none">
+        <Button variant="secondary" className="group pl-3 w-full md:w-auto">
           <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
           <span className="ml-2">{prev.label}</span>
         </Button>
       </Link>
-    ) : <div></div>}
+    ) : <div className="flex-1 md:flex-none"></div>}
     
     {next && (
       <Link 
         to={next.path} 
-        className={next.disabled ? 'pointer-events-none' : ''}
+        className={`flex-1 md:flex-none ${next.disabled ? 'pointer-events-none' : ''}`}
         onMouseEnter={onPrefetchNext}
         onFocus={onPrefetchNext}
       >
-         <Button variant="primary" className="group pr-3" disabled={next.disabled}>
+         <Button variant="primary" className="group pr-3 w-full md:w-auto" disabled={next.disabled}>
            <span className="mr-2">{next.label}</span>
            <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
          </Button>
@@ -100,62 +110,6 @@ export const StepNavigation: React.FC<{
     )}
   </div>
 );
-
-export const PipelineProgress: React.FC<{ 
-  steps: { label: string; path: string; isComplete: boolean; isActive: boolean }[] 
-}> = ({ steps }) => {
-  const completedCount = steps.filter(s => s.isComplete).length;
-  const progress = Math.round((completedCount / steps.length) * 100);
-
-  return (
-    <div className="w-full mb-8 px-2">
-      <div className="flex justify-between text-xs font-mono text-slate-500 mb-2 uppercase tracking-widest">
-        <span>Pipeline Progress</span>
-        <span>{progress}%</span>
-      </div>
-      <div className="w-full bg-slate-800 h-1 mb-6 rounded-full overflow-hidden">
-        <motion.div 
-            initial={{ width: 0 }} 
-            animate={{ width: `${progress}%` }} 
-            transition={{ duration: 1, ease: "easeOut" }}
-            className="h-full bg-primary-500"
-        />
-      </div>
-      <div className="flex items-center justify-between relative max-w-4xl mx-auto">
-        {/* Background Line */}
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-0.5 bg-slate-800 -z-10 rounded-full" />
-        
-        {steps.map((step, index) => (
-          <Link to={step.path} key={index} className="group relative focus:outline-none">
-             <div className={`
-               flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-500 ease-out z-10 relative
-               ${step.isActive 
-                  ? 'bg-primary-950 border-primary-500 text-primary-400 shadow-[0_0_20px_rgba(16,185,129,0.4)] scale-110' 
-                  : step.isComplete 
-                    ? 'bg-primary-900/20 border-primary-500/50 text-primary-500' 
-                    : 'bg-slate-950 border-slate-800 text-slate-600 group-hover:border-slate-600'
-               }
-             `}>
-               {step.isComplete && !step.isActive ? (
-                  <Check size={18} strokeWidth={3} />
-               ) : (
-                  <span className="text-sm font-mono font-bold">{index + 1}</span>
-               )}
-             </div>
-             
-             {/* Label */}
-             <div className={`
-               absolute top-12 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-bold uppercase tracking-widest transition-all duration-300
-               ${step.isActive ? 'text-primary-400 translate-y-0' : step.isComplete ? 'text-slate-400' : 'text-slate-700'}
-             `}>
-               {step.label}
-             </div>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-};
 
 export const Tooltip: React.FC<{ content: string; children: React.ReactNode; position?: 'top' | 'bottom' | 'left' | 'right'; className?: string }> = ({ content, children, position = 'top', className = '' }) => {
   const [isVisible, setIsVisible] = useState(false);
@@ -216,7 +170,7 @@ export const Tooltip: React.FC<{ content: string; children: React.ReactNode; pos
             animate={anim.animate}
             exit={anim.initial}
             transition={{ duration: 0.15 }}
-            className="absolute z-[100] px-3 py-2 text-xs font-medium text-slate-200 bg-slate-900/95 backdrop-blur border border-white/10 rounded-lg shadow-xl w-max max-w-[250px] whitespace-normal pointer-events-none"
+            className="absolute z-[100] px-3 py-2 text-xs font-medium text-slate-200 bg-slate-900/95 backdrop-blur border border-white/10 rounded-lg shadow-xl w-max max-w-[200px] md:max-w-[250px] whitespace-normal pointer-events-none hidden md:block"
             style={getPositionStyles()}
           >
             {content}
@@ -250,8 +204,8 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; children: R
             className="bg-[#09090b] border border-white/10 w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl shadow-2xl pointer-events-auto custom-scrollbar"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between p-6 border-b border-white/5 sticky top-0 bg-[#09090b]/80 backdrop-blur-md z-10">
-              <h3 className="text-xl font-bold text-white font-display">{title}</h3>
+            <div className="flex items-center justify-between p-6 border-b border-white/5 sticky top-0 bg-[#09090b]/95 backdrop-blur-md z-10">
+              <h3 className="text-lg md:text-xl font-bold text-white font-display">{title}</h3>
               <button 
                 onClick={onClose}
                 className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
@@ -259,7 +213,7 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; children: R
                 <X size={20} />
               </button>
             </div>
-            <div className="p-6 md:p-8">
+            <div className="p-5 md:p-8">
               {children}
             </div>
           </motion.div>
@@ -277,7 +231,7 @@ export const GlassCard: React.FC<{ children: React.ReactNode; className?: string
   <motion.div 
     whileHover={hoverEffect ? { y: -4, boxShadow: "0 20px 40px -10px rgba(16, 185, 129, 0.1)" } : {}}
     initial={{ border: '1px solid rgba(255,255,255,0.05)' }}
-    className={`bg-glass-100 backdrop-blur-xl border border-glass-border rounded-2xl p-6 relative overflow-hidden ${className}`}
+    className={`bg-glass-100 backdrop-blur-xl border border-glass-border rounded-2xl p-5 md:p-6 relative overflow-hidden ${className}`}
   >
     {/* Subtle gradient sheen */}
     <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-50 pointer-events-none" />
@@ -298,7 +252,7 @@ export const Button: React.FC<ButtonProps> = ({
   tooltip,
   ...props 
 }) => {
-  const baseStyles = "px-6 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-2 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed";
+  const baseStyles = "px-6 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-2 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base";
   
   const variants = {
     primary: "bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] border border-white/10",
@@ -340,12 +294,13 @@ export const FieldWrapper: React.FC<{
   rightLabel?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
-}> = ({ label, tooltip, error, rightLabel, children, className = '' }) => (
+  required?: boolean;
+}> = ({ label, tooltip, error, rightLabel, children, className = '', required }) => (
   <div className={`mb-5 group ${className}`}>
-    <div className="flex items-center justify-between mb-2">
+    <div className="flex flex-wrap items-center justify-between mb-2 gap-2">
       <div className="flex items-center gap-2">
         <label className={`block text-xs font-mono font-medium uppercase tracking-widest transition-colors ${error ? 'text-red-400' : 'text-slate-500 group-focus-within:text-primary-400'}`}>
-          {label}
+          {label} {required && <span className="text-red-400 ml-0.5">*</span>}
         </label>
         {tooltip && (
           <Tooltip content={tooltip}>
@@ -378,9 +333,9 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input: React.FC<InputProps> = ({ label, tooltip, error, rightLabel, className = '', ...props }) => (
-  <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={rightLabel}>
+  <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={rightLabel} required={props.required}>
     <input 
-      className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 ${
+      className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-base md:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 ${
         error 
           ? 'border-red-500/50 focus:border-red-500 focus:shadow-[0_0_15px_rgba(239,68,68,0.1)]' 
           : 'border-white/10 focus:border-primary-500/50 focus:shadow-[0_0_15px_rgba(16,185,129,0.1)]'
@@ -436,9 +391,9 @@ export const TextArea: React.FC<TextAreaProps> = ({
   ) : undefined;
 
   return (
-    <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={displayLabel}>
+    <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={displayLabel} required={props.required}>
       <textarea 
-        className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 min-h-[120px] resize-y ${
+        className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-base md:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 min-h-[120px] resize-y ${
           error || isOverLimit
             ? 'border-red-500/50 focus:border-red-500 focus:shadow-[0_0_15px_rgba(239,68,68,0.1)]' 
             : 'border-white/10 focus:border-primary-500/50 focus:shadow-[0_0_15px_rgba(16,185,129,0.1)]'
@@ -460,9 +415,9 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 }
 
 export const Select: React.FC<SelectProps> = ({ label, tooltip, error, rightLabel, children, className = '', ...props }) => (
-  <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={rightLabel}>
+  <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={rightLabel} required={props.required}>
     <select 
-      className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 appearance-none ${
+      className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-base md:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 appearance-none ${
          error 
           ? 'border-red-500/50 focus:border-red-500 focus:shadow-[0_0_15px_rgba(239,68,68,0.1)]' 
           : 'border-white/10 focus:border-primary-500/50 focus:shadow-[0_0_15px_rgba(16,185,129,0.1)]'
@@ -586,7 +541,7 @@ export const CopyBlock: React.FC<{
          <div className="flex items-center gap-3">
             {label && <div className="text-xs font-mono text-primary-400 uppercase tracking-widest">{label}</div>}
             {timestamp && (
-                <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                <div className="hidden md:flex items-center gap-1 text-[10px] text-slate-500">
                     <Clock size={10} />
                     <span>{new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
@@ -653,7 +608,7 @@ export const CopyBlock: React.FC<{
       ) : (
         <div 
             ref={scrollRef}
-            className="bg-[#050505] border border-white/10 rounded-xl p-6 font-mono text-sm text-slate-300 whitespace-pre-wrap max-h-[500px] overflow-y-auto shadow-inner custom-scrollbar relative"
+            className="bg-[#050505] border border-white/10 rounded-xl p-4 md:p-6 font-mono text-sm text-slate-300 whitespace-pre-wrap max-h-[500px] overflow-y-auto shadow-inner custom-scrollbar relative"
         >
             <div className="absolute top-0 right-0 p-4 bg-gradient-to-l from-[#050505] to-transparent w-20 h-full pointer-events-none" />
             {content || <span className="text-slate-700 italic">Generate content to view code...</span>}
@@ -668,7 +623,7 @@ export const CopyBlock: React.FC<{
 
 export const RefinementControl: React.FC<{ 
   onRefine: (text: string) => void; 
-  isRefining: boolean;
+  isRefining: boolean; 
   placeholder?: string;
 }> = ({ onRefine, isRefining, placeholder = "Suggest changes (e.g., 'Make it more detailed', 'Focus on mobile')" }) => {
   const [text, setText] = useState('');
@@ -724,8 +679,50 @@ export const RefinementControl: React.FC<{
   );
 };
 
+export const ManualEntryControl: React.FC<{
+  onUpdate: (text: string) => void;
+  placeholder?: string;
+}> = ({ onUpdate, placeholder = "Paste content here to overwrite..." }) => {
+  const [text, setText] = useState('');
+
+  const handleSubmit = () => {
+    if (text.trim()) {
+      onUpdate(text);
+      setText('');
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mt-6 bg-surface/50 backdrop-blur-md border border-white/10 rounded-2xl p-4 shadow-lg"
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <Edit2 size={16} className="text-blue-400" />
+        <h4 className="text-sm font-semibold text-slate-200">Update Content Manually</h4>
+      </div>
+      <div className="flex flex-col gap-2">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder={placeholder}
+          className="w-full h-24 bg-[#050505]/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all resize-none custom-scrollbar"
+        />
+        <Button
+          onClick={handleSubmit}
+          disabled={!text.trim()}
+          className="self-end h-auto py-2 px-4 bg-blue-600 hover:bg-blue-500 border-0"
+        >
+          <CheckCircle size={16} className="mr-2" /> Save Update
+        </Button>
+      </div>
+    </motion.div>
+  );
+};
+
 export const PersonaError: React.FC = () => (
-  <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6 animate-fade-in">
+  <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6 animate-fade-in px-4">
     <div className="p-6 bg-slate-900/50 rounded-full border border-slate-800">
       <AlertTriangle size={48} className="text-amber-500" />
     </div>

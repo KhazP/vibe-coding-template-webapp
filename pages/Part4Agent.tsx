@@ -1,5 +1,8 @@
 
-import React, { useState } from 'react';
+
+
+
+import React, { useState, useEffect } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { Button, CopyBlock, GenerationLoader, Tooltip, PersonaError, StepNavigation } from '../components/UI';
 import { generateAgentsMdPrompt, generateToolConfig } from '../utils/templates';
@@ -12,16 +15,20 @@ import JSZip from 'jszip';
 import { motion } from 'framer-motion';
 
 const Part4Agent: React.FC = React.memo(() => {
-  const { state, toggleTool, performGeminiAgent } = useProject();
-  const { answers, prdOutput, techOutput, researchOutput, tools, isGenerating, persona } = state;
+  const { state, toggleTool, performGeminiAgent, setAgentOutputs, updateToolSettings } = useProject();
+  const { answers, prdOutput, techOutput, researchOutput, tools, isGenerating, persona, agentOutputs, toolSettings } = state;
   
   const [generated, setGenerated] = useState(false);
   const [activeTab, setActiveTab] = useState<string>(FILE_NAMES.AGENTS_MD);
   const [outputs, setOutputs] = useState<Record<string, string>>({});
-  
-  // State for Adapter Modes (true = Adapter/AGENTS.md, false = Config/Specific)
-  const [claudeAdapterMode, setClaudeAdapterMode] = useState(false);
-  const [geminiAdapterMode, setGeminiAdapterMode] = useState(false);
+
+  // Initialize state from context if available
+  useEffect(() => {
+      if (agentOutputs && Object.keys(agentOutputs).length > 0) {
+          setOutputs(agentOutputs);
+          setGenerated(true);
+      }
+  }, [agentOutputs]);
 
   // Guard Clause: Ensure Persona is Selected
   if (!persona) return <PersonaError />;
@@ -43,12 +50,17 @@ const Part4Agent: React.FC = React.memo(() => {
                 answers['project_description'] || 'App', 
                 persona || Persona.VibeCoder, 
                 answers,
-                { claudeAdapterMode, geminiAdapterMode } // Pass tool-specific options
+                { 
+                  claudeAdapterMode: toolSettings.claudeAdapterMode, 
+                  geminiAdapterMode: toolSettings.geminiAdapterMode,
+                  antigravityAdapterMode: toolSettings.antigravityAdapterMode
+                } // Pass persisted tool-specific options
             );
           }
         });
 
         setOutputs(newOutputs);
+        setAgentOutputs(newOutputs);
         setGenerated(true);
         setActiveTab(FILE_NAMES.AGENTS_MD);
     }
@@ -113,13 +125,28 @@ const Part4Agent: React.FC = React.memo(() => {
   const renderToggle = (toolId: string) => {
       const isClaude = toolId === TOOL_IDS.CLAUDE;
       const isGemini = toolId === TOOL_IDS.GEMINI_CLI;
+      const isAntigravity = toolId === TOOL_IDS.ANTIGRAVITY;
       
-      if (!isClaude && !isGemini) return null;
+      if (!isClaude && !isGemini && !isAntigravity) return null;
 
-      const checked = isClaude ? claudeAdapterMode : geminiAdapterMode;
-      const setChecked = isClaude ? setClaudeAdapterMode : setGeminiAdapterMode;
-      const labelActive = FILE_NAMES.AGENTS_MD;
-      const labelInactive = isClaude ? FILE_NAMES.CLAUDE_MD : FILE_NAMES.GEMINI_MD;
+      // Logic:
+      // If unchecked (false) -> Native/Optimized (GEMINI.md / CLAUDE.md)
+      // If checked (true) -> Adapter (AGENTS.md)
+      
+      const checked = isClaude 
+        ? toolSettings.claudeAdapterMode 
+        : isGemini 
+            ? toolSettings.geminiAdapterMode 
+            : toolSettings.antigravityAdapterMode;
+      
+      const handleChange = (val: boolean) => {
+          if (isClaude) updateToolSettings({ claudeAdapterMode: val });
+          else if (isGemini) updateToolSettings({ geminiAdapterMode: val });
+          else updateToolSettings({ antigravityAdapterMode: val });
+      };
+
+      const labelActive = FILE_NAMES.AGENTS_MD; // Adapter
+      const labelInactive = isClaude ? FILE_NAMES.CLAUDE_MD : FILE_NAMES.GEMINI_MD; // Optimized
 
       return (
         <div 
@@ -133,7 +160,7 @@ const Part4Agent: React.FC = React.memo(() => {
                     <input 
                         type="checkbox" 
                         checked={checked} 
-                        onChange={(e) => setChecked(e.target.checked)}
+                        onChange={(e) => handleChange(e.target.checked)}
                         className="sr-only peer" 
                     />
                     <div className="w-8 h-4 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-primary-600"></div>
@@ -330,8 +357,8 @@ const Part4Agent: React.FC = React.memo(() => {
       
       <StepNavigation 
          prev={{ label: 'Tech Design', path: '/tech' }}
-         next={{ label: 'Build Phase', path: '/build', disabled: !generated }}
-         onPrefetchNext={() => import('./Part5Build')}
+         next={{ label: 'Export & Deploy', path: '/export', disabled: !generated }}
+         onPrefetchNext={() => import('./Part5Export')}
       />
     </div>
   );

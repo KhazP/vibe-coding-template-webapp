@@ -1,18 +1,29 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useProject } from '../context/ProjectContext';
-import { Button, PersonaError, Skeleton, StepNavigation } from '../components/UI';
+import { Button, PersonaError, Skeleton, StepNavigation, CopyBlock, TextArea, GlassCard, Tooltip } from '../components/UI';
 import { ProjectInput, ProjectTextArea, ProjectSelect } from '../components/FormFields';
 import { ArtifactSection } from '../components/ArtifactSection';
 import { generateResearchPrompt } from '../utils/templates';
 import { Persona } from '../types';
-import { Sparkles, Globe, Loader2 } from 'lucide-react';
+import { Sparkles, Globe, Loader2, Zap, ExternalLink, ArrowDown, CheckCircle2, ArrowRight, Info } from 'lucide-react';
 import { ModelStatus } from '../components/ModelStatus';
 import { useToast } from '../components/Toast';
 
 const Part1Research: React.FC = React.memo(() => {
-  const { state, performGeminiResearch, setValidationErrors } = useProject();
+  const { state, performGeminiResearch, setValidationErrors, setResearchOutput, generationPhase } = useProject();
   const { persona, answers, researchOutput, researchSources, isGenerating } = state;
   const { addToast } = useToast();
+  
+  const [researchMethod, setResearchMethod] = useState<'in-app' | 'external'>('in-app');
+  const [externalPrompt, setExternalPrompt] = useState<string>('');
+  const [externalPasteBuffer, setExternalPasteBuffer] = useState<string>('');
+
+  // Sync buffer if researchOutput changes externally (e.g. undo/redo)
+  useEffect(() => {
+      if (researchOutput && !externalPasteBuffer) {
+          setExternalPasteBuffer(researchOutput);
+      }
+  }, [researchOutput]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -45,6 +56,23 @@ const Part1Research: React.FC = React.memo(() => {
     }
   };
 
+  const handleGeneratePrompt = () => {
+    if (validate() && persona) {
+        const prompt = generateResearchPrompt(persona, answers);
+        setExternalPrompt(prompt);
+        addToast('Research prompt generated!', 'success');
+    } else {
+        addToast('Please fix validation errors before generating prompt.', 'error');
+    }
+  };
+
+  const handleSaveExternalResearch = () => {
+      if (externalPasteBuffer.trim()) {
+          setResearchOutput(externalPasteBuffer);
+          addToast('Research results saved!', 'success');
+      }
+  };
+
   if (!persona) return <PersonaError />;
 
   return (
@@ -56,9 +84,36 @@ const Part1Research: React.FC = React.memo(() => {
 
       <ModelStatus />
 
-      <div className="grid md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-6">
           
+          {/* Research Method Toggle - Moved to Top */}
+          <div className="flex items-center gap-3">
+             <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 w-full md:w-fit">
+                <button 
+                onClick={() => setResearchMethod('in-app')} 
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all duration-300 ${
+                    researchMethod === 'in-app' ? 'bg-primary-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                }`}
+                >
+                    <Zap size={14} /> In-App (Gemini)
+                </button>
+                <button 
+                onClick={() => setResearchMethod('external')} 
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all duration-300 ${
+                    researchMethod === 'external' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                }`}
+                >
+                    <ExternalLink size={14} /> External AI
+                </button>
+             </div>
+             <Tooltip content="In-App uses Gemini to research immediately. External AI generates a prompt you can paste into ChatGPT, Claude, or Perplexity." position="right">
+                 <div className="p-2 text-slate-500 hover:text-slate-300 transition-colors cursor-help">
+                    <Info size={16} />
+                 </div>
+             </Tooltip>
+          </div>
+
           {persona === Persona.VibeCoder && (
             <>
               <ProjectTextArea 
@@ -295,69 +350,129 @@ const Part1Research: React.FC = React.memo(() => {
             </>
           )}
 
-          <Button 
-            onClick={handleRunResearch} 
-            disabled={isGenerating}
-            className="w-full bg-gradient-to-r from-blue-600 to-primary-600 hover:from-blue-500 hover:to-primary-500 border-0"
-            tooltip="Run Gemini with Google Search to validate your ideas."
-          >
-            {isGenerating ? (
-              <><Loader2 className="animate-spin" size={18} /> Researching...</>
-            ) : (
-              <><Sparkles size={18} /> Run Research with Gemini</>
-            )}
-          </Button>
+          {/* Action Area */}
+          <div className="pt-4 border-t border-white/5">
+             {researchMethod === 'in-app' ? (
+                <Button 
+                    onClick={handleRunResearch} 
+                    disabled={isGenerating}
+                    className="w-full bg-gradient-to-r from-blue-600 to-primary-600 hover:from-blue-500 hover:to-primary-500 border-0"
+                    tooltip="Run Gemini with Google Search to validate your ideas."
+                >
+                    {isGenerating ? (
+                    <><Loader2 className="animate-spin" size={18} /> {generationPhase || 'Researching...'}</>
+                    ) : (
+                    <><Sparkles size={18} /> Run Research with Gemini</>
+                    )}
+                </Button>
+             ) : (
+                <div className="space-y-4 animate-fade-in">
+                    <Button 
+                        onClick={handleGeneratePrompt} 
+                        variant="secondary"
+                        className="w-full border-blue-500/20 hover:border-blue-500/50"
+                    >
+                        <Sparkles size={18} className="text-blue-400" /> Generate Prompt for External AI
+                    </Button>
+                    
+                    {externalPrompt && (
+                        <div className="space-y-4">
+                            <CopyBlock content={externalPrompt} label="Prompt to Copy" fileName="research-prompt" />
+                            
+                            {/* Visual Indicator for Right Panel */}
+                            <div className="hidden md:flex items-center justify-between p-3 rounded-lg border border-dashed border-blue-500/30 bg-blue-500/5 text-blue-300 text-xs font-mono animate-pulse">
+                                <span className="flex items-center gap-2"><ArrowRight size={14} /> COPY PROMPT ABOVE</span>
+                                <span className="flex items-center gap-2">PASTE RESULT IN RIGHT PANEL <ArrowRight size={14} /></span>
+                            </div>
+                            
+                            <div className="md:hidden flex flex-col items-center justify-center py-2 text-slate-500">
+                                <ArrowDown size={16} className="animate-bounce" />
+                                <span className="text-[10px] uppercase tracking-widest mt-1">Paste Result Below</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+             )}
+          </div>
         </div>
 
         <div className="space-y-4">
-           <ArtifactSection
-             section="research"
-             loaderLabel="Conducting Deep Research & Market Analysis..."
-             placeholder={
-               <div className="max-w-xs">
-                 <Sparkles className="mx-auto mb-3 opacity-50" size={32} />
-                 <p>Fill in the details and click "Run Research" to let Gemini browse the web and analyze your idea.</p>
-               </div>
-             }
-           >
-              {/* Sources Display Logic */}
-              {isGenerating && (!researchSources || researchSources.length === 0) && (
-                 <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 mt-4 animate-pulse">
-                    <div className="flex items-center gap-2 mb-3">
-                        <Skeleton className="h-4 w-4 rounded-full" />
-                        <Skeleton className="h-4 w-24" />
-                    </div>
-                    <div className="space-y-2 pl-6">
-                        <Skeleton className="h-3 w-3/4" />
-                        <Skeleton className="h-3 w-1/2" />
-                        <Skeleton className="h-3 w-2/3" />
-                    </div>
+           {/* If External Method AND No Output yet, show Paste Card instead of ArtifactSection Placeholder */}
+           {researchMethod === 'external' && !researchOutput ? (
+             <GlassCard className="h-full flex flex-col justify-center min-h-[400px] border-dashed border-blue-500/20 bg-blue-900/5">
+                 <div className="text-center mb-6">
+                    <Sparkles className="mx-auto mb-3 text-blue-400" size={32} />
+                    <h3 className="text-lg font-bold text-slate-200">External Research Results</h3>
+                    <p className="text-sm text-slate-400 max-w-xs mx-auto">Paste the output from ChatGPT, Perplexity, or Gemini Advanced here to populate the workspace.</p>
                  </div>
-               )}
-
-               {researchSources && researchSources.length > 0 && (
-                 <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 mt-4">
-                   <h4 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
-                     <Globe size={14} className="text-blue-400" /> Sources
-                   </h4>
-                   <div className="space-y-2">
-                     {researchSources.map((source, idx) => (
-                       source.web?.uri && (
-                         <a 
-                           key={idx} 
-                           href={source.web.uri} 
-                           target="_blank" 
-                           rel="noopener noreferrer"
-                           className="block text-xs text-blue-400 hover:underline truncate"
-                         >
-                           {idx + 1}. {source.web.title || source.web.uri}
-                         </a>
-                       )
-                     ))}
+                 <TextArea
+                    label="Paste Results"
+                    placeholder="Paste your research findings here..."
+                    value={externalPasteBuffer}
+                    onChange={(e) => setExternalPasteBuffer(e.target.value)}
+                    className="flex-1 min-h-[200px] mb-4 bg-slate-900/50 border-blue-500/20 focus:border-blue-500/50"
+                 />
+                 <Button
+                    onClick={handleSaveExternalResearch}
+                    disabled={!externalPasteBuffer.trim()}
+                    className="w-full bg-blue-600 hover:bg-blue-500"
+                 >
+                    <CheckCircle2 size={16} /> Save Research
+                 </Button>
+             </GlassCard>
+           ) : (
+               <ArtifactSection
+                 section="research"
+                 loaderLabel="Conducting Deep Research & Market Analysis..."
+                 mode={researchMethod === 'external' ? 'manual' : 'ai'}
+                 placeholder={
+                   <div className="max-w-xs">
+                     <Sparkles className="mx-auto mb-3 opacity-50" size={32} />
+                     <p>
+                        Fill in the details and click "Run Research" to let Gemini browse the web and analyze your idea.
+                     </p>
                    </div>
-                 </div>
-               )}
-           </ArtifactSection>
+                 }
+               >
+                  {/* Sources Display Logic */}
+                  {isGenerating && (!researchSources || researchSources.length === 0) && (
+                     <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 mt-4 animate-pulse">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Skeleton className="h-4 w-4 rounded-full" />
+                            <Skeleton className="h-4 w-24" />
+                        </div>
+                        <div className="space-y-2 pl-6">
+                            <Skeleton className="h-3 w-3/4" />
+                            <Skeleton className="h-3 w-1/2" />
+                            <Skeleton className="h-3 w-2/3" />
+                        </div>
+                     </div>
+                   )}
+
+                   {researchSources && researchSources.length > 0 && (
+                     <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 mt-4">
+                       <h4 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
+                         <Globe size={14} className="text-blue-400" /> Sources
+                       </h4>
+                       <div className="space-y-2">
+                         {researchSources.map((source, idx) => (
+                           source.web?.uri && (
+                             <a 
+                               key={idx} 
+                               href={source.web.uri} 
+                               target="_blank" 
+                               rel="noopener noreferrer"
+                               className="block text-xs text-blue-400 hover:underline truncate"
+                             >
+                               {idx + 1}. {source.web.title || source.web.uri}
+                             </a>
+                           )
+                         ))}
+                       </div>
+                     </div>
+                   )}
+               </ArtifactSection>
+           )}
         </div>
       </div>
       

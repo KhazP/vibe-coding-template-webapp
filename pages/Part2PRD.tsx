@@ -1,8 +1,7 @@
-
 import React, { useEffect, useState } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { Button, PersonaError, StepNavigation } from '../components/UI';
-import { ProjectInput, ProjectTextArea } from '../components/FormFields';
+import { ProjectInput, ProjectTextArea, ProjectSelect } from '../components/FormFields';
 import { ArtifactSection } from '../components/ArtifactSection';
 import { generatePRDPrompt } from '../utils/templates';
 import { Sparkles, CheckCircle, AlertCircle, Edit2, Loader2, Link } from 'lucide-react';
@@ -11,7 +10,7 @@ import { Persona } from '../types';
 import { useToast } from '../components/Toast';
 
 const Part2PRD: React.FC = React.memo(() => {
-  const { state, setAnswer, performGeminiPRD, setValidationErrors } = useProject();
+  const { state, setAnswer, performGeminiPRD, setValidationErrors, generationPhase } = useProject();
   const { answers, prdOutput, persona, researchOutput, isGenerating } = state;
   const [showIdeaInput, setShowIdeaInput] = useState(false);
   const { addToast } = useToast();
@@ -114,7 +113,7 @@ const Part2PRD: React.FC = React.memo(() => {
 
       <ModelStatus />
 
-      <div className="grid md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-6">
           
           {persona === Persona.VibeCoder && (
@@ -191,201 +190,161 @@ const Part2PRD: React.FC = React.memo(() => {
                  field="prd_vibe_non_features"
                  label="7. What features are you not including now?" 
                  placeholder="List ideas saved for Version 2+." 
-                 tooltip="Out of scope items." 
+                 tooltip="Scope creep prevention." 
+                 maxLength={1000}
                />
+
                <ProjectInput 
                  field="prd_vibe_metric"
-                 label="8. How will you know if the app is successful?" 
-                 placeholder="1–2 simple metrics (sign-ups, daily users)." 
-                 tooltip="Key Performance Indicators (KPIs)." 
-                 maxLength={200} 
+                 label="8. How will you know it’s working?" 
+                 placeholder="e.g. 'Users engage daily' or 'People pay $5'." 
+                 tooltip="Success metrics." 
                />
+
                <ProjectInput 
                  field="prd_vibe_vibe"
-                 label="9. What vibe or style do you want for the UI/UX?" 
-                 placeholder="e.g. “clean, fast, professional” or “fun, colorful, friendly”" 
-                 tooltip="Look and feel." 
-                 maxLength={200} 
+                 label="9. What’s the 'Vibe' of the app?" 
+                 placeholder="e.g. Minimalist & Fast, Fun & Gamified, Corporate & Serious." 
+                 tooltip="Design aesthetic and tone." 
                />
+
                <ProjectTextArea 
                  field="prd_vibe_constraints"
-                 label="10. Any constraints or special requirements?" 
-                 placeholder="Budget limits, deadline, specific platforms/technologies." 
-                 tooltip="Limitations to consider." 
+                 label="10. Any hard constraints?" 
+                 placeholder="Budget, Timeline, Legal, etc." 
+                 tooltip="Limitations." 
                />
              </>
           )}
 
           {persona === Persona.Developer && (
-            <>
+             <>
                <ProjectInput 
                  field="prd_dev_name"
-                 label="1. Product/App Name" 
-                 placeholder="Product name" 
-                 tooltip="Project identifier." 
+                 label="1. Project Name" 
+                 placeholder="Internal codename or product name." 
                  required
                />
-               
                <ProjectTextArea 
                  field="prd_dev_oneliner"
-                 label={answers['project_description'] ? "2. Refine Executive One-Liner" : "2. Executive one-liner"} 
-                 placeholder="Problem solved / Value provided." 
-                 tooltip="Concise value prop (Pre-filled from Research Context)." 
-                 maxLength={500}
+                 label={answers['project_description'] ? "2. Refine Problem/Solution Statement" : "2. Problem/Solution Statement"} 
+                 placeholder="Concise technical problem and proposed solution." 
                  required
                  rightLabel={answers['project_description'] ? fromResearchBadge : undefined}
                />
-               
                <ProjectInput 
                  field="prd_dev_goal"
-                 label="3. Launch goal or key objective" 
-                 placeholder="Success criteria for launch (user count, revenue)." 
-                 tooltip="Business objective." 
+                 label="3. Primary Objective" 
+                 placeholder="Business or technical goal." 
                />
                <ProjectTextArea 
                  field="prd_dev_audience"
-                 label="4. Define your target audience in detail" 
-                 placeholder="Primary/Secondary personas, Jobs-to-be-done." 
-                 tooltip="User segmentation." 
+                 label="4. Target Audience" 
+                 placeholder="User segments." 
                />
                <ProjectTextArea 
                  field="prd_dev_stories"
-                 label="5. Provide 3–5 user stories for the MVP" 
-                 placeholder="'As a [user], I want to [action] so that [benefit]'." 
-                 tooltip="Agile user stories." 
+                 label="5. Key User Stories" 
+                 placeholder="As a [user], I want to [action] so that [benefit]." 
                />
-               
                <ProjectTextArea 
                  field="prd_dev_features"
-                 label="6. List core features with priorities (MoSCoW)" 
-                 placeholder="Must-have, Should-have, Could-have, Won't-have." 
-                 tooltip="Feature prioritization." 
-                 maxLength={3000}
+                 label="6. Functional Requirements (MoSCoW)" 
+                 placeholder="Must Have, Should Have, Could Have, Won't Have." 
                  required
                />
-
-               <ProjectInput 
+               <ProjectTextArea 
                  field="prd_dev_metrics"
-                 label="7. Define success metrics and targets" 
-                 placeholder="Activation rate, engagement, retention, revenue." 
-                 tooltip="Quantitative metrics." 
+                 label="7. Success Metrics (KPIs)" 
+                 placeholder="Retention, Latency, Conversion." 
                />
-               
                <ProjectTextArea 
                  field="prd_dev_tech"
-                 label={answers['research_dev_constraints'] ? "8. Refine Technical & UX Requirements" : "8. Technical & UX Requirements"} 
-                 placeholder="Performance, Accessibility, Platform support, Design system." 
-                 tooltip="Non-functional requirements (Pre-filled from Research)." 
+                 label={answers['research_dev_constraints'] ? "8. Refine Tech Requirements" : "8. Tech Requirements"} 
+                 placeholder="Platform, performance budgets, existing infra integration." 
                  rightLabel={answers['research_dev_constraints'] ? fromResearchBadge : undefined}
                />
-               
                <ProjectTextArea 
                  field="prd_dev_compliance"
-                 label="9. Compliance & Data Privacy" 
-                 placeholder="GDPR, HIPAA, Data Residency, Auditing requirements?" 
-                 tooltip="Legal/Security constraints." 
+                 label="9. Compliance & Security" 
+                 placeholder="GDPR, HIPAA, SOC2, Auth requirements." 
                />
                <ProjectTextArea 
                  field="prd_dev_risks"
-                 label="10. Assess risks and assumptions" 
-                 placeholder="Technical risks, market risks, execution risks." 
-                 tooltip="Risk mitigation." 
+                 label="10. Risks & Mitigation" 
+                 placeholder="Technical debt, adoption risks." 
                />
-               
                <ProjectTextArea 
                  field="prd_dev_biz"
-                 label={answers['research_dev_context'] ? "11. Refine Business model & constraints" : "11. Business model & constraints"} 
-                 placeholder="Monetization, Budget, Corporate policies." 
-                 tooltip="Business constraints (Pre-filled from Research Context)." 
+                 label={answers['research_dev_context'] ? "11. Refine Business Constraints" : "11. Business Constraints"} 
+                 placeholder="Budget, Timeline, Stakeholders." 
                  rightLabel={answers['research_dev_context'] ? fromResearchBadge : undefined}
                />
-            </>
+             </>
           )}
 
           {persona === Persona.InBetween && (
-            <>
+             <>
                <ProjectInput 
                  field="prd_mid_name"
-                 label="1. What’s the name of your app or project?" 
-                 placeholder="Name of your project." 
-                 tooltip="Project name." 
+                 label="1. App Name" 
                  required
                />
-               
                <ProjectTextArea 
                  field="prd_mid_purpose"
-                 label={answers['project_description'] ? "2. Refine the app’s purpose" : "2. Summarize the app’s purpose in one sentence."} 
-                 placeholder="What problem does it solve, or what goal does it help users achieve?" 
-                 tooltip="Purpose statement (Pre-filled from Research)." 
-                 maxLength={1000}
+                 label={answers['project_description'] ? "2. Refine Purpose" : "2. Purpose"} 
+                 placeholder="Why are you building this? What problem does it solve?" 
                  required
                  rightLabel={answers['project_description'] ? fromResearchBadge : undefined}
                />
-               
                <ProjectInput 
                  field="prd_mid_goal"
-                 label="3. What is your launch goal for this MVP?" 
-                 placeholder="e.g. “Get 50 beta users,” “Have a working app in 2 months”" 
-                 tooltip="Learning or business goal." 
+                 label="3. Learning vs Launching?" 
+                 placeholder="Is the goal to learn X technology or launch a real business?" 
                />
-               
                <ProjectTextArea 
                  field="prd_mid_users"
-                 label={answers['research_mid_problem'] ? "4. Refine Target Users & Needs" : "4. Who are your target users and what do they need?"} 
-                 placeholder="Primary user type, main problem, current workaround." 
-                 tooltip="Target user definition (Pre-filled from Research)." 
+                 label={answers['research_mid_problem'] ? "4. Refine Users" : "4. Target Users"} 
+                 placeholder="Who is this for?" 
                  rightLabel={answers['research_mid_problem'] ? fromResearchBadge : undefined}
                />
-               
                <ProjectTextArea 
                  field="prd_mid_flow"
-                 label="5. Walk through the main user flow." 
-                 placeholder="Discovery -> First action -> Core action -> Outcome." 
-                 tooltip="Core user journey." 
-                 maxLength={2000} 
+                 label="5. Core Flow" 
+                 placeholder="Simple step-by-step of how it works." 
                />
-               
                <ProjectTextArea 
                  field="prd_mid_features"
-                 label="6. Which 3–5 features must be in Version 1?" 
-                 placeholder="Briefly describe what it does and why it’s critical." 
-                 tooltip="MVP scope." 
-                 maxLength={2000}
+                 label="6. Key Features (MVP)" 
+                 placeholder="What is the bare minimum needed to work?" 
                  required
                />
-
                <ProjectTextArea 
                  field="prd_mid_non_features"
-                 label="7. What are you not building yet?" 
-                 placeholder="Features deferred until later." 
-                 tooltip="Future roadmap." 
+                 label="7. Future Ideas" 
+                 placeholder="Things to add later." 
                />
-               
                <ProjectInput 
                  field="prd_mid_metric"
-                 label={answers['research_mid_timeline'] ? "8. Refine Success Metrics" : "8. How will you measure success?"} 
-                 placeholder="Short-term (1 month) and Medium-term (3 months) metrics." 
-                 tooltip="Success definitions." 
+                 label={answers['research_mid_timeline'] ? "8. Refine Success Definition" : "8. Success Definition"} 
+                 placeholder="It works? People use it? I learned React?" 
                  rightLabel={answers['research_mid_timeline'] ? fromResearchBadge : undefined}
                />
-               
-               <ProjectTextArea 
+               <ProjectInput 
                  field="prd_mid_design"
-                 label="9. Describe the desired design and user experience." 
-                 placeholder="Visual style, key screens, mobile-responsive?" 
-                 tooltip="UX/UI expectations." 
+                 label="9. Design Preferences" 
+                 placeholder="Simple, colorful, dark mode?" 
                />
                <ProjectTextArea 
                  field="prd_mid_constraints"
-                 label="10. List any constraints or requirements." 
-                 placeholder="Budget, timeline, technical preferences." 
-                 tooltip="Hard constraints." 
+                 label="10. Constraints" 
+                 placeholder="Time, skills, money." 
                />
-            </>
+             </>
           )}
 
           {/* Context Indicator */}
-          <div className={`text-xs px-3 py-2 rounded-lg flex items-center gap-2 border ${researchOutput ? 'bg-green-900/20 border-green-800 text-green-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+          <div className={`text-xs px-3 py-2 rounded-lg flex items-center gap-2 border ${researchOutput ? 'bg-blue-900/20 border-blue-800 text-blue-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
              {researchOutput ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
              {researchOutput ? "Research Context Attached" : "No Research Context found (skipping Part 1)"}
           </div>
@@ -393,11 +352,11 @@ const Part2PRD: React.FC = React.memo(() => {
           <Button 
             onClick={handleGenerate} 
             disabled={isGenerating}
-            className="w-full bg-gradient-to-r from-green-600 to-primary-600 hover:from-green-500 hover:to-primary-500 border-0"
-            tooltip="Generate a structured PRD using Gemini."
+            className="w-full bg-gradient-to-r from-blue-600 to-primary-600 hover:from-blue-500 hover:to-primary-500 border-0"
+            tooltip="Generate a comprehensive PRD based on your inputs."
           >
             {isGenerating ? (
-              <><Loader2 className="animate-spin" size={18} /> Generating...</>
+              <><Loader2 className="animate-spin" size={18} /> {generationPhase || 'Generating PRD...'}</>
             ) : (
               <><Sparkles size={18} /> Generate PRD with Gemini</>
             )}
@@ -406,12 +365,12 @@ const Part2PRD: React.FC = React.memo(() => {
 
         <div className="space-y-4">
            <ArtifactSection 
-             section="prd"
-             loaderLabel="Defining Product Requirements & User Stories..."
+             section="prd" 
+             loaderLabel="Drafting Product Requirements..."
              placeholder={
                <div className="max-w-xs">
                  <Sparkles className="mx-auto mb-3 opacity-50" size={32} />
-                 <p>Fill in the details and click "Generate PRD" to let Gemini draft a comprehensive document.</p>
+                 <p>Fill in the details and click "Generate PRD" to let Gemini structure your project requirements.</p>
                </div>
              }
            />
@@ -420,7 +379,7 @@ const Part2PRD: React.FC = React.memo(() => {
       
       <StepNavigation 
          prev={{ label: 'Research', path: '/research' }}
-         next={{ label: 'Tech Design', path: '/tech', disabled: !prdOutput }}
+         next={{ label: 'Tech Design', path: '/tech', disabled: !state.prdOutput }}
          onPrefetchNext={() => import('./Part3Tech')}
       />
     </div>

@@ -1,4 +1,7 @@
 
+
+
+
 import { Persona } from '../types';
 import { FILE_NAMES, TOOL_IDS } from './constants';
 
@@ -302,6 +305,7 @@ The goal is that ANY AI agent reading this file knows exactly what to do without
 export interface ToolOptions {
     claudeAdapterMode?: boolean; // true = adapter (@AGENTS.md), false = full config
     geminiAdapterMode?: boolean; // true = adapter, false = full config
+    antigravityAdapterMode?: boolean; // true = adapter, false = full config
 }
 
 export const generateToolConfig = (toolId: string, appName: string, persona: Persona, answers: Record<string, string>, options?: ToolOptions) => {
@@ -339,6 +343,19 @@ export const generateToolConfig = (toolId: string, appName: string, persona: Per
 - npm test: Run test suite`;
     };
 
+    const getCodingStandards = () => {
+        if (persona === Persona.VibeCoder) {
+            return `- Keep solutions simple and beginner-friendly
+- Comment complex logic extensively
+- Use modern, stable libraries`;
+        } else {
+             return `- Follow patterns defined in ${agentsMd}
+- Prefer functional paradigms where possible
+- Keep components small and focused
+- Write comments for complex logic only`;
+        }
+    };
+
     switch (toolId) {
         case TOOL_IDS.CURSOR:
             return `# ${FILE_NAMES.CURSOR_RULES}
@@ -370,38 +387,72 @@ Read and strictly follow the rules in ${agentsMd}.
 read: ${agentsMd}
 `;
         case TOOL_IDS.GEMINI_CLI:
-            if (options?.geminiAdapterMode) {
+        case TOOL_IDS.ANTIGRAVITY:
+            // Check specific adapter mode based on tool ID
+            const isGemini = toolId === TOOL_IDS.GEMINI_CLI;
+            const useAdapter = isGemini ? options?.geminiAdapterMode : options?.antigravityAdapterMode;
+
+            if (useAdapter) {
                  // Adapter Mode
                  return `# ${FILE_NAMES.GEMINI_MD} Adapter
 # This file inherits instructions from ${agentsMd}
 
-Context: Read and strictly follow the rules in ${agentsMd}.
+# Context for Google Antigravity / Gemini
+@${agentsMd}
 `;
             } else {
-                // Full Config Mode (Gemini Best Practices)
-                return `# ${FILE_NAMES.GEMINI_MD}
+                // Optimized Mode (Best Practice GEMINI.md)
+                return `# GEMINI.MD: AI Collaboration Guide
 
-# Project: ${appName}
+This document provides essential context for AI models interacting with this project. Adhering to these guidelines will ensure consistency and maintain code quality.
 
-## Architecture & Technologies
-- Stack: ${answers['tech_dev_stack'] || answers['tech_vibe_platform'] || 'See Tech Design'}
-- Context: ${answers['project_description']}
+## 1. Project Overview & Purpose
 
-## Coding Standards
-- Follow the patterns defined in the Tech Design
-- Maintain clean, readable code
-- Add comments for complex logic
-- Prefer functional paradigms
+* **Primary Goal:** ${answers['project_description'] || 'Build a functional application.'}
+* **Business Domain:** ${answers['research_vibe_who'] || answers['prd_dev_audience'] || 'General User Base'}
 
-## Workflow
+## 2. Core Technologies & Stack
+
+* **Stack:** ${answers['tech_dev_stack'] || answers['tech_vibe_platform'] || 'Standard Web Stack'}
+
+## 3. Architectural Patterns
+
+* **Overall Architecture:** ${answers['tech_dev_architecture'] || 'Modular Monolith (Default)'}
+* **Directory Structure Philosophy:** (Inferred)
+    * \`/src\`: Contains all primary source code.
+    * \`/tests\`: Contains all unit and integration tests.
+    * \`/config\`: Holds environment and configuration files.
+
+## 4. Coding Conventions & Style Guide
+
+* **Formatting:** Standard formatting (e.g. Prettier/Black).
+* **Naming Conventions:** CamelCase for vars/funcs, PascalCase for classes/components.
+* **API Design:** RESTful principles (unless otherwise specified).
+* **Error Handling:** Use try...catch blocks and custom error classes.
+
+## 5. Key Files & Entrypoints
+
+* **Main Entrypoint(s):** (Inferred from stack, e.g., index.js, app.py)
+* **Configuration:** .env, config files.
+* **CI/CD Pipeline:** GitHub Actions (inferred).
+
+## 6. Development & Testing Workflow
+
+* **Local Development Environment:**
 ${getStackCommands()}
 
-## Team Norms
-- Commit messages should be descriptive
-- Test before pushing
-- What to avoid: Hallucinated imports, changing core architecture without approval
+* **Testing:**
+    * Run tests via standard commands.
+    * New code requires corresponding unit tests.
+
+## 7. Specific Instructions for AI Collaboration
+
+* **Contribution Guidelines:** All changes must review ${agentsMd}.
+* **Security:** Do not hardcode secrets. Ensure auth logic is secure.
+* **Dependencies:** Use standard package managers (npm/pip) to add libs.
 `;
             }
+
         case TOOL_IDS.CLAUDE:
             if (options?.claudeAdapterMode) {
                 // Switch ON: Generate Adapter
@@ -410,13 +461,12 @@ ${getStackCommands()}
                 // Switch OFF: Generate Full Best-Practice Config
                 return `# ${FILE_NAMES.CLAUDE_MD}
 
+# Bash commands
 ${getStackCommands()}
 
-# Code Style
-- Follow the architectural patterns defined in ${agentsMd}
-- Prefer functional paradigms where possible
-- Keep components small and focused
-- Write comments for complex logic only
+# Code style
+- Framework: ${answers['tech_dev_stack'] || 'Standard'}
+${getCodingStandards()}
 
 # Workflow
 - Review ${agentsMd} before starting complex tasks
@@ -426,13 +476,9 @@ ${getStackCommands()}
 
 # Environment
 - Project: ${appName}
+- Persona: ${persona}
 `;
             }
-        
-        case TOOL_IDS.ANTIGRAVITY:
-            return `# ${FILE_NAMES.ANTIGRAVITY_MD}
-import: ${agentsMd}
-`;
 
         // Generators (Keep prompt style for copy-paste tools)
         case TOOL_IDS.LOVABLE:

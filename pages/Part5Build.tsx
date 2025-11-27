@@ -4,16 +4,16 @@ import { useProject } from '../context/ProjectContext';
 import { CopyBlock, GlassCard, Button, TextArea, PersonaError, StepNavigation } from '../components/UI';
 import { ArtifactSection } from '../components/ArtifactSection';
 import { Link } from 'react-router-dom';
-import { Terminal, Zap, GitMerge, Loader2, Play, AlertTriangle, LifeBuoy, CheckCircle2, Sparkles, FolderTree, Lock } from 'lucide-react';
+import { Terminal, Zap, GitMerge, Loader2, Play, AlertTriangle, LifeBuoy, CheckCircle2, Sparkles, FolderTree, Lock, Bot, FileCode, Settings } from 'lucide-react';
 import { ModelStatus } from '../components/ModelStatus';
 import { generateBuildPlanPrompt, generatePhasePrompt, generateTroubleshootPrompt, getBuildPlanSystemInstruction } from '../utils/templates';
-import { Persona } from '../types';
-import { TOOL_IDS, FILE_NAMES } from '../utils/constants';
+import { Persona, ToolDefinition } from '../types';
+import { TOOL_IDS, FILE_NAMES, TOOLS } from '../utils/constants';
 import { useToast } from '../components/Toast';
 
 const Part5Build: React.FC = React.memo(() => {
   const { state, performGeminiBuildPlan, queryGemini } = useProject();
-  const { tools, answers, persona, prdOutput, techOutput, buildPlan, isGenerating } = state;
+  const { tools, answers, persona, prdOutput, techOutput, buildPlan, isGenerating, agentOutputs } = state;
   const { addToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<'kickoff' | 'guided'>('kickoff');
@@ -29,6 +29,15 @@ const Part5Build: React.FC = React.memo(() => {
   if (!persona) {
     return <PersonaError />;
   }
+
+  // Helpers for Summary
+  const selectedTools = tools.map(tId => TOOLS.find(t => t.id === tId)).filter((t): t is ToolDefinition => !!t);
+  const hasAgentConfig = agentOutputs && Object.keys(agentOutputs).length > 0;
+  
+  const configFiles: string[] = [FILE_NAMES.AGENTS_MD];
+  selectedTools.forEach(t => {
+      if(t?.file) configFiles.push(t.file);
+  });
 
   const handleGenerateBuildPlan = async () => {
     const prompt = generateBuildPlanPrompt(persona, answers, prdOutput, techOutput);
@@ -128,16 +137,63 @@ const Part5Build: React.FC = React.memo(() => {
 
       <ModelStatus />
 
-      {/* No Tools Selected Warning */}
-      {tools.length === 0 && (
-        <div className="p-4 bg-blue-900/10 border border-blue-500/20 rounded-xl text-center flex items-center justify-center gap-3">
-            <Zap className="text-blue-400" size={20} />
-            <span className="text-blue-200 text-sm">No specific tools selected? You can still use the generated docs with any AI coding tool.</span>
-            <Link to="/agent" className="text-blue-400 underline hover:text-blue-300 text-sm">
-                Configure Adapters
-            </Link>
+      {/* Configuration Summary Dashboard */}
+      <GlassCard className="border-l-4 border-l-primary-500">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-bold text-slate-200 flex items-center gap-2">
+                        <Bot size={20} className="text-primary-400" />
+                        Agent Configuration
+                    </h3>
+                    {hasAgentConfig ? (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold uppercase tracking-wide border border-emerald-500/20">
+                            Ready
+                        </span>
+                    ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 text-[10px] font-bold uppercase tracking-wide border border-amber-500/20">
+                            Pending
+                        </span>
+                    )}
+                </div>
+                
+                <div className="flex flex-wrap gap-2 text-sm text-slate-400 items-center">
+                     <span className="text-slate-500 text-xs uppercase tracking-wider font-bold">Tools:</span>
+                     {tools.length > 0 ? (
+                        selectedTools.map(t => (
+                            <span key={t?.id} className="px-2 py-1 rounded-md bg-white/5 border border-white/10 text-slate-200 text-xs flex items-center gap-1.5">
+                                {t?.name}
+                            </span>
+                        ))
+                     ) : (
+                        <span className="text-slate-500 text-xs italic">Generic (No specific tools selected)</span>
+                     )}
+                </div>
+
+                <div className="flex items-center gap-2 text-xs font-mono text-slate-500">
+                    <FileCode size={14} className="text-slate-600" />
+                    <span className="text-slate-500 font-bold">Context Files:</span>
+                    <span className={hasAgentConfig ? "text-emerald-400" : "text-slate-600"}>
+                        {hasAgentConfig ? configFiles.join(', ') : 'Waiting for generation...'}
+                    </span>
+                </div>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0">
+                 {!hasAgentConfig && (
+                    <div className="hidden md:flex items-center gap-2 text-amber-400 text-xs bg-amber-900/20 px-3 py-2 rounded-lg border border-amber-500/20 max-w-[200px] leading-tight">
+                        <AlertTriangle size={14} className="shrink-0" />
+                        <span>Go back to Step 4 to generate config files first.</span>
+                    </div>
+                 )}
+                 <Link to="/agent">
+                    <Button variant="secondary" className="text-xs h-9 bg-white/5 hover:bg-white/10 border-white/10">
+                        <Settings size={14} className="mr-2" /> Reconfigure
+                    </Button>
+                 </Link>
+            </div>
         </div>
-      )}
+      </GlassCard>
 
       {/* Step 1: Master Build Plan */}
       <section className="space-y-4">
@@ -154,7 +210,7 @@ const Part5Build: React.FC = React.memo(() => {
                     <FolderTree className="mx-auto text-slate-600 mb-4" size={48} />
                     <h4 className="text-slate-200 font-medium mb-2">Generate Your Blueprint</h4>
                     <p className="text-slate-400 text-sm max-w-md mx-auto mb-8">
-                        We need a map before we drive. This step generates a <strong>complete File Tree</strong> and step-by-step dependency plan.
+                        We need a map before we drive. This step generates a <strong>complete File Tree</strong> and step-by-step dependency plan based on your agent configuration.
                         <br/><br/>
                         <span className="text-primary-400 text-xs uppercase tracking-widest font-bold">Required for Step 2</span>
                     </p>
@@ -282,9 +338,9 @@ const Part5Build: React.FC = React.memo(() => {
                             </div>
                         )) : (
                             <div className="col-span-2 text-center text-slate-500 py-8">
-                                No tools selected in Agent Config. 
+                                No specific tools selected in Agent Config. 
                                 <br/>
-                                <Link to="/agent" className="text-primary-400 underline">Select tools</Link> or use Guided Mode.
+                                <Link to="/agent" className="text-primary-400 underline">Select tools</Link> or use Guided Mode for generic prompts.
                             </div>
                         )}
                     </div>

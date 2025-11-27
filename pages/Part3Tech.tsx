@@ -11,7 +11,7 @@ import { Persona } from '../types';
 import { useToast } from '../components/Toast';
 
 const Part3Tech: React.FC = React.memo(() => {
-  const { state, setAnswer, performGeminiTech, setValidationErrors } = useProject();
+  const { state, setAnswer, performGeminiTech, setValidationErrors, generationPhase } = useProject();
   const { answers, prdOutput, persona, isGenerating } = state;
   const { addToast } = useToast();
 
@@ -388,7 +388,7 @@ const Part3Tech: React.FC = React.memo(() => {
             tooltip="Generate a robust technical design document."
           >
             {isGenerating ? (
-              <><Loader2 className="animate-spin" size={18} /> Designing...</>
+              <><Loader2 className="animate-spin" size={18} /> {generationPhase || 'Designing...'}</>
             ) : (
               <><Sparkles size={18} /> Generate Tech Design with Gemini</>
             )}

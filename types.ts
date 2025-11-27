@@ -41,6 +41,8 @@ export interface GroundingChunk {
   };
 }
 
+export type PresetMode = 'fast' | 'balanced' | 'thorough' | 'custom';
+
 export interface GeminiSettings {
   modelName: string;
   thinkingBudget: number;
@@ -48,6 +50,13 @@ export interface GeminiSettings {
   temperature?: number;
   topK?: number;
   topP?: number;
+  preset?: PresetMode;
+}
+
+export interface ToolSettings {
+  claudeAdapterMode: boolean;
+  geminiAdapterMode: boolean;
+  antigravityAdapterMode: boolean;
 }
 
 export interface ProjectState {
@@ -62,14 +71,15 @@ export interface ProjectState {
   prdOutput: string;
   techOutput: string;
   agentOutputs: Record<string, string>;
-  buildPlan: string;
+  buildPlan: string; // Deprecated but kept for compatibility
   tools: string[];
+  toolSettings: ToolSettings;
   isGenerating: boolean;
   settings: GeminiSettings;
   sectionTimestamps: Record<string, number>;
 }
 
-export type StepId = 'home' | 'research' | 'prd' | 'tech' | 'agent' | 'build' | 'settings';
+export type StepId = 'home' | 'research' | 'prd' | 'tech' | 'agent' | 'export' | 'settings';
 
 export interface ToolDefinition {
   id: string;

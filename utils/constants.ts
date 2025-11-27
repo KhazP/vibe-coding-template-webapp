@@ -1,4 +1,7 @@
 
+
+
+
 import { ToolDefinition } from "../types";
 
 export const APP_NAME = 'Vibe-Coding Workflow';
@@ -10,7 +13,7 @@ export const ROUTES = {
   PRD: '/prd',
   TECH: '/tech',
   AGENT: '/agent',
-  BUILD: '/build',
+  EXPORT: '/export',
 } as const;
 
 export const STORAGE_KEYS = {
@@ -47,6 +50,45 @@ export const DEFAULT_SETTINGS = {
   TEMPERATURE: 0.7,
   TOP_K: 64,
   TOP_P: 0.95,
+} as const;
+
+export const PRESETS = {
+  FAST: {
+    id: 'fast',
+    label: 'Fast',
+    badge: 'Flash',
+    description: 'Optimized for speed. Uses Gemini 2.5 Flash with moderate thinking.',
+    config: {
+        modelName: MODELS.GEMINI_FLASH,
+        thinkingBudget: 8192,
+        temperature: 0.7,
+        useGrounding: true
+    }
+  },
+  BALANCED: {
+    id: 'balanced',
+    label: 'Balanced',
+    badge: 'Pro',
+    description: 'High intelligence, standard latency. Uses Gemini 3 Pro without thinking.',
+    config: {
+        modelName: MODELS.GEMINI_PRO,
+        thinkingBudget: 0,
+        temperature: 0.7,
+        useGrounding: true
+    }
+  },
+  THOROUGH: {
+    id: 'thorough',
+    label: 'Thorough',
+    badge: 'Pro + Thinking',
+    description: 'Max reasoning power. Uses Gemini 3 Pro with max thinking budget.',
+    config: {
+        modelName: MODELS.GEMINI_PRO,
+        thinkingBudget: 32768,
+        temperature: 0.7,
+        useGrounding: true
+    }
+  }
 } as const;
 
 export const PERSONA_KEYS = {
@@ -153,11 +195,11 @@ export const TOOLS: ToolDefinition[] = [
   {
     id: TOOL_IDS.ANTIGRAVITY,
     name: 'Google Antigravity',
-    file: FILE_NAMES.ANTIGRAVITY_MD, 
+    file: FILE_NAMES.GEMINI_MD, 
     category: 'Adapter Required',
-    description: 'Requires explicit context linking to AGENTS.md.',
+    description: 'Requires GEMINI.md for context.',
     supportLevel: 'adapter',
-    techTooltip: 'Links AGENTS.md via explicit import in ANTIGRAVITY.md.'
+    techTooltip: 'Antigravity reads GEMINI.md for project context.'
   },
   
   // Generators
