@@ -1,8 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Use import.meta.env for Vite compatibility
-const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || 'https://ejovnhzzchqpikgktbat.supabase.co';
-const supabaseKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY;
+// Safe access to environment variables
+const getEnv = () => {
+  try {
+    // Check if import.meta.env exists
+    if (import.meta && (import.meta as any).env) {
+        return (import.meta as any).env;
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+  return {};
+};
+
+const env = getEnv();
+
+const supabaseUrl = env.VITE_SUPABASE_URL || 'https://ejovnhzzchqpikgktbat.supabase.co';
+const supabaseKey = env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseKey) {
   console.warn('Supabase key not configured, analytics will default to local storage.');
