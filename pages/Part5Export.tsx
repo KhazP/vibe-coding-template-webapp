@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { GlassCard, Button, PersonaError, StepNavigation, Tooltip } from '../components/UI';
@@ -10,7 +9,7 @@ import {
 } from 'lucide-react';
 import { ModelStatus } from '../components/ModelStatus';
 import { TOOL_IDS, FILE_NAMES, TOOLS } from '../utils/constants';
-import { LAUNCH_PROTOCOLS, LAUNCH_PROTOCOL_INDEX } from '../utils/launchProtocols';
+import { getLaunchProtocol, LAUNCH_PROTOCOL_INDEX } from '../utils/launchProtocols';
 import JSZip from 'jszip';
 import { useToast } from '../components/Toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -294,8 +293,9 @@ const Part5Export: React.FC = React.memo(() => {
             protocols.file("LAUNCH_PROTOCOLS_INDEX.md", LAUNCH_PROTOCOL_INDEX);
             // Include protocols for selected tools
             tools.forEach(tId => {
-                if (LAUNCH_PROTOCOLS[tId]) {
-                    protocols.file(`LAUNCH_PROTOCOL_${tId.toUpperCase()}.md`, LAUNCH_PROTOCOLS[tId]);
+                const protocol = getLaunchProtocol(tId, state.toolSettings);
+                if (protocol) {
+                    protocols.file(`LAUNCH_PROTOCOL_${tId.toUpperCase()}.md`, protocol);
                 }
             });
         }
@@ -378,7 +378,7 @@ Your AI agent will use this as its primary context.
          );
      }
 
-     const protocolContent = LAUNCH_PROTOCOLS[activeTab];
+     const protocolContent = getLaunchProtocol(activeTab, state.toolSettings);
      if (protocolContent) {
          return <MarkdownRenderer content={protocolContent} onCopy={copyToClipboard} />;
      }

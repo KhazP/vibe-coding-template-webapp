@@ -1,7 +1,5 @@
-
-
-
 import { TOOL_IDS } from './constants';
+import { ToolSettings } from '../types';
 
 export const LAUNCH_PROTOCOL_INDEX = `# Vibe-Coding Launch Protocols Index
 
@@ -21,7 +19,7 @@ export const LAUNCH_PROTOCOL_INDEX = `# Vibe-Coding Launch Protocols Index
 > **Note:** "Native" means the tool reads \`AGENTS.md\` automatically. "Import" or "Linking" requires a one-time configuration step.
 `;
 
-export const LAUNCH_PROTOCOLS: Record<string, string> = {
+const STATIC_PROTOCOLS: Record<string, string> = {
   [TOOL_IDS.CURSOR]: `### Cursor Quick Start Guide
 
 **Time Estimate:** 5 minutes
@@ -192,104 +190,6 @@ In VS Code Chat View:
 - **Official Docs:** [docs.github.com/copilot](https://docs.github.com/en/copilot)
 `,
 
-  [TOOL_IDS.GEMINI_CLI]: `### Gemini CLI Quick Start Guide
-
-**Time Estimate:** 5 minutes
-
-#### 1. Installation
-Install via npm.
-\`\`\`bash
-npm install -g @google/gemini-cli
-\`\`\`
-- **Requirements:** Node.js >= 18, Google API Key
-- **Env Var:** Set \`GEMINI_API_KEY\` in your terminal.
-
-#### 2. Setup Project Context
-Gemini CLI uses \`GEMINI.md\` as its brain.
-- **File Location:** Project root.
-- **Action:** Place the generated \`GEMINI.md\` (and \`AGENTS.md\`) in your project root.
-- **Verification:** Run \`gemini context\`; it should show the imported content.
-
-#### 3. First Prompt
-Run in terminal:
-\`\`\`bash
-gemini prompt "Read AGENTS.md. Generate the scaffold commands."
-\`\`\`
-
-#### 4. Context & Workflow
-- **Imports:** The \`@filename\` syntax allows modular context.
-- **Piping:** You can pipe file content too: \`cat AGENTS.md | gemini prompt "Summarize this"\`
-
-#### 5. Links & Resources
-- **GitHub:** [github.com/google/gemini-cli](https://github.com/google/gemini-cli)
-`,
-
-  [TOOL_IDS.CLAUDE]: `### Claude Code Quick Start Guide
-
-**Time Estimate:** 10 minutes
-
-#### 1. Installation
-Install the official tool.
-\`\`\`bash
-npm install -g @anthropic-ai/claude-code
-\`\`\`
-- **Requirements:** Node.js, Anthropic Account
-- **Compatibility:** macOS/Linux (WSL for Windows)
-
-#### 2. Setup Project Context
-Claude Code looks for \`CLAUDE.md\`.
-- **File Location:** Project root.
-- **Action:** Place the generated \`CLAUDE.md\` (and \`AGENTS.md\`) in your project root.
-- **Verification:** Claude will confirm context loading on startup.
-
-#### 3. First Prompt
-Start the REPL:
-\`\`\`bash
-claude
-\`\`\`
-Then type:
-\`\`\`text
-Read AGENTS.md. Scaffold the project.
-\`\`\`
-
-#### 4. Context & Workflow
-- **Persistence:** Claude remembers context within a session nicely.
-- **Cost:** Monitor token usage, as large contexts add up with Claude Opus/Sonnet.
-
-#### 5. Links & Resources
-- **Docs:** [claude.ai/docs](https://docs.anthropic.com)
-`,
-
-  [TOOL_IDS.ANTIGRAVITY]: `### Google Antigravity Quick Start Guide
-
-**Time Estimate:** 15 minutes
-
-#### 1. Installation
-Install the desktop IDE or Linux package.
-- **Linux:** \`sudo apt install anti-gravity\`
-- **Mac/Win:** Download installer from Google.
-- **Requirements:** Google Account, Vertex AI access.
-
-#### 2. Setup Project Context
-Google Antigravity uses \`GEMINI.md\` to understand your project.
-- **File Location:** Project root.
-- **Action:** Place the generated \`GEMINI.md\` (and \`AGENTS.md\`) in your project root.
-- **Note:** Ensure the IDE is pointed to the folder containing these files.
-
-#### 3. First Prompt
-In the Agent panel:
-\`\`\`text
-Using the project knowledge base, implement the MVP scaffold.
-\`\`\`
-
-#### 4. Context & Workflow
-- **Updates:** If you change \`AGENTS.md\` locally, Antigravity picks up changes via \`GEMINI.md\`.
-- **Modes:** Use "Agent-Assisted" mode for the best balance of control.
-
-#### 5. Links & Resources
-- **Blog:** [developers.googleblog.com](https://developers.googleblog.com)
-`,
-
   [TOOL_IDS.LOVABLE]: `### Lovable Quick Start Guide
 
 **Time Estimate:** 2 minutes
@@ -345,4 +245,117 @@ Based on the attached AGENTS.md, generate the dashboard UI.
 #### 5. Links & Resources
 - **Docs:** [v0.app/docs](https://v0.app/docs)
 `
+};
+
+export const getLaunchProtocol = (toolId: string, settings: ToolSettings): string | undefined => {
+  // Dynamic Protocol Generation based on Adapter vs Optimized mode
+  
+  if (toolId === TOOL_IDS.GEMINI_CLI) {
+     const isAdapter = settings.geminiAdapterMode;
+     return `### Gemini CLI Quick Start Guide
+
+**Time Estimate:** 5 minutes
+
+#### 1. Installation
+Install via npm.
+\`\`\`bash
+npm install -g @google/gemini-cli
+\`\`\`
+- **Requirements:** Node.js >= 18, Google API Key
+- **Env Var:** Set \`GEMINI_API_KEY\` in your terminal.
+
+#### 2. Setup Project Context
+Gemini CLI uses \`GEMINI.md\` as its brain.
+- **File Location:** Project root.
+- **Action:** Place the generated \`GEMINI.md\`${isAdapter ? ' (and `AGENTS.md`)' : ''} in your project root.
+- **Verification:** Run \`gemini context\`; it should show the ${isAdapter ? 'imported ' : ''}content.
+
+#### 3. First Prompt
+Run in terminal:
+\`\`\`bash
+gemini prompt "Read ${isAdapter ? 'AGENTS.md' : 'GEMINI.md'}. Generate the scaffold commands."
+\`\`\`
+
+#### 4. Context & Workflow
+- **Imports:** The \`@filename\` syntax allows modular context.
+- **Piping:** You can pipe file content too: \`cat ${isAdapter ? 'AGENTS.md' : 'GEMINI.md'} | gemini prompt "Summarize this"\`
+
+#### 5. Links & Resources
+- **GitHub:** [github.com/google/gemini-cli](https://github.com/google/gemini-cli)
+`;
+  }
+
+  if (toolId === TOOL_IDS.ANTIGRAVITY) {
+      const isAdapter = settings.antigravityAdapterMode;
+      return `### Google Antigravity Quick Start Guide
+
+**Time Estimate:** 15 minutes
+
+#### 1. Installation
+Install the desktop IDE or Linux package.
+- **Linux:** \`sudo apt install anti-gravity\`
+- **Mac/Win:** Download installer from Google.
+- **Requirements:** Google Account, Vertex AI access.
+
+#### 2. Setup Project Context
+Google Antigravity uses \`GEMINI.md\` to understand your project.
+- **File Location:** Project root.
+- **Action:** Place the generated \`GEMINI.md\`${isAdapter ? ' (and `AGENTS.md`)' : ''} in your project root.
+- **Note:** Ensure the IDE is pointed to the folder containing these files.
+
+#### 3. First Prompt
+In the Agent panel:
+\`\`\`text
+Using the project knowledge base${isAdapter ? '' : ' (GEMINI.md)'}, implement the MVP scaffold.
+\`\`\`
+
+#### 4. Context & Workflow
+- **Updates:** If you change \`${isAdapter ? 'AGENTS.md' : 'GEMINI.md'}\` locally, Antigravity picks up changes${isAdapter ? ' via `GEMINI.md`' : ''}.
+- **Modes:** Use "Agent-Assisted" mode for the best balance of control.
+
+#### 5. Links & Resources
+- **Blog:** [developers.googleblog.com](https://developers.googleblog.com)
+`;
+  }
+
+  if (toolId === TOOL_IDS.CLAUDE) {
+      const isAdapter = settings.claudeAdapterMode;
+      return `### Claude Code Quick Start Guide
+
+**Time Estimate:** 10 minutes
+
+#### 1. Installation
+Install the official tool.
+\`\`\`bash
+npm install -g @anthropic-ai/claude-code
+\`\`\`
+- **Requirements:** Node.js, Anthropic Account
+- **Compatibility:** macOS/Linux (WSL for Windows)
+
+#### 2. Setup Project Context
+Claude Code looks for \`CLAUDE.md\`.
+- **File Location:** Project root.
+- **Action:** Place the generated \`CLAUDE.md\`${isAdapter ? ' (and `AGENTS.md`)' : ''} in your project root.
+- **Verification:** Claude will confirm context loading on startup.
+
+#### 3. First Prompt
+Start the REPL:
+\`\`\`bash
+claude
+\`\`\`
+Then type:
+\`\`\`text
+Read ${isAdapter ? 'AGENTS.md' : 'CLAUDE.md'}. Scaffold the project.
+\`\`\`
+
+#### 4. Context & Workflow
+- **Persistence:** Claude remembers context within a session nicely.
+- **Cost:** Monitor token usage, as large contexts add up with Claude Opus/Sonnet.
+
+#### 5. Links & Resources
+- **Docs:** [claude.ai/docs](https://docs.anthropic.com)
+`;
+  }
+
+  return STATIC_PROTOCOLS[toolId];
 };
