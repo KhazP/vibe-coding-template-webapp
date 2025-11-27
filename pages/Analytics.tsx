@@ -7,42 +7,55 @@ import { supabase } from '../utils/supabaseClient';
 const Analytics: React.FC = () => {
   const [events, setEvents] = useState<AnalyticsEvent[]>([]);
   const [isSimulated, setIsSimulated] = useState(false);
-  const [isConnected, setIsConnected] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
 
-  // Load events from Supabase
+  // Load events from Supabase or Local Storage
   const loadEvents = async () => {
     try {
-        if (!process.env.SUPABASE_ANON_KEY) {
-            // Fallback to local storage if no key
-            setIsConnected(false);
-            const stored = localStorage.getItem('VIBE_ANALYTICS_EVENTS');
-            if (stored) setEvents(JSON.parse(stored));
-            return;
+        let remoteEvents: AnalyticsEvent[] = [];
+        let isRemoteConnected = false;
+
+        // Try fetching from Supabase if client exists
+        if (supabase) {
+            const { data, error } = await supabase
+                .from('events')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(2000);
+                
+            if (!error && data) {
+                isRemoteConnected = true;
+                remoteEvents = data.map((e: any) => ({
+                    id: e.id,
+                    eventName: e.event_name,
+                    timestamp: new Date(e.created_at).getTime(),
+                    data: e.metadata
+                }));
+            } else if (error) {
+                console.warn('Supabase Fetch Error:', error.message);
+            }
         }
 
-        const { data, error } = await supabase
-            .from('events')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(2000);
-            
-        if (error) throw error;
-
-        if (data) {
+        if (isRemoteConnected) {
             setIsConnected(true);
-            const mappedEvents: AnalyticsEvent[] = data.map(e => ({
-                id: e.id,
-                eventName: e.event_name,
-                timestamp: new Date(e.created_at).getTime(),
-                data: e.metadata
-            }));
-            setEvents(mappedEvents);
+            setEvents(remoteEvents);
+        } else {
+            // Fallback to local storage if Supabase failed or isn't configured
+            setIsConnected(false);
+            const stored = localStorage.getItem('VIBE_ANALYTICS_EVENTS');
+            if (stored) {
+                // Ensure we parse correctly and perhaps sort by timestamp desc
+                const localEvents = JSON.parse(stored) as AnalyticsEvent[];
+                localEvents.sort((a, b) => b.timestamp - a.timestamp);
+                setEvents(localEvents);
+            }
         }
     } catch (e) {
         console.error('Failed to load analytics', e);
-        // Fallback
+        // Final Fallback
         const stored = localStorage.getItem('VIBE_ANALYTICS_EVENTS');
         if (stored) setEvents(JSON.parse(stored));
+        setIsConnected(false);
     }
   };
 
@@ -114,7 +127,7 @@ const Analytics: React.FC = () => {
                 <AlertTriangle size={18} className="shrink-0 mt-0.5 text-amber-400" />
                 <div>
                     <strong>Connection Issue:</strong> Could not connect to Supabase. Showing local data only. 
-                    Ensure <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> are set in your environment.
+                    Ensure <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> are set in your environment variables.
                 </div>
             </div>
         )}
@@ -214,7 +227,7 @@ const Analytics: React.FC = () => {
                         </div>
                     ))}
                     {events.length === 0 && (
-                        <div className="text-center text-slate-600 py-10">No events found in Supabase.</div>
+                        <div className="text-center text-slate-600 py-10">No events found.</div>
                     )}
                 </div>
             </GlassCard>

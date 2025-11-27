@@ -263,21 +263,21 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     // 2. Log to Supabase (Primary Source of Truth)
-    try {
-      if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
-        const { error } = await supabase.from('events').insert({
-          event_name: eventName,
-          event_type: 'app_event',
-          user_session_id: sessionIdRef.current,
-          metadata: data
-        });
-        
-        if (error) {
-           console.warn('Supabase Insert Error:', error.message);
+    if (supabase) {
+        try {
+            const { error } = await supabase.from('events').insert({
+              event_name: eventName,
+              event_type: 'app_event',
+              user_session_id: sessionIdRef.current,
+              metadata: data
+            });
+            
+            if (error) {
+               console.warn('Supabase Insert Error:', error.message);
+            }
+        } catch (e) {
+            console.warn('Supabase Connection Error:', e);
         }
-      }
-    } catch (e) {
-      console.warn('Supabase Connection Error:', e);
     }
   }, []);
 
