@@ -11,14 +11,16 @@ declare global {
   }
 }
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ejovnhzzchqpikgktbat.supabase.co';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Access environment variables safely to prevent crash if import.meta.env is undefined.
+// We use optional chaining so that if 'env' is missing, these become undefined instead of throwing.
+const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env?.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseKey) {
-  console.warn('Supabase key not configured, analytics will default to local storage.');
+if (!supabaseUrl || !supabaseKey) {
+  console.warn('Supabase configuration missing (VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY). Analytics will default to local storage.');
 }
 
-// Export null if no key is present so consumers can check for existence
-export const supabase = supabaseKey 
+// Export null if configuration is incomplete so consumers can handle the offline state gracefully
+export const supabase = (supabaseUrl && supabaseKey) 
   ? createClient(supabaseUrl, supabaseKey) 
   : null;
