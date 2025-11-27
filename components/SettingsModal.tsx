@@ -1,9 +1,7 @@
-
-
 import React from 'react';
 import { useProject } from '../context/ProjectContext';
 import { Settings as SettingsIcon, Zap, BrainCircuit, Search, Gauge, ChevronDown, Check } from 'lucide-react';
-import { Modal, Tooltip, Select } from './UI';
+import { Modal, Tooltip, Select, Button } from './UI';
 import { MODEL_CONFIGS, PRESETS } from '../utils/constants';
 import { PresetMode } from '../types';
 

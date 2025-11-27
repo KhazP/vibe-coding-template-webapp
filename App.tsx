@@ -1,5 +1,3 @@
-
-
 import React, { lazy, Suspense } from 'react';
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { ProjectProvider } from './context/ProjectContext';
@@ -17,6 +15,7 @@ const Part2PRD = lazy(() => import('./pages/Part2PRD'));
 const Part3Tech = lazy(() => import('./pages/Part3Tech'));
 const Part4Agent = lazy(() => import('./pages/Part4Agent'));
 const Part5Export = lazy(() => import('./pages/Part5Export'));
+const Analytics = lazy(() => import('./pages/Analytics'));
 
 const LoadingFallback = () => (
   <div className="h-full w-full flex items-center justify-center p-12">
@@ -38,6 +37,7 @@ const AnimatedRoutes: React.FC = () => {
           <Route path="/tech" element={<Part3Tech />} />
           <Route path="/agent" element={<Part4Agent />} />
           <Route path="/export" element={<Part5Export />} />
+          <Route path="/admindashboard" element={<Analytics />} />
         </Routes>
       </Suspense>
     </AnimatePresence>

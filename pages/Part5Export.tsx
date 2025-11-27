@@ -219,7 +219,7 @@ const MarkdownRenderer: React.FC<{ content: string; onCopy: (text: string) => vo
 // --- Main Page Component ---
 
 const Part5Export: React.FC = React.memo(() => {
-  const { state, currentProjectId } = useProject();
+  const { state, currentProjectId, logEvent } = useProject();
   const { tools, answers, persona, prdOutput, techOutput, researchOutput, agentOutputs } = state;
   const { addToast } = useToast();
 
@@ -330,6 +330,9 @@ Your AI agent will use this as its primary context.
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
+    // Log Event
+    logEvent('export_kit', { project: projectName, tools });
+
     addToast('Project kit downloaded!', 'success');
     toggleCheck('download'); // Auto-check download
   };

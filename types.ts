@@ -90,3 +90,10 @@ export interface ToolDefinition {
   supportLevel: 'native' | 'adapter' | 'manual';
   techTooltip: string;
 }
+
+export interface AnalyticsEvent {
+  id: string;
+  eventName: 'project_created' | 'persona_selected' | 'generation_complete' | 'export_kit' | 'page_view';
+  timestamp: number;
+  data?: any;
+}

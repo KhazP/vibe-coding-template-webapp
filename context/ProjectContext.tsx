@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useReducer, useRef, useCallback, useMemo } from 'react';
-import { Persona, ProjectState, GeminiSettings, GroundingChunk, ProjectFieldKey, ToolSettings } from '../types';
+import { Persona, ProjectState, GeminiSettings, GroundingChunk, ProjectFieldKey, ToolSettings, AnalyticsEvent } from '../types';
 import { runDeepResearch, generateArtifact, streamArtifact, streamDeepResearch } from '../utils/gemini';
 import { getPRDSystemInstruction, getTechDesignSystemInstruction, getAgentSystemInstruction, getRefineSystemInstruction, generateRefinePrompt, getBuildPlanSystemInstruction } from '../utils/templates';
 import { useToast } from '../components/Toast';
 import { STORAGE_KEYS, DEFAULT_SETTINGS } from '../utils/constants';
+import { supabase } from '../utils/supabaseClient';
 
 interface ProjectContextType {
   state: ProjectState;
@@ -51,6 +52,9 @@ interface ProjectContextType {
   clearApiKey: () => void;
   isApiKeyModalOpen: boolean;
   setIsApiKeyModalOpen: (isOpen: boolean) => void;
+
+  // Analytics
+  logEvent: (eventName: AnalyticsEvent['eventName'], data?: any) => void;
 }
 
 const defaultSettings: GeminiSettings = {
@@ -212,6 +216,7 @@ const THEMES = {
 };
 
 const API_KEY_STORAGE = 'VIBE_GEMINI_API_KEY';
+const ANALYTICS_STORAGE = 'VIBE_ANALYTICS_EVENTS';
 
 /**
  * Provider component for the ProjectContext.
@@ -229,6 +234,52 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // API Key State
   const [apiKey, setApiKeyState] = useState<string | null>(() => localStorage.getItem(API_KEY_STORAGE));
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+
+  // Session ID Management
+  const sessionIdRef = useRef<string>(sessionStorage.getItem('VIBE_SESSION_ID') || crypto.randomUUID());
+
+  useEffect(() => {
+    sessionStorage.setItem('VIBE_SESSION_ID', sessionIdRef.current);
+  }, []);
+
+  // Analytics Engine
+  const logEvent = useCallback(async (eventName: AnalyticsEvent['eventName'], data?: any) => {
+    // 1. Log to Local Storage (Backup / Immediate Client Access)
+    try {
+        const timestamp = Date.now();
+        const event: AnalyticsEvent = {
+            id: crypto.randomUUID(),
+            eventName,
+            timestamp,
+            data
+        };
+        const existingEvents = JSON.parse(localStorage.getItem(ANALYTICS_STORAGE) || '[]');
+        existingEvents.push(event);
+        // Keep last 1000 events locally
+        const trimmed = existingEvents.slice(-1000);
+        localStorage.setItem(ANALYTICS_STORAGE, JSON.stringify(trimmed));
+    } catch (e) {
+        console.warn('Local Analytics Error:', e);
+    }
+
+    // 2. Log to Supabase (Primary Source of Truth)
+    try {
+      if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+        const { error } = await supabase.from('events').insert({
+          event_name: eventName,
+          event_type: 'app_event',
+          user_session_id: sessionIdRef.current,
+          metadata: data
+        });
+        
+        if (error) {
+           console.warn('Supabase Insert Error:', error.message);
+        }
+      }
+    } catch (e) {
+      console.warn('Supabase Connection Error:', e);
+    }
+  }, []);
 
   // Auto-open modal if no key on mount
   useEffect(() => {
@@ -526,9 +577,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const createProject = useCallback((name: string) => {
     dispatch({ type: 'CREATE_PROJECT', payload: { name } });
+    logEvent('project_created', { name });
     addToast('New project created', 'success');
     return null; 
-  }, [addToast]);
+  }, [addToast, logEvent]);
 
   const loadProject = useCallback((id: string) => {
     dispatch({ type: 'SWITCH_PROJECT', payload: id });
@@ -539,7 +591,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     addToast('Project deleted', 'info');
   }, [addToast]);
 
-  const setPersona = useCallback((persona: Persona) => updateCurrentProject({ persona }), [updateCurrentProject]);
+  const setPersona = useCallback((persona: Persona) => {
+      updateCurrentProject({ persona });
+      logEvent('persona_selected', { persona });
+  }, [updateCurrentProject, logEvent]);
   
   const setValidationErrors = useCallback((validationErrors: Partial<Record<ProjectFieldKey, string>>) => {
       updateCurrentProject({ validationErrors }, { snapshot: false });
@@ -683,6 +738,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           isGenerating: false, 
           sectionTimestamps
       });
+      logEvent('generation_complete', { type: 'research', project: proj.name });
       setGenerationPhase('');
       addToast('Research completed', 'success');
 
@@ -699,7 +755,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       setGenerationPhase('');
     }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError]);
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent]);
 
   const performGeminiPRD = useCallback(async (prompt: string) => {
     const proj = state.projects[state.currentId];
@@ -731,6 +787,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const currentTimestamps = proj.sectionTimestamps || {};
         const sectionTimestamps = { ...currentTimestamps, prd: Date.now() };
         updateCurrentProject({ prdOutput: accumulatedText, isGenerating: false, sectionTimestamps });
+        logEvent('generation_complete', { type: 'prd', project: proj.name });
         setGenerationPhase('');
         addToast('PRD generated', 'success');
     } catch (error: any) {
@@ -740,7 +797,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
         setGenerationPhase('');
     }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError]);
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent]);
 
   const performGeminiTech = useCallback(async (prompt: string) => {
     const proj = state.projects[state.currentId];
@@ -772,6 +829,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const currentTimestamps = proj.sectionTimestamps || {};
         const sectionTimestamps = { ...currentTimestamps, tech: Date.now() };
         updateCurrentProject({ techOutput: accumulatedText, isGenerating: false, sectionTimestamps });
+        logEvent('generation_complete', { type: 'tech', project: proj.name });
         setGenerationPhase('');
         addToast('Tech Design generated', 'success');
     } catch (error: any) {
@@ -781,7 +839,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
         setGenerationPhase('');
     }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError]);
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent]);
 
   const performGeminiAgent = useCallback(async (prompt: string) => {
       const proj = state.projects[state.currentId];
@@ -798,6 +856,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           // but we still want standard error handling.
           const text = await generateArtifact(getAgentSystemInstruction(), prompt, proj.settings, apiKey);
           updateCurrentProject({ isGenerating: false });
+          logEvent('generation_complete', { type: 'agent', project: proj.name });
           setGenerationPhase('');
           addToast('Agent config generated', 'success');
           return text;
@@ -807,7 +866,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setGenerationPhase('');
           return "";
       }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError]);
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent]);
 
   const performGeminiBuildPlan = useCallback(async (prompt: string) => {
     const proj = state.projects[state.currentId];
@@ -839,6 +898,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const currentTimestamps = proj.sectionTimestamps || {};
         const sectionTimestamps = { ...currentTimestamps, build: Date.now() };
         updateCurrentProject({ buildPlan: accumulatedText, isGenerating: false, sectionTimestamps });
+        logEvent('generation_complete', { type: 'build_plan', project: proj.name });
         setGenerationPhase('');
         addToast('Build Plan generated', 'success');
     } catch (error: any) {
@@ -848,7 +908,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
         setGenerationPhase('');
     }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError]);
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent]);
 
   const performRefinement = useCallback(async (type: 'research' | 'prd' | 'tech' | 'build', instruction: string) => {
     updateCurrentProject({ isGenerating: true });
@@ -988,7 +1048,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     isApiKeyModalOpen,
     setIsApiKeyModalOpen,
     generationPhase,
-    cancelGeneration
+    cancelGeneration,
+    logEvent
   }), [
     activeProjectState, 
     sortedProjects, 
@@ -1028,7 +1089,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     clearApiKey,
     isApiKeyModalOpen,
     generationPhase,
-    cancelGeneration
+    cancelGeneration,
+    logEvent
   ]);
 
   return (
