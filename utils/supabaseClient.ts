@@ -1,22 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Safe access to environment variables
-const getEnv = () => {
-  try {
-    // Check if import.meta.env exists
-    if (import.meta && (import.meta as any).env) {
-        return (import.meta as any).env;
-    }
-  } catch (e) {
-    // Ignore errors
+declare global {
+  interface ImportMetaEnv {
+    readonly VITE_SUPABASE_URL: string;
+    readonly VITE_SUPABASE_ANON_KEY: string;
   }
-  return {};
-};
+}
 
-const env = getEnv();
-
-const supabaseUrl = env.VITE_SUPABASE_URL || 'https://ejovnhzzchqpikgktbat.supabase.co';
-const supabaseKey = env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://ejovnhzzchqpikgktbat.supabase.co';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseKey) {
   console.warn('Supabase key not configured, analytics will default to local storage.');
