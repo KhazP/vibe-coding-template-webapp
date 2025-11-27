@@ -127,7 +127,7 @@ const Analytics: React.FC = () => {
                 <AlertTriangle size={18} className="shrink-0 mt-0.5 text-amber-400" />
                 <div>
                     <strong>Connection Issue:</strong> Could not connect to Supabase. Showing local data only. 
-                    Ensure <code>SUPABASE_URL</code> and <code>SUPABASE_ANON_KEY</code> are set in your environment variables.
+                    Ensure <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> are set in your environment variables.
                 </div>
             </div>
         )}
