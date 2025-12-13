@@ -1,12 +1,15 @@
+
 import React from 'react';
 import { useProject } from '../context/ProjectContext';
-import { Settings as SettingsIcon, Zap, BrainCircuit, Search, Gauge, ChevronDown, Check, Activity } from 'lucide-react';
+import { Settings as SettingsIcon, Zap, BrainCircuit, Search, Gauge, ChevronDown, Check, Activity, Bell, User, Clock, FileArchive, EyeOff } from 'lucide-react';
 import { Modal, Tooltip, Select, Button } from './UI';
 import { MODEL_CONFIGS, PRESETS } from '../utils/constants';
-import { PresetMode } from '../types';
+import { PresetMode, ToastPosition, Persona } from '../types';
+import { useToast } from './Toast';
 
 const SettingsModal: React.FC = () => {
   const { state, updateSettings, isSettingsOpen, setIsSettingsOpen } = useProject();
+  const { position, setPosition } = useToast();
   const { settings } = state;
   const [showAdvanced, setShowAdvanced] = React.useState(settings.preset === 'custom');
 
@@ -23,8 +26,6 @@ const SettingsModal: React.FC = () => {
             preset: presetId,
             ...presetConfig.config
         });
-        // Optionally close advanced if a preset is selected to keep UI clean
-        // setShowAdvanced(false); 
     }
   };
 
@@ -62,7 +63,7 @@ const SettingsModal: React.FC = () => {
   const currentMaxBudget = currentConfig ? currentConfig.maxThinkingBudget : 32768;
 
   return (
-    <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Gemini Configuration">
+    <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Global Settings">
       <div className="space-y-8">
         
         {/* Header / Intro */}
@@ -109,26 +110,148 @@ const SettingsModal: React.FC = () => {
             </div>
         </div>
 
-        {/* Analytics Toggle */}
-        <div className="flex items-center justify-between p-4 bg-slate-950 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                    <Activity size={20} className="text-emerald-400" />
+        {/* Interface Settings Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            {/* Notification Position */}
+            <div className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+                    <Bell size={16} className="text-blue-400" />
                 </div>
-                <div>
-                    <label className="font-medium text-slate-300 block">Usage Analytics</label>
-                    <p className="text-xs text-slate-500">Help improve Vibe Coding by sharing usage stats anonymously.</p>
+                <div className="flex-1">
+                    <label className="font-medium text-slate-300 block text-xs">Notifications</label>
+                    <p className="text-[10px] text-slate-500">Position</p>
+                </div>
+                <div className="w-32">
+                    <Select 
+                        label="" 
+                        value={position} 
+                        onChange={(e) => setPosition(e.target.value as ToastPosition)}
+                        className="!mb-0 !py-1.5 !text-xs"
+                    >
+                        <option value="top-right">Top Right</option>
+                        <option value="top-left">Top Left</option>
+                        <option value="bottom-right">Bottom Right</option>
+                        <option value="bottom-left">Bottom Left</option>
+                    </Select>
                 </div>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-                <input 
-                    type="checkbox" 
-                    checked={settings.enableAnalytics ?? true} 
-                    onChange={(e) => updateSettings({ enableAnalytics: e.target.checked })}
-                    className="sr-only peer" 
-                />
-                <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-            </label>
+
+            {/* Default Persona */}
+            <div className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0">
+                    <User size={16} className="text-purple-400" />
+                </div>
+                <div className="flex-1">
+                    <label className="font-medium text-slate-300 block text-xs">Default Persona</label>
+                    <p className="text-[10px] text-slate-500">Skip selection</p>
+                </div>
+                <div className="w-32">
+                    <Select 
+                        label="" 
+                        value={settings.defaultPersona || ''} 
+                        onChange={(e) => updateSettings({ defaultPersona: e.target.value as Persona || null })}
+                        className="!mb-0 !py-1.5 !text-xs"
+                    >
+                        <option value="">None (Ask)</option>
+                        <option value={Persona.VibeCoder}>Vibe-Coder</option>
+                        <option value={Persona.Developer}>Developer</option>
+                        <option value={Persona.InBetween}>Learner</option>
+                    </Select>
+                </div>
+            </div>
+
+            {/* Auto-Save Interval */}
+            <div className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+                    <Clock size={16} className="text-emerald-400" />
+                </div>
+                <div className="flex-1">
+                    <label className="font-medium text-slate-300 block text-xs">Auto-Save</label>
+                    <p className="text-[10px] text-slate-500">Interval (ms)</p>
+                </div>
+                <div className="w-32 flex items-center gap-2">
+                    <input 
+                        type="range" 
+                        min="500" 
+                        max="5000" 
+                        step="500"
+                        value={settings.autoSaveInterval || 1000}
+                        onChange={(e) => updateSettings({ autoSaveInterval: parseInt(e.target.value) })}
+                        className="w-20 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                    />
+                    <span className="text-[10px] font-mono w-8 text-right">{settings.autoSaveInterval || 1000}</span>
+                </div>
+            </div>
+
+            {/* Export Format */}
+            <div className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center shrink-0">
+                    <FileArchive size={16} className="text-orange-400" />
+                </div>
+                <div className="flex-1">
+                    <label className="font-medium text-slate-300 block text-xs">Export Format</label>
+                    <p className="text-[10px] text-slate-500">Default type</p>
+                </div>
+                <div className="w-32">
+                    <Select 
+                        label="" 
+                        value={settings.defaultExportFormat || 'zip'} 
+                        onChange={(e) => updateSettings({ defaultExportFormat: e.target.value as 'zip' | 'markdown' })}
+                        className="!mb-0 !py-1.5 !text-xs"
+                    >
+                        <option value="zip">ZIP Archive</option>
+                        <option value="markdown">Markdown</option>
+                    </Select>
+                </div>
+            </div>
+        </div>
+
+        {/* Toggles Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             {/* Reduced Motion Toggle */}
+            <div className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center">
+                        <EyeOff size={16} className="text-slate-400" />
+                    </div>
+                    <div>
+                        <label className="font-medium text-slate-300 block text-xs">Reduced Motion</label>
+                        <p className="text-[10px] text-slate-500">Disable heavy animations.</p>
+                    </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                        type="checkbox" 
+                        checked={settings.reducedMotion ?? false} 
+                        onChange={(e) => updateSettings({ reducedMotion: e.target.checked })}
+                        className="sr-only peer" 
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-slate-600"></div>
+                </label>
+            </div>
+
+            {/* Analytics Toggle */}
+            <div className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                        <Activity size={16} className="text-emerald-400" />
+                    </div>
+                    <div>
+                        <label className="font-medium text-slate-300 block text-xs">Usage Analytics</label>
+                        <p className="text-[10px] text-slate-500">Help improve Vibe Coding.</p>
+                    </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                    <input 
+                        type="checkbox" 
+                        checked={settings.enableAnalytics ?? true} 
+                        onChange={(e) => updateSettings({ enableAnalytics: e.target.checked })}
+                        className="sr-only peer" 
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-600"></div>
+                </label>
+            </div>
         </div>
 
         {/* Advanced Accordion */}
@@ -138,7 +261,7 @@ const SettingsModal: React.FC = () => {
                 className="flex items-center gap-2 text-xs font-medium text-slate-400 hover:text-white transition-colors mb-4 w-full"
             >
                 <ChevronDown size={14} className={`transition-transform duration-300 ${showAdvanced ? 'rotate-180' : ''}`} />
-                {showAdvanced ? 'Hide Advanced Settings' : 'Show Advanced Settings (Manual Override)'}
+                {showAdvanced ? 'Hide Advanced AI Settings' : 'Show Advanced AI Settings (Manual Override)'}
             </button>
 
             {showAdvanced && (

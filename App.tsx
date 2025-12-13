@@ -1,10 +1,11 @@
+
 import React, { lazy, Suspense } from 'react';
 import { HashRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { ProjectProvider } from './context/ProjectContext';
+import { ProjectProvider, useProject } from './context/ProjectContext';
 import { ToastProvider } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, MotionConfig } from 'framer-motion';
 import { GenerationLoader } from './components/UI';
 
 // Lazy Load Pages
@@ -25,22 +26,25 @@ const LoadingFallback = () => (
 
 const AnimatedRoutes: React.FC = () => {
   const location = useLocation();
+  const { state } = useProject();
   
   return (
-    <AnimatePresence mode="wait">
-      <Suspense fallback={<LoadingFallback />}>
-        <Routes location={location} key={location.pathname}>
-          <Route path="/" element={<Home />} />
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/research" element={<Part1Research />} />
-          <Route path="/prd" element={<Part2PRD />} />
-          <Route path="/tech" element={<Part3Tech />} />
-          <Route path="/agent" element={<Part4Agent />} />
-          <Route path="/export" element={<Part5Export />} />
-          <Route path="/admindashboard" element={<Analytics />} />
-        </Routes>
-      </Suspense>
-    </AnimatePresence>
+    <MotionConfig reducedMotion={state.settings.reducedMotion ? "always" : "user"}>
+      <AnimatePresence mode="wait">
+        <Suspense fallback={<LoadingFallback />}>
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={<Home />} />
+            <Route path="/projects" element={<Projects />} />
+            <Route path="/research" element={<Part1Research />} />
+            <Route path="/prd" element={<Part2PRD />} />
+            <Route path="/tech" element={<Part3Tech />} />
+            <Route path="/agent" element={<Part4Agent />} />
+            <Route path="/export" element={<Part5Export />} />
+            <Route path="/admindashboard" element={<Analytics />} />
+          </Routes>
+        </Suspense>
+      </AnimatePresence>
+    </MotionConfig>
   );
 };
 

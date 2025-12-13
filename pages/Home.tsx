@@ -1,18 +1,55 @@
 
-
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles, Wand2, Box, Layers, Terminal, Github, Coffee, Settings, Key } from 'lucide-react';
-import { Button, GlassCard, PageTransition, Tooltip } from '../components/UI';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, Sparkles, Wand2, Box, Layers, Terminal, UserCheck } from 'lucide-react';
+import { Button, GlassCard, PageTransition, Tooltip, Modal } from '../components/UI';
 import { useProject } from '../context/ProjectContext';
 import { Persona } from '../types';
 import { motion } from 'framer-motion';
+import { useToast } from '../components/Toast';
 
 const Home: React.FC = () => {
-  const { setPersona, setIsSettingsOpen, setIsApiKeyModalOpen } = useProject();
+  const { setPersona, state, updateSettings } = useProject();
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+  
+  const [pendingPersona, setPendingPersona] = useState<Persona | null>(null);
 
-  const selectPersona = (p: Persona) => {
-    setPersona(p);
+  // Auto-redirect ONLY if a Default Persona is configured in Global Settings.
+  // This allows users to revisit the 'Start' page to change personas if no default is enforced.
+  useEffect(() => {
+      if (state.settings.defaultPersona && !state.researchOutput) {
+          // Ensure state matches default if not already (safeguard)
+          if (state.persona !== state.settings.defaultPersona) {
+              setPersona(state.settings.defaultPersona);
+          }
+          navigate('/research');
+      }
+  }, [state.settings.defaultPersona, state.researchOutput, state.persona, navigate, setPersona]);
+
+  const handlePersonaClick = (p: Persona) => {
+    // If a default is already set, just proceed (though usually handled by useEffect)
+    if (state.settings.defaultPersona) {
+       setPersona(p);
+       navigate('/research');
+       return;
+    }
+    
+    // Trigger Modal
+    setPendingPersona(p);
+  };
+
+  const confirmSelection = (makeDefault: boolean) => {
+    if (!pendingPersona) return;
+
+    if (makeDefault) {
+        updateSettings({ defaultPersona: pendingPersona });
+        addToast('Default persona saved. "Start" page will be skipped next time.', 'success');
+    }
+
+    setPersona(pendingPersona);
+    setPendingPersona(null);
+    navigate('/research');
   };
 
   const container = {
@@ -92,32 +129,40 @@ const Home: React.FC = () => {
           animate="show"
           className="grid md:grid-cols-3 gap-6 mb-24"
         >
-          {personas.map((p) => (
-            <Link 
-              key={p.id} 
-              to="/research" 
-              onClick={() => selectPersona(p.id)}
-              className="block h-full"
-            >
-              <motion.div variants={item} className="h-full">
-                <GlassCard className={`h-full group transition-all duration-500 ${p.border}`} hoverEffect={true}>
-                  <div className={`absolute inset-0 bg-gradient-to-br ${p.color} opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl`} />
-                  
-                  <div className="relative z-10 flex flex-col h-full">
-                    <div className="mb-6 p-4 bg-surface/80 w-fit rounded-2xl border border-white/10 shadow-lg group-hover:scale-110 transition-transform duration-500">
-                      {p.customIcon || p.icon}
-                    </div>
-                    <h3 className="text-2xl font-bold text-white mb-3 font-display">{p.title}</h3>
-                    <p className="text-slate-400 text-sm leading-relaxed mb-8 flex-1">{p.desc}</p>
+          {personas.map((p) => {
+            const isActive = state.persona === p.id;
+            return (
+              <button 
+                key={p.id} 
+                onClick={() => handlePersonaClick(p.id)}
+                className="block h-full text-left w-full"
+              >
+                <motion.div variants={item} className="h-full">
+                  <GlassCard 
+                    className={`h-full group transition-all duration-500 ${isActive ? 'border-primary-500/50 bg-primary-500/5 ring-1 ring-primary-500/20' : p.border}`} 
+                    hoverEffect={true}
+                  >
+                    <div className={`absolute inset-0 bg-gradient-to-br ${p.color} opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur-xl`} />
                     
-                    <div className="flex items-center text-primary-400 font-medium text-sm group-hover:translate-x-2 transition-transform duration-300">
-                      Select Path <ArrowRight size={16} className="ml-2" />
+                    <div className="relative z-10 flex flex-col h-full">
+                      <div className="mb-6 p-4 bg-surface/80 w-fit rounded-2xl border border-white/10 shadow-lg group-hover:scale-110 transition-transform duration-500">
+                        {p.customIcon || p.icon}
+                      </div>
+                      <h3 className="text-2xl font-bold text-white mb-3 font-display flex items-center gap-2">
+                        {p.title}
+                        {isActive && <span className="text-xs font-mono font-normal bg-primary-900/30 text-primary-300 px-2 py-0.5 rounded-full border border-primary-500/20">Active</span>}
+                      </h3>
+                      <p className="text-slate-400 text-sm leading-relaxed mb-8 flex-1">{p.desc}</p>
+                      
+                      <div className="flex items-center text-primary-400 font-medium text-sm group-hover:translate-x-2 transition-transform duration-300">
+                        Select Path <ArrowRight size={16} className="ml-2" />
+                      </div>
                     </div>
-                  </div>
-                </GlassCard>
-              </motion.div>
-            </Link>
-          ))}
+                  </GlassCard>
+                </motion.div>
+              </button>
+            );
+          })}
         </motion.div>
 
         <motion.div 
@@ -181,33 +226,39 @@ const Home: React.FC = () => {
           </div>
         </motion.div>
 
-        <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1 }}
-            className="mt-auto pt-24 pb-8 flex flex-col md:flex-row justify-end items-center gap-4"
-        >
-            <div className="flex items-center gap-3">
-               <a 
-                  href="https://github.com/KhazP/vibe-coding-prompt-template" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-               >
-                 <Button variant="secondary" className="text-xs h-10 border-white/10 bg-white/5 hover:bg-white/10">
-                    <Github size={16} /> Star on GitHub
-                 </Button>
-               </a>
-               <a 
-                  href="https://buymeacoffee.com/alpyalayg" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-               >
-                 <Button variant="secondary" className="text-xs h-10 border-[#FFDD00]/20 bg-[#FFDD00]/10 hover:bg-[#FFDD00]/20 text-[#FFDD00]">
-                    <Coffee size={16} /> Support
-                 </Button>
-               </a>
+        {/* Set Default Modal */}
+        <Modal isOpen={!!pendingPersona} onClose={() => setPendingPersona(null)} title="Set Default Persona?">
+            <div className="space-y-6">
+                <div className="flex items-center gap-4 p-4 bg-primary-900/10 border border-primary-500/20 rounded-xl">
+                    <div className="w-10 h-10 bg-primary-500/20 rounded-full flex items-center justify-center shrink-0">
+                        <UserCheck size={20} className="text-primary-400" />
+                    </div>
+                    <p className="text-sm text-slate-300">
+                        Do you want to use the <strong>{personas.find(p => p.id === pendingPersona)?.title}</strong> persona automatically for future projects?
+                    </p>
+                </div>
+                
+                <p className="text-xs text-slate-500">
+                    If you select <strong>Yes</strong>, this start screen will be skipped in the future. You can always change this later in Settings.
+                </p>
+
+                <div className="flex gap-3 justify-end pt-2">
+                    <Button 
+                        variant="secondary" 
+                        onClick={() => confirmSelection(false)}
+                        className="bg-white/5 hover:bg-white/10 border-white/5"
+                    >
+                        No, ask every time
+                    </Button>
+                    <Button 
+                        onClick={() => confirmSelection(true)}
+                        className="bg-primary-600 hover:bg-primary-500"
+                    >
+                        Yes, set as default
+                    </Button>
+                </div>
             </div>
-        </motion.div>
+        </Modal>
       </div>
     </PageTransition>
   );

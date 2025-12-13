@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useReducer, useRef, useCallback, useMemo } from 'react';
 import { Persona, ProjectState, GeminiSettings, GroundingChunk, ProjectFieldKey, ToolSettings, AnalyticsEvent } from '../types';
 import { runDeepResearch, runDeepResearchInteraction, generateArtifact, streamArtifact, streamDeepResearch } from '../utils/gemini';
@@ -65,7 +66,13 @@ const defaultSettings: GeminiSettings = {
   topK: DEFAULT_SETTINGS.TOP_K,
   topP: DEFAULT_SETTINGS.TOP_P,
   preset: 'thorough',
-  enableAnalytics: true
+  enableAnalytics: true,
+  
+  // Defaults for new QoL features
+  defaultPersona: null,
+  reducedMotion: false,
+  autoSaveInterval: 1000,
+  defaultExportFormat: 'zip'
 };
 
 const getGlobalSettings = (): GeminiSettings => {
@@ -82,7 +89,7 @@ const createNewProjectState = (): ProjectState => ({
   id: crypto.randomUUID(),
   name: 'Untitled Project',
   lastModified: Date.now(),
-  persona: null,
+  persona: getGlobalSettings().defaultPersona || null, // Auto-apply default persona if set
   answers: {},
   validationErrors: {},
   researchOutput: '',
@@ -493,7 +500,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [state.projects, state.currentId, pushToHistory]);
 
 
-  // Persistence Effect - Debounced
+  // Persistence Effect - Configurable Auto-Save
+  const currentProject = state.projects[state.currentId];
+  const autoSaveInterval = currentProject?.settings?.autoSaveInterval || 1000;
+
   useEffect(() => {
     // Only save if dirty
     if (saveStatus !== 'unsaved') return;
@@ -518,10 +528,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.warn("Failed to save state", e);
         setSaveStatus('saved'); // Reset to avoid getting stuck
       }
-    }, 1000); // 1s debounce to prevent spamming local storage on keystrokes
+    }, autoSaveInterval); 
 
     return () => clearTimeout(handler);
-  }, [state, saveStatus]);
+  }, [state, saveStatus, autoSaveInterval]);
 
   // Prevent Navigation when unsaved
   useEffect(() => {
@@ -556,8 +566,17 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [state, addToast]);
 
+  // Reduced Motion Effect
+  const reducedMotion = currentProject?.settings?.reducedMotion || false;
+  useEffect(() => {
+      if (reducedMotion) {
+          document.body.classList.add('reduce-motion');
+      } else {
+          document.body.classList.remove('reduce-motion');
+      }
+  }, [reducedMotion]);
+
   // Theme Effect
-  const currentProject = state.projects[state.currentId];
   const activePersona = currentProject?.persona;
 
   useEffect(() => {
@@ -674,8 +693,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const updated = { ...currentSettings, ...newSettings };
     updateCurrentProject({ settings: updated });
     
+    // Also update global default settings in storage
     localStorage.setItem(STORAGE_KEYS.GLOBAL_SETTINGS, JSON.stringify(updated));
-    // Toast handled in UI or silent
   }, [state.projects, state.currentId, updateCurrentProject]);
   
   const updateToolSettings = useCallback((settings: Partial<ToolSettings>) => {

@@ -1,14 +1,14 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { Zap, FileText, Cpu, Bot, Terminal, FolderOpen, Save, Loader2, CheckCircle, AlertCircle, Circle, PlayCircle, Settings, Key, Menu, X, Rocket } from 'lucide-react';
+import { Zap, FileText, Cpu, Bot, Terminal, FolderOpen, Save, Loader2, CheckCircle, AlertCircle, Circle, PlayCircle, Settings, Key, Menu, X, Rocket, Github } from 'lucide-react';
 import { motion, LayoutGroup, AnimatePresence } from 'framer-motion';
 import { useProject } from '../context/ProjectContext';
 import SettingsModal from './SettingsModal';
 import { Tooltip, Breadcrumbs, Button } from './UI';
 import { ApiKeyGate } from './ApiKeyGate';
 import FlowFieldBackground from './FlowFieldBackground';
+import { BuyMeACoffee } from './BuyMeACoffee';
 
 const NavItem: React.FC<{ 
   to: string; 
@@ -138,15 +138,17 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
   const renderNavItems = () => (
     <>
-      <NavItem 
-        to="/" 
-        icon={<Terminal />} 
-        label="Start" 
-        isActive={location.pathname === '/'} 
-        isHovered={hoveredPath === '/'}
-        onHover={() => setHoveredPath('/')}
-        onLeave={() => setHoveredPath(null)}
-      />
+      {!state.settings.defaultPersona && (
+        <NavItem 
+          to="/" 
+          icon={<Terminal />} 
+          label="Start" 
+          isActive={location.pathname === '/'} 
+          isHovered={hoveredPath === '/'}
+          onHover={() => setHoveredPath('/')}
+          onLeave={() => setHoveredPath(null)}
+        />
+      )}
       <NavItem 
         to="/research" 
         icon={<Zap />} 
@@ -255,6 +257,19 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                   
                   {/* Action Buttons */}
                   <div className="pt-6 border-t border-white/5 space-y-3">
+                     <a 
+                        href="https://github.com/KhazP/vibe-coding-prompt-template" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="block w-full"
+                     >
+                         <Button 
+                            variant="secondary" 
+                            className="w-full text-sm h-12 justify-start bg-white/5 border-white/10 hover:bg-white/10 px-4 text-slate-400 hover:text-white"
+                         >
+                            <Github size={18} /> <span className="ml-2">Star on GitHub</span>
+                         </Button>
+                     </a>
                      <Button 
                         variant="secondary" 
                         onClick={() => { setIsSettingsOpen(true); setIsMobileMenuOpen(false); }}
@@ -322,6 +337,19 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
              
              {/* Action Bar */}
              <div className="flex flex-col gap-2 mb-4">
+                 <a 
+                    href="https://github.com/KhazP/vibe-coding-prompt-template" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="block w-full"
+                 >
+                     <Button 
+                        variant="secondary" 
+                        className="w-full text-xs h-10 justify-start bg-white/5 border-white/10 hover:bg-white/10 px-3 text-slate-400 hover:text-white"
+                     >
+                        <Github size={16} /> <span className="ml-2">Star on GitHub</span>
+                     </Button>
+                 </a>
                  <Button 
                     variant="secondary" 
                     onClick={() => setIsSettingsOpen(true)}
@@ -386,6 +414,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </main>
 
       <SettingsModal />
+      <BuyMeACoffee />
     </div>
   );
 };

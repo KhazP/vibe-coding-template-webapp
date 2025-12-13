@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { GlassCard, Button, PersonaError, StepNavigation, Tooltip } from '../components/UI';
@@ -220,7 +221,7 @@ const MarkdownRenderer: React.FC<{ content: string; onCopy: (text: string) => vo
 
 const Part5Export: React.FC = React.memo(() => {
   const { state, currentProjectId, logEvent } = useProject();
-  const { tools, answers, persona, prdOutput, techOutput, researchOutput, agentOutputs } = state;
+  const { tools, answers, persona, prdOutput, techOutput, researchOutput, agentOutputs, settings } = state;
   const { addToast } = useToast();
 
   const [activeTab, setActiveTab] = useState<string>('index');
@@ -268,6 +269,35 @@ const Part5Export: React.FC = React.memo(() => {
   const hasAgentConfig = agentOutputs && Object.keys(agentOutputs).length > 0;
 
   // --- Actions ---
+
+  const handleExport = async () => {
+      // Check user preference
+      const format = settings.defaultExportFormat || 'zip';
+      
+      if (format === 'markdown') {
+          handleCopyAllMarkdown();
+      } else {
+          handleDownloadZip();
+      }
+  };
+
+  const handleCopyAllMarkdown = () => {
+      let combined = `# ${projectName.toUpperCase()} - PROJECT EXPORT\n\n`;
+      
+      if (researchOutput) combined += `## RESEARCH\n${researchOutput}\n\n---\n\n`;
+      if (prdOutput) combined += `## PRD\n${prdOutput}\n\n---\n\n`;
+      if (techOutput) combined += `## TECH DESIGN\n${techOutput}\n\n---\n\n`;
+      if (hasAgentConfig) {
+          Object.entries(agentOutputs).forEach(([filename, content]) => {
+              combined += `## ${filename}\n\`\`\`markdown\n${content}\n\`\`\`\n\n---\n\n`;
+          });
+      }
+      
+      navigator.clipboard.writeText(combined);
+      addToast('Full project markdown copied to clipboard!', 'success');
+      logEvent('export_kit', { project: projectName, format: 'markdown' });
+      toggleCheck('download');
+  };
 
   const handleDownloadZip = async () => {
     const zip = new JSZip();
@@ -331,7 +361,7 @@ Your AI agent will use this as its primary context.
     URL.revokeObjectURL(url);
     
     // Log Event
-    logEvent('export_kit', { project: projectName, tools });
+    logEvent('export_kit', { project: projectName, tools, format: 'zip' });
 
     addToast('Project kit downloaded!', 'success');
     toggleCheck('download'); // Auto-check download
@@ -388,6 +418,8 @@ Your AI agent will use this as its primary context.
 
      return <div className="text-slate-500 italic p-4">Protocol not available for this tool.</div>;
   };
+
+  const isZipDefault = settings.defaultExportFormat === 'zip' || !settings.defaultExportFormat;
 
   return (
     <div className="space-y-12 animate-fade-in pb-20">
@@ -470,9 +502,17 @@ Your AI agent will use this as its primary context.
                      </div>
                  </div>
 
-                 <Button onClick={handleDownloadZip} className="w-full bg-primary-600 hover:bg-primary-500 text-white shadow-lg shadow-primary-500/20 group">
-                     <Download size={18} className="group-hover:-translate-y-1 transition-transform" /> Download Full Kit (.zip)
-                 </Button>
+                 <div className="flex gap-2">
+                    <Button onClick={handleExport} className="flex-1 bg-primary-600 hover:bg-primary-500 text-white shadow-lg shadow-primary-500/20 group">
+                        {isZipDefault ? <Download size={18} className="group-hover:-translate-y-1 transition-transform" /> : <Copy size={18} />} 
+                        {isZipDefault ? "Download Kit (.zip)" : "Copy Full Markdown"}
+                    </Button>
+                    
+                    {/* Secondary Option Button */}
+                    <Button onClick={isZipDefault ? handleCopyAllMarkdown : handleDownloadZip} variant="secondary" className="px-3" tooltip={isZipDefault ? "Copy as Markdown instead" : "Download as ZIP instead"}>
+                        {isZipDefault ? <Copy size={18} /> : <Download size={18} />}
+                    </Button>
+                 </div>
              </GlassCard>
           </div>
 

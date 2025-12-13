@@ -6,6 +6,8 @@ export enum Persona {
   InBetween = 'C'
 }
 
+export type ToastPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+
 export type ProjectFieldKey = 
   | 'project_description'
   // Research - Vibe
@@ -52,6 +54,12 @@ export interface GeminiSettings {
   topP?: number;
   preset?: PresetMode;
   enableAnalytics?: boolean;
+  
+  // New QoL Settings
+  defaultPersona?: Persona | null;
+  reducedMotion?: boolean;
+  autoSaveInterval?: number; // milliseconds
+  defaultExportFormat?: 'zip' | 'markdown';
 }
 
 export interface ToolSettings {
