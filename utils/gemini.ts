@@ -1,6 +1,29 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { GroundingChunk, GeminiSettings } from "../types";
+
+// --- Types for Interactions API (Deep Research) ---
+// Matches official docs: https://ai.google.dev/gemini-api/docs/interactions
+
+interface InteractionRequest {
+  agent: string;
+  input: string; 
+  background: boolean; 
+  agent_config?: {
+      type: string;
+      thinking_summaries?: string;
+  };
+  stream?: boolean;
+}
+
+interface InteractionResponse {
+  name: string; // The resource name e.g., "interactions/123..."
+  state: 'STATE_UNSPECIFIED' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED';
+  error?: { message: string; code: number };
+  // Docs specify interaction.outputs[-1].text
+  outputs?: {
+     content?: { parts: { text: string }[] };
+  }[];
+}
 
 /**
  * Retries an asynchronous operation with exponential backoff.
@@ -23,7 +46,7 @@ const retryWithBackoff = async <T>(
         error?.status >= 500 || 
         error?.message?.includes('fetch') || 
         error?.message?.includes('network') ||
-        error?.message?.includes('overloaded') ||
+        error?.message?.includes('overloaded') || 
         error?.message?.includes('aborted');
     
     // Auth errors should NOT be retried
@@ -52,6 +75,7 @@ const retryWithBackoff = async <T>(
 
 /**
  * Streams deep research content from Gemini, optionally using Google Search grounding.
+ * This is the FALLBACK method using standard GenerateContent.
  * 
  * @param prompt - The user prompt for research.
  * @param settings - Gemini configuration settings.
@@ -156,6 +180,123 @@ ${prompt}`;
  */
 export const runDeepResearch = async (prompt: string, settings: GeminiSettings, apiKey: string): Promise<{ text: string; sources: GroundingChunk[] }> => {
   return streamDeepResearch(prompt, settings, apiKey, () => {});
+};
+
+/**
+ * Executes a Deep Research Interaction via the REST API.
+ * Uses the "Start + Poll" pattern required for Deep Research.
+ * 
+ * Docs: https://ai.google.dev/gemini-api/docs/deep-research
+ */
+export const runDeepResearchInteraction = async (
+  prompt: string,
+  apiKey: string,
+  onStatusUpdate?: (status: string) => void,
+  signal?: AbortSignal
+): Promise<{ text: string; sources: GroundingChunk[] }> => {
+  if (!apiKey) throw new Error("API Key is missing.");
+  
+  // Endpoint matches Interactions API docs
+  const baseUrl = "https://generativelanguage.googleapis.com/v1beta/interactions";
+
+  // 1. Create Interaction
+  onStatusUpdate?.("Initializing Deep Research Agent...");
+  
+  // Payload matches Deep Research docs: plain input string + background: true
+  const payload: InteractionRequest = {
+    agent: "deep-research-pro-preview-12-2025",
+    input: prompt,
+    background: true, 
+  };
+
+  try {
+    const createRes = await fetch(`${baseUrl}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal
+    });
+
+    if (!createRes.ok) {
+       const err = await createRes.json().catch(() => ({}));
+       
+       // Handle 404 specifically for Fallback logic
+       if (createRes.status === 404) {
+           const error: any = new Error(`Deep Research Agent not found (404).`);
+           error.status = 404;
+           throw error;
+       }
+       
+       throw new Error(`Deep Research Creation Failed: ${err?.error?.message || createRes.statusText}`);
+    }
+
+    const creationData: any = await createRes.json();
+    const interactionName = creationData.name; // e.g., "interactions/123..."
+
+    if (!interactionName) {
+        throw new Error("API did not return an interaction name.");
+    }
+
+    // 2. Poll for Completion (Long-running)
+    onStatusUpdate?.("Agent is thinking & researching (this takes 2-5 mins)...");
+
+    let attempts = 0;
+    const maxAttempts = 120; // 20 minutes max (10s interval)
+    const pollInterval = 10000; // 10s recommended by docs
+
+    while (attempts < maxAttempts) {
+        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+        
+        attempts++;
+        
+        // GET interaction to check status
+        const pollRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${interactionName}?key=${apiKey}`, {
+            signal
+        });
+        
+        if (!pollRes.ok) {
+            console.warn(`Polling failed: ${pollRes.status}. Retrying...`);
+            await new Promise(r => setTimeout(r, pollInterval));
+            continue;
+        }
+
+        const pollData: InteractionResponse = await pollRes.json();
+        
+        // Check Status
+        if (pollData.state === 'SUCCEEDED') {
+            // 3. Extract Output
+            let text = '';
+            
+            // Check outputs array (Standard API behavior)
+            const lastOutput = pollData.outputs?.[(pollData.outputs?.length || 1) - 1];
+            
+            if (lastOutput?.content?.parts) {
+                text = lastOutput.content.parts.map(p => p.text).join('');
+            } else {
+                // Fallback debugging
+                text = JSON.stringify(pollData, null, 2);
+            }
+            
+            // Deep Research usually embeds sources in the text, so we return empty sources array
+            // unless schema provides explicit metadata.
+            return { text, sources: [] };
+            
+        } else if (pollData.state === 'FAILED') {
+            throw new Error(`Deep Research Failed: ${pollData.error?.message || 'Unknown error'}`);
+        }
+
+        // Processing / Unspecified -> Wait and Loop
+        onStatusUpdate?.(`Researching... (${Math.floor(attempts * 10 / 60)}m elapsed)`);
+        
+        await new Promise(r => setTimeout(r, pollInterval));
+    }
+
+    throw new Error("Deep Research timed out.");
+
+  } catch (error: any) {
+    // Propagate errors (including 404) to be handled by context
+    throw error;
+  }
 };
 
 /**

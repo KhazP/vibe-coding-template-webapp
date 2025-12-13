@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useReducer, useRef, useCallback, useMemo } from 'react';
 import { Persona, ProjectState, GeminiSettings, GroundingChunk, ProjectFieldKey, ToolSettings, AnalyticsEvent } from '../types';
-import { runDeepResearch, generateArtifact, streamArtifact, streamDeepResearch } from '../utils/gemini';
+import { runDeepResearch, runDeepResearchInteraction, generateArtifact, streamArtifact, streamDeepResearch } from '../utils/gemini';
 import { getPRDSystemInstruction, getTechDesignSystemInstruction, getAgentSystemInstruction, getRefineSystemInstruction, generateRefinePrompt, getBuildPlanSystemInstruction } from '../utils/templates';
 import { useToast } from '../components/Toast';
 import { STORAGE_KEYS, DEFAULT_SETTINGS } from '../utils/constants';
@@ -26,7 +26,7 @@ interface ProjectContextType {
   updateToolSettings: (settings: Partial<ToolSettings>) => void;
   generateAgentOutputs: () => void;
   toggleTool: (toolId: string) => void;
-  performGeminiResearch: (prompt: string) => Promise<void>;
+  performGeminiResearch: (prompt: string, mode?: 'standard' | 'deep') => Promise<void>;
   performGeminiPRD: (prompt: string) => Promise<void>;
   performGeminiTech: (prompt: string) => Promise<void>;
   performGeminiAgent: (prompt: string) => Promise<string>;
@@ -708,7 +708,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // --- Gemini Actions with Streaming ---
 
-  const performGeminiResearch = useCallback(async (prompt: string) => {
+  const performGeminiResearch = useCallback(async (prompt: string, mode: 'standard' | 'deep' = 'standard') => {
     const proj = state.projects[state.currentId];
     if (!proj) return;
     if (!apiKey) {
@@ -720,6 +720,92 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     abortControllerRef.current = new AbortController();
     
     updateCurrentProject({ isGenerating: true, researchOutput: '', researchSources: [] });
+    
+    // -- Deep Research (Agent Mode) --
+    if (mode === 'deep') {
+        setGenerationPhase('Starting Deep Research Agent...');
+        try {
+            const { text, sources } = await runDeepResearchInteraction(
+                prompt, 
+                apiKey, 
+                (status) => setGenerationPhase(status),
+                abortControllerRef.current.signal
+            );
+            
+            const currentTimestamps = proj.sectionTimestamps || {};
+            const sectionTimestamps = { ...currentTimestamps, research: Date.now() };
+            
+            updateCurrentProject({ 
+                researchOutput: text, 
+                researchSources: sources, 
+                isGenerating: false, 
+                sectionTimestamps
+            });
+            logEvent('generation_complete', { type: 'research_deep', project: proj.name });
+            setGenerationPhase('');
+            addToast('Deep Research Report ready', 'success');
+        } catch (error: any) {
+             // Fallback Logic: If Agent fails (404/Not Found), fallback to Gemini Pro + Grounding
+             if (error?.message?.includes('not found') || error?.message?.includes('404') || error?.status === 404) {
+                 console.warn("Deep Research fallback triggered:", error.message);
+                 addToast('Deep Research Agent unavailable (Beta). Falling back to Gemini Pro + Search.', 'warning');
+                 setGenerationPhase('Falling back to Standard Research...');
+                 
+                 // Fallback execution
+                 try {
+                    let accumulatedText = '';
+                    const fallbackSettings = { ...proj.settings, useGrounding: true, thinkingBudget: 8192 }; // Enhance fallback settings
+                    
+                    const { text, sources } = await streamDeepResearch(
+                        prompt, 
+                        fallbackSettings, 
+                        apiKey, 
+                        (chunk) => {
+                            accumulatedText += chunk;
+                            dispatch({ 
+                                type: 'UPDATE_PROJECT', 
+                                payload: { researchOutput: accumulatedText } 
+                            });
+                        },
+                        (status) => setGenerationPhase(status),
+                        abortControllerRef.current.signal
+                    );
+
+                    const currentTimestamps = proj.sectionTimestamps || {};
+                    const sectionTimestamps = { ...currentTimestamps, research: Date.now() };
+                    updateCurrentProject({ 
+                        researchOutput: text, 
+                        researchSources: sources, 
+                        isGenerating: false, 
+                        sectionTimestamps
+                    });
+                    logEvent('generation_complete', { type: 'research_fallback', project: proj.name });
+                    setGenerationPhase('');
+                    addToast('Research completed (Standard Mode)', 'success');
+                    return; // Exit successfully after fallback
+                 } catch (fallbackError: any) {
+                     handleApiError(fallbackError);
+                     updateCurrentProject({ 
+                        researchOutput: `[Deep Research Failed: ${error.message}]\n[Fallback Failed: ${fallbackError.message}]`, 
+                        isGenerating: false 
+                     });
+                     setGenerationPhase('');
+                     return;
+                 }
+             }
+
+             // Standard Error Handling for other errors
+             handleApiError(error);
+             updateCurrentProject({ 
+                researchOutput: `[Deep Research Failed: ${error.message}]`, 
+                isGenerating: false 
+             });
+             setGenerationPhase('');
+        }
+        return;
+    }
+
+    // -- Standard Mode --
     setGenerationPhase('Initializing AI...');
     let accumulatedText = '';
     
