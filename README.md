@@ -1,54 +1,48 @@
-
 <div align="center">
 
-# ⚡ Vibe-Coding Workflow
+# ⚡ Vibe-Coding Workflow (Web App)
 
-**From Idea to "Cursor-Ready" Context in Minutes.**  
-An automated pipeline for generating Deep Research, PRDs, Technical Architectures, and Agent Configurations.
+**The Automated Successor to the [Vibe-Coding Prompt Template](https://github.com/KhazP/vibe-coding-prompt-template).**
+
+Transform any app idea into "Cursor-Ready" code through an automated, interactive UI pipeline powered by Gemini 3 Pro.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![Successor](https://img.shields.io/badge/Successor%20to-Vibe%20Coding%20Template-blueviolet)](https://github.com/KhazP/vibe-coding-prompt-template)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://reactjs.org/)
 [![Powered by Gemini](https://img.shields.io/badge/Powered%20by-Gemini%203%20Pro-8E75B2?logo=google-gemini)](https://ai.google.dev/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.0-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
 
-[Features](#-features) • [Getting Started](#-getting-started) • [The Workflow](#-the-workflow) • [Supported Agents](#-supported-ai-agents) • [Tech Stack](#-tech-stack)
+[Features](#-features) • [Getting Started](#-getting-started) • [The Workflow](#-the-5-step-workflow) • [Supported Agents](#-supported-ai-agents) • [Tech Stack](#-tech-stack)
 
 </div>
 
 ---
 
-## 🚀 What is this?
+## 🎯 What This Does
 
-**Vibe-Coding Workflow** is a specialized tool designed to solve the "Blank Canvas Paralysis" when working with AI coding agents (like Cursor, Windsurf, or Cline).
+This is the **Automatic UI Version** of the original Vibe-Coding methodology. 
 
-AI Agents are powerful, but they hallucinate when they lack context. This tool automates the creation of the **"Perfect Context Stack"**:
-1.  **Deep Research**: Validates your idea against real-time data (Google Search Grounding).
-2.  **Product Specs (PRD)**: Defines *what* to build based on your persona.
-3.  **Tech Design**: Defines *how* to build it (Stack, DB Schema, API).
-4.  **Agent Configuration**: Generates the **`AGENTS.md`** "Universal Brain" and tool-specific rules (e.g., `.cursorrules`).
+Instead of manually copy-pasting prompts into ChatGPT or Claude, this web app automates the entire "Context Stack" generation process. It connects directly to Google's Gemini 3 Pro API to conduct research, write specs, and configure your AI code editor in minutes.
 
-Whether you are a **"Vibe Coder"** (Idea-first, low-code) or a **Senior Developer** (Architecture-first), this tool adapts the output to your style.
+| # | Stage | Goal | Automated Output |
+|---|-------|------|--------|
+| 1️⃣ | **Deep Research** | Validate market & tech landscape | Live Google Search Report |
+| 2️⃣ | **Define (PRD)** | Clarify product scope | Comprehensive PRD |
+| 3️⃣ | **Tech Design** | Decide how to build | Architecture & Database Schema |
+| 4️⃣ | **Agent Config** | Generate AI instructions | `AGENTS.md` + Tool Configs |
+| 5️⃣ | **Build & Export** | Generate & test code | Downloadable `.zip` Kit |
 
 ---
 
 ## ✨ Features
 
+*   **⚡ Automated Pipeline**: No more context switching. The app passes context from Research → PRD → Tech Design automatically.
+*   **🧠 Deep Research Agent**: Uses **Gemini 3 Pro + Google Search Grounding** to validate ideas against real-time data.
 *   **🎭 3 Distinct Personas**:
-    *   **Vibe-Coder**: Focuses on the "Story", user journey, and simplicity.
-    *   **Developer**: Focuses on architecture, scalability, and edge cases.
-    *   **Learner**: Focuses on educational breakdowns and "why" decisions are made.
-*   **🧠 Deep Research Agent**: Uses Google Gemini 3 Pro with Search Grounding to analyze competitors, validate tech stacks, and find real-time libraries.
-*   **📄 Artifact Generation**: automatically writes comprehensive Markdown files for PRDs and Technical Design Documents.
-*   **🤖 Universal Agent Config**: Generates a standardized `AGENTS.md` file that serves as a single source of truth for any AI tool.
-*   **🔌 Tool Adapters**: One-click generation of configuration files for:
-    *   Cursor (`.cursorrules`)
-    *   Windsurf (`.windsurfrules`)
-    *   Cline (`.clinerules`)
-    *   Aider (`.aider.conf.yml`)
-    *   GitHub Copilot (`copilot-instructions.md`)
-*   **⚡ Build Planner**: Breaks down the implementation into a step-by-step "Master Build Plan" with specific terminal commands for your agent.
-*   **📦 One-Click Export**: Zips the entire documentation kit ready to be dropped into your IDE.
+    *   **Vibe-Coder**: Story-driven, simple, for non-technical founders.
+    *   **Developer**: Concise, technical, architecture-focused.
+    *   **Learner**: Educational, explaining the "why" behind technical choices.
+*   **🔌 Universal Adapters**: Generates config files for **Cursor, Windsurf, Cline, Aider**, and more.
+*   **📦 One-Click Export**: Downloads a ready-to-use `.zip` containing your `docs/` folder and `AGENTS.md`.
 
 ---
 
@@ -62,8 +56,8 @@ Whether you are a **"Vibe Coder"** (Idea-first, low-code) or a **Senior Develope
 
 1.  **Clone the repository**
     ```bash
-    git clone https://github.com/yourusername/vibe-coding-workflow.git
-    cd vibe-coding-workflow
+    git clone https://github.com/yourusername/vibe-coding-webapp.git
+    cd vibe-coding-webapp
     ```
 
 2.  **Install dependencies**
@@ -76,34 +70,42 @@ Whether you are a **"Vibe Coder"** (Idea-first, low-code) or a **Senior Develope
     npm run dev
     ```
 
-4.  **Enter your API Key**
-    The app will prompt you for your Gemini API Key on launch. This key is stored **locally** in your browser's LocalStorage.
+4.  **Launch & Configure**
+    Open `http://localhost:5173`. You will be prompted to enter your Gemini API Key (stored locally in your browser).
 
 ---
 
-## 🌊 The Workflow
+## 📋 The 5-Step Workflow
 
-The application guides you through a 5-step pipeline:
+### 1️⃣ Deep Research 🔍
+**Validate your idea with AI-powered market research.**
+*   **Manual way:** Copy prompts, search Google manually, paste results.
+*   **Automated way:** Click "Run Research". The app uses Gemini's Grounding tool to browse the live web, analyze competitors, and check library feasibility instantly.
 
-### 1. Research 🔍
-We run a deep analysis of your idea. You choose between "Standard" (Gemini Pro + Search) or "Deep Research" (Autonomous Agent).
-*   *Output*: Market analysis, competitor breakdown, and tech stack validation.
+### 2️⃣ Product Requirements (PRD) 📝
+**Define exactly what you're building.**
+*   The app uses your Research context to draft a professional PRD.
+*   Selects features based on your chosen persona (e.g., "MVP-focused" for Vibe Coders).
 
-### 2. Define (PRD) 📝
-We generate a Product Requirements Document.
-*   *Output*: User Stories, Core Features (MVP), and Success Metrics.
+### 3️⃣ Technical Design 🏗️
+**Plan the technical architecture.**
+*   Architects the stack (e.g., Next.js vs. Python) based on your budget and skills.
+*   Generates database schemas and API endpoints.
 
-### 3. Tech Design 🏗️
-We architect the solution.
-*   *Output*: Database Schema, API Endpoints, Component Structure, and Security protocols.
+### 4️⃣ Generate AI Agent Instructions 🤖
+**Create blueprints for your AI coding assistant.**
+*   Generates the all-important **`AGENTS.md`** (The Universal Brain).
+*   Automatically creates tool-specific rules:
+    *   `.cursorrules` (for Cursor)
+    *   `.windsurfrules` (for Windsurf)
+    *   `.clinerules` (for Cline)
+    *   `.aider.conf.yml` (for Aider)
 
-### 4. Agent Config 🤖
-We generate the "Brain" for your AI code editor.
-*   *Output*: `AGENTS.md` + Tool-specific config files (e.g., `.cursorrules`).
-
-### 5. Build & Export 📦
-We generate a step-by-step execution plan and zip it all up.
-*   *Output*: A `.zip` file containing your documentation folder structure, ready for `git init`.
+### 5️⃣ Build & Export 📦
+**Let AI build your MVP.**
+*   Generates a Master Build Plan (`BUILD_PLAN.md`) with a file tree.
+*   Provides copy-paste "Kickoff Prompts" for your specific tool.
+*   **Download Kit**: Get a zip file with everything structured perfectly for `git init`.
 
 ---
 
@@ -125,20 +127,19 @@ The tool generates optimized configuration files for the following tools:
 
 ## 💻 Tech Stack
 
-*   **Frontend**: React 19, TypeScript, Vite
-*   **Styling**: Tailwind CSS, Framer Motion (Animations)
-*   **AI**: Google GenAI SDK (`@google/genai`)
-    *   *Models*: Gemini 3 Pro Preview (Reasoning), Gemini 2.5 Flash (Speed)
-    *   *Features*: Google Search Grounding, Thinking Budget
-*   **Visualization**: P5.js (Flow field background)
-*   **Icons**: Lucide React
-*   **Storage**: LocalStorage + IndexedDB (via Context) / Supabase (Optional Analytics)
+This web application is built with:
+
+*   **Framework**: React 19 + Vite
+*   **Language**: TypeScript
+*   **AI Engine**: Google GenAI SDK (`@google/genai`)
+*   **Styling**: Tailwind CSS + Framer Motion
+*   **Persistence**: LocalStorage (Zero backend required)
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+PRs & issues welcome! This is a community project evolved from the original [Vibe-Coding Prompt Template](https://github.com/KhazP/vibe-coding-prompt-template).
 
 1.  Fork the Project
 2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
@@ -148,12 +149,15 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ---
 
-## 📄 License
+## 📜 License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+Released under the [MIT License](LICENSE).
 
 ---
 
+**The best time to build your idea was yesterday.**  
+**The second best time is now.** 🚀
+
 <div align="center">
-  <p>Built with ❤️ for the Vibe Coding Community</p>
+  <p>Built with ❤️ by the Vibe Coding Community</p>
 </div>
