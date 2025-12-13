@@ -210,10 +210,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-[#050505]/90 backdrop-blur-xl border-b border-white/5 p-4 flex items-center justify-between shadow-lg">
           <div className="flex items-center gap-3">
-             <div className="relative w-8 h-8 bg-gradient-to-br from-primary-600 to-primary-900 rounded-lg flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] border border-white/10 shrink-0">
-                 <Zap className="text-white relative z-10" size={16} />
-             </div>
-             <span className="font-bold text-sm text-white leading-tight tracking-tight font-display">Vibe Workflow</span>
+              <div className="relative w-8 h-8 bg-gradient-to-br from-primary-600 to-primary-900 rounded-lg flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] border border-white/10 shrink-0">
+                  <Zap className="text-white relative z-10" size={16} />
+              </div>
+              <span className="font-bold text-sm text-white leading-tight tracking-tight font-display">Vibe Workflow</span>
           </div>
           <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5">
               {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -291,12 +291,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </AnimatePresence>
 
       {/* Glass Sidebar (Desktop) */}
-      <motion.aside 
-        initial={{ x: -20, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-        className="w-72 hidden md:flex flex-col fixed h-full z-30 border-r border-white/5 bg-[#050505]/60 backdrop-blur-2xl"
-      >
+      <aside className="w-72 hidden md:flex flex-col fixed h-full z-30 border-r border-white/5 bg-[#050505]/60 backdrop-blur-2xl">
         <div className="p-8 pb-4">
           <div className="flex items-center gap-3 mb-12">
             <div className="relative w-10 h-10 bg-gradient-to-br from-primary-600 to-primary-900 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] border border-white/10 shrink-0">
@@ -311,18 +306,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           <LayoutGroup id="sidebar">
             {/* Projects Section */}
             <div className="mb-8">
-               <div className="text-xs font-mono text-slate-600 uppercase tracking-widest mb-3 px-6">Workspace</div>
-               <nav className="space-y-1">
-                  <NavItem 
-                    to="/projects" 
-                    icon={<FolderOpen />} 
-                    label="My Projects" 
-                    isActive={location.pathname === '/projects'}
-                    isHovered={hoveredPath === '/projects'}
-                    onHover={() => setHoveredPath('/projects')}
-                    onLeave={() => setHoveredPath(null)}
-                  />
-               </nav>
+              <div className="text-xs font-mono text-slate-600 uppercase tracking-widest mb-3 px-6">Workspace</div>
+              <nav className="space-y-1">
+                <NavItem 
+                  to="/projects" 
+                  icon={<FolderOpen />} 
+                  label="My Projects" 
+                  isActive={location.pathname === '/projects'}
+                  isHovered={hoveredPath === '/projects'}
+                  onHover={() => setHoveredPath('/projects')}
+                  onLeave={() => setHoveredPath(null)}
+                />
+              </nav>
             </div>
 
             <div className="text-xs font-mono text-slate-600 uppercase tracking-widest mb-3 px-6">Pipeline</div>
@@ -334,58 +329,57 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         </div>
 
         <div className="mt-auto p-6 border-t border-white/5 bg-gradient-to-t from-primary-900/5 to-transparent">
-             
-             {/* Action Bar */}
-             <div className="flex flex-col gap-2 mb-4">
-                 <a 
+            {/* Action Bar */}
+            <div className="flex flex-col gap-2 mb-4">
+                <a 
                     href="https://github.com/KhazP/vibe-coding-prompt-template" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="block w-full"
-                 >
-                     <Button 
+                >
+                    <Button 
                         variant="secondary" 
                         className="w-full text-xs h-10 justify-start bg-white/5 border-white/10 hover:bg-white/10 px-3 text-slate-400 hover:text-white"
-                     >
+                    >
                         <Github size={16} /> <span className="ml-2">Star on GitHub</span>
-                     </Button>
-                 </a>
-                 <Button 
+                    </Button>
+                </a>
+                <Button 
                     variant="secondary" 
                     onClick={() => setIsSettingsOpen(true)}
                     className="w-full text-xs h-10 justify-start bg-white/5 border-white/10 hover:bg-white/10 px-3 text-slate-400 hover:text-white"
-                 >
+                >
                     <Settings size={16} /> <span className="ml-2">Settings</span>
-                 </Button>
-                 <Button 
+                </Button>
+                <Button 
                     variant="secondary" 
                     onClick={() => setIsApiKeyModalOpen(true)}
                     className="w-full text-xs h-10 justify-start bg-white/5 border-white/10 hover:bg-white/10 px-3 text-slate-400 hover:text-white"
-                 >
+                >
                     <Key size={16} /> <span className="ml-2">API Key</span>
-                 </Button>
-             </div>
+                </Button>
+            </div>
 
-             <div className="text-[10px] text-slate-600 mt-2 text-center font-mono opacity-50">
-               Auto-save • v2.2.0
-             </div>
+            <div className="text-[10px] text-slate-600 mt-2 text-center font-mono opacity-50">
+              Auto-save • v2.2.0
+            </div>
         </div>
-      </motion.aside>
+      </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 md:ml-72 relative z-10 h-screen overflow-y-auto overflow-x-hidden scroll-smooth pt-20 md:pt-0">
+      <main className="flex-1 relative z-20 h-screen overflow-y-auto overflow-x-hidden scroll-smooth pt-20 md:pt-0 md:ml-72 transition-all duration-500 ease-in-out">
         <div className="max-w-6xl mx-auto p-4 md:p-12 pb-32">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-             <div className="hidden md:block">
-               <Breadcrumbs items={getBreadcrumbs()} />
-             </div>
-             {/* Mobile Breadcrumbs (Simplified) */}
-             <div className="md:hidden text-xs font-mono text-slate-500 uppercase tracking-wider mb-2">
-                 {showPipeline ? getCurrentStepLabel(location.pathname) : 'Workspace'}
-             </div>
+            <div className="hidden md:block">
+                <Breadcrumbs items={getBreadcrumbs()} />
+            </div>
+            {/* Mobile Breadcrumbs (Simplified) */}
+            <div className="md:hidden text-xs font-mono text-slate-500 uppercase tracking-wider mb-2">
+                {showPipeline ? getCurrentStepLabel(location.pathname) : 'Workspace'}
+            </div>
 
-             <div className="flex items-center gap-4 justify-between md:justify-end">
+            <div className="flex items-center gap-4 justify-between md:justify-end">
                 <div className="text-xs font-mono flex items-center gap-2 transition-all duration-300">
                     {saveStatus === 'saving' && (
                         <span className="text-slate-400 flex items-center gap-2">
@@ -402,11 +396,22 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                             <AlertCircle size={12} /> Unsaved
                         </span>
                     )}
+                    {saveStatus === 'error' && (
+                        <span className="text-red-500 flex items-center gap-2 font-bold animate-pulse" title="Storage Full! Export or delete projects.">
+                            <AlertCircle size={12} /> Storage Full
+                        </span>
+                    )}
                 </div>
-                <Button variant="secondary" onClick={saveProject} className="h-8 text-xs px-3 bg-white/5 border-white/10 hover:bg-white/10">
-                    <Save size={14} className="mr-1.5" /> Save
-                </Button>
-             </div>
+                <div className="flex gap-2">
+                    <Button 
+                        variant="secondary" 
+                        onClick={saveProject} 
+                        className="h-8 text-xs px-3 bg-white/5 border-white/10 hover:bg-white/10"
+                    >
+                        <Save size={14} className="mr-1.5" /> Save
+                    </Button>
+                </div>
+            </div>
           </div>
 
           {children}

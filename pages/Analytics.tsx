@@ -91,31 +91,20 @@ const ProgressBar: React.FC<{ label: string; value: number; max: number; color: 
 const Analytics: React.FC = () => {
   const [events, setEvents] = useState<AnalyticsEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  
-  // Auth State
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [passwordInput, setPasswordInput] = useState('');
-  const [authError, setAuthError] = useState(false);
-
-  const envPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'admin';
-
-  const handleLogin = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (passwordInput === envPassword) {
-          setIsAuthenticated(true);
-          setAuthError(false);
-      } else {
-          setAuthError(true);
-      }
-  };
+  const [loading, setLoading] = useState(true);
 
   // Load events
   const loadEvents = async () => {
+    setLoading(true);
     try {
         let remoteEvents: AnalyticsEvent[] = [];
         let isRemoteConnected = false;
 
         if (supabase) {
+            // Check session first if using Supabase
+            // const { data: { session } } = await supabase.auth.getSession();
+            // If connected, we assume valid credentials/RLS are in place.
+            
             const { data, error } = await supabase
                 .from('events')
                 .select('*')
@@ -150,16 +139,16 @@ const Analytics: React.FC = () => {
         const stored = localStorage.getItem('VIBE_ANALYTICS_EVENTS');
         if (stored) setEvents(JSON.parse(stored));
         setIsConnected(false);
+    } finally {
+        setLoading(false);
     }
   };
 
   useEffect(() => {
-      if (isAuthenticated) {
-          loadEvents();
-          const interval = setInterval(loadEvents, 15000); // 15s polling
-          return () => clearInterval(interval);
-      }
-  }, [isAuthenticated]);
+      loadEvents();
+      const interval = setInterval(loadEvents, 15000); // 15s polling
+      return () => clearInterval(interval);
+  }, []);
 
 
   // --- Deep Metrics Calculation ---
@@ -181,11 +170,7 @@ const Analytics: React.FC = () => {
       const genAgent = generations.filter(e => e.data?.type === 'agent').length;
 
       // Unique Sessions
-      const sessions = new Set(events.map(e => e.id)); // Using ID as proxy if no session_id stored locally, but Supabase has session_id. 
-      // Note: Local storage events structure might not have session_id in root, but Supabase does. 
-      // For simplified local analytics, we assume 'id' is unique event, we need session tracking. 
-      // The current context doesn't explicitly store session IDs in local event objects effectively for grouping unless we check `data`.
-      // Let's assume `data` might contain it or we just use event volume for now.
+      // const sessions = new Set(events.map(e => e.id)); 
       
       // Active in last 24h
       const activeEvents24h = events.filter(e => (now - e.timestamp) < oneDay);
@@ -233,43 +218,6 @@ const Analytics: React.FC = () => {
       };
   }, [events]);
 
-  // --- Login Screen ---
-  if (!isAuthenticated) {
-      return (
-          <PageTransition>
-              <div className="flex flex-col items-center justify-center min-h-[60vh]">
-                  <GlassCard className="w-full max-w-md p-8 flex flex-col items-center text-center border-primary-500/20 shadow-[0_0_50px_rgba(16,185,129,0.1)]">
-                      <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center mb-6 border border-white/10 shadow-inner">
-                          <Lock className="text-primary-400" size={32} />
-                      </div>
-                      <h2 className="text-2xl font-bold text-white mb-2">Admin Access</h2>
-                      <p className="text-slate-400 mb-8 text-sm">Enter the workspace password to view analytics.</p>
-                      
-                      <form onSubmit={handleLogin} className="w-full space-y-4">
-                          <Input 
-                             label="Password" 
-                             type="password" 
-                             value={passwordInput} 
-                             onChange={(e) => setPasswordInput(e.target.value)}
-                             placeholder="••••••••"
-                             className="text-center tracking-widest"
-                             autoFocus
-                          />
-                          {authError && (
-                              <p className="text-red-400 text-xs flex items-center justify-center gap-1 animate-shake">
-                                  <AlertTriangle size={12} /> Incorrect password
-                              </p>
-                          )}
-                          <Button className="w-full justify-center mt-2">
-                             <Unlock size={18} className="mr-2" /> Unlock Dashboard
-                          </Button>
-                      </form>
-                  </GlassCard>
-              </div>
-          </PageTransition>
-      );
-  }
-
   // --- Main Dashboard ---
   return (
     <PageTransition>
@@ -290,7 +238,7 @@ const Analytics: React.FC = () => {
                 </div>
             </div>
             <Button onClick={loadEvents} variant="secondary" className="border-white/10 text-slate-300">
-                <RefreshCw size={16} className="mr-2" /> Refresh Data
+                <RefreshCw size={16} className={`mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh Data
             </Button>
         </div>
 

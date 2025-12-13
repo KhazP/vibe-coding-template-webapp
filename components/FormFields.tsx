@@ -1,5 +1,4 @@
-
-import React, { useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { Input, TextArea, Select } from './UI';
 import { ProjectFieldKey } from '../types';
@@ -40,53 +39,92 @@ export type ProjectFieldProps = TextAreaType | InputType | SelectType;
 /**
  * A unified form field component that strictly requires a valid ProjectFieldKey.
  * Uses discriminated unions for 'type' prop (textarea, input, select).
+ * 
+ * Performance Optimization: Uses local state and debounced global updates to prevent 
+ * rapid re-renders of the entire app context on every keystroke.
  */
 export const ProjectField: React.FC<ProjectFieldProps> = (props) => {
   const { state, setAnswer, setValidationErrors } = useProject();
   const { field, error, ...rest } = props;
+  
+  const contextValue = state.answers[field] || '';
   const contextError = state.validationErrors?.[field];
-  const value = state.answers[field] || '';
   const errorMessage = error || contextError;
+
+  // Local state for immediate UI feedback
+  const [localValue, setLocalValue] = useState(contextValue);
+  
+  // Ref to track debounce timeout
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync with global state changes (e.g., undo/redo, import)
+  // We only update if the context value is different from our local value 
+  // and we assume the context is the source of truth when it changes externally.
+  useEffect(() => {
+    if (contextValue !== localValue) {
+        setLocalValue(contextValue);
+    }
+  }, [contextValue]);
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const val = e.target.value;
-    setAnswer(field, val);
+    setLocalValue(val);
 
-    // Real-time validation logic
-    let err = '';
-    
-    // Check required
-    if (props.required && !val.trim()) {
-        err = 'This field is required.';
-    }
-    
-    // Check Max Length
-    if ((props.type === 'textarea' || props.type === 'input') && (props as any).maxLength) {
-        const limit = (props as any).maxLength;
-        if (val.length > limit) {
-             err = `Max length is ${limit} characters.`;
-        }
-    }
+    // Clear existing timeout
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-    const currentErrors = state.validationErrors || {};
-    
-    if (err) {
-        // If we found an error, update it immediately
-        if (contextError !== err) {
-             setValidationErrors({ ...currentErrors, [field]: err });
+    // Debounce the expensive context update
+    timeoutRef.current = setTimeout(() => {
+        setAnswer(field, val);
+
+        // Validation Logic (Executed after debounce)
+        let err = '';
+        
+        // Check required
+        if (props.required && !val.trim()) {
+            err = 'This field is required.';
         }
-    } else {
-        // If valid, and there was an error, clear it
-        if (contextError) {
-             const newErrors = { ...currentErrors };
-             delete newErrors[field];
-             setValidationErrors(newErrors);
+        
+        // Check Max Length
+        if ((props.type === 'textarea' || props.type === 'input') && (props as any).maxLength) {
+            const limit = (props as any).maxLength;
+            if (val.length > limit) {
+                err = `Max length is ${limit} characters.`;
+            }
         }
-    }
+
+        const currentErrors = state.validationErrors || {};
+        
+        if (err) {
+            if (contextError !== err) {
+                setValidationErrors({ ...currentErrors, [field]: err });
+            }
+        } else {
+            if (contextError) {
+                const newErrors = { ...currentErrors };
+                delete newErrors[field];
+                setValidationErrors(newErrors);
+            }
+        }
+    }, 300); // 300ms debounce
   };
 
   const handleBlur = () => {
-    const currentValue = state.answers[field] || '';
+    // Flush pending updates immediately on blur
+    if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+        setAnswer(field, localValue);
+    }
+
+    const currentValue = localValue;
     let err = '';
 
     if (props.required && !currentValue.trim()) {
@@ -118,7 +156,7 @@ export const ProjectField: React.FC<ProjectFieldProps> = (props) => {
       return (
         <TextArea
           {...rest}
-          value={value}
+          value={localValue}
           error={errorMessage}
           onChange={handleChange}
           onBlur={handleBlur}
@@ -128,7 +166,7 @@ export const ProjectField: React.FC<ProjectFieldProps> = (props) => {
       return (
         <Input
           {...rest}
-          value={value}
+          value={localValue}
           error={errorMessage}
           onChange={handleChange}
           onBlur={handleBlur}
@@ -139,7 +177,7 @@ export const ProjectField: React.FC<ProjectFieldProps> = (props) => {
       return (
         <Select
           {...selectRest}
-          value={value}
+          value={localValue}
           error={errorMessage}
           onChange={handleChange}
           onBlur={handleBlur}

@@ -1,7 +1,4 @@
 
-
-
-
 import { ToolDefinition } from "../types";
 
 export const APP_NAME = 'Vibe-Coding Workflow';
@@ -25,6 +22,14 @@ export const STORAGE_KEYS = {
 export const MODELS = {
   GEMINI_PRO: 'gemini-3-pro-preview',
   GEMINI_FLASH: 'gemini-2.5-flash',
+  DEEP_RESEARCH: 'deep-research-pro-preview-12-2025',
+} as const;
+
+export const TOKEN_LIMITS = {
+  INPUT_GLOBAL: 1048576, // 1M tokens for Gemini 3 Pro / 2.5 Flash
+  OUTPUT_GLOBAL: 65536,
+  WARNING_THRESHOLD: 200000, // Warn about latency after 200k
+  CRITICAL_THRESHOLD: 900000
 } as const;
 
 export const MODEL_CONFIGS = {
@@ -41,6 +46,21 @@ export const MODEL_CONFIGS = {
     supportsGrounding: true,
     description: 'Optimized for speed (up to 24k tokens).',
     isFlash: true
+  }
+} as const;
+
+export const PRICING = {
+  [MODELS.GEMINI_PRO]: {
+    input: 2.00, // per 1M tokens
+    output: 12.00, // per 1M tokens
+    grounding: 0, // Free during preview until Jan 2026
+    groundingFreeLimit: 5000 // Monthly
+  },
+  [MODELS.GEMINI_FLASH]: {
+    input: 0.30, // per 1M tokens
+    output: 2.50, // per 1M tokens
+    grounding: 35.00 / 1000, // $35 per 1000 prompts
+    groundingFreeLimit: 1500 // Daily
   }
 } as const;
 

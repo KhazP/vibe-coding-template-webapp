@@ -1,10 +1,10 @@
 
 import React, { createContext, useContext, useState, useEffect, useReducer, useRef, useCallback, useMemo } from 'react';
-import { Persona, ProjectState, GeminiSettings, GroundingChunk, ProjectFieldKey, ToolSettings, AnalyticsEvent } from '../types';
+import { Persona, ProjectState, GeminiSettings, GroundingChunk, ProjectFieldKey, ToolSettings, AnalyticsEvent, ArtifactSectionName, TokenUsage, ArtifactVersion } from '../types';
 import { runDeepResearch, runDeepResearchInteraction, generateArtifact, streamArtifact, streamDeepResearch } from '../utils/gemini';
 import { getPRDSystemInstruction, getTechDesignSystemInstruction, getAgentSystemInstruction, getRefineSystemInstruction, generateRefinePrompt, getBuildPlanSystemInstruction } from '../utils/templates';
 import { useToast } from '../components/Toast';
-import { STORAGE_KEYS, DEFAULT_SETTINGS } from '../utils/constants';
+import { STORAGE_KEYS, DEFAULT_SETTINGS, PRICING, MODELS } from '../utils/constants';
 import { supabase } from '../utils/supabaseClient';
 
 interface ProjectContextType {
@@ -14,6 +14,7 @@ interface ProjectContextType {
   createProject: (name: string) => string | null;
   loadProject: (id: string) => void;
   deleteProject: (id: string) => void;
+  importProjects: (projects: ProjectState[]) => void;
   setPersona: (p: Persona) => void;
   setAnswer: (key: ProjectFieldKey, value: string) => void;
   setValidationErrors: (errors: Partial<Record<ProjectFieldKey, string>>) => void;
@@ -41,8 +42,12 @@ interface ProjectContextType {
   canUndo: boolean;
   canRedo: boolean;
   saveProject: () => void;
-  saveStatus: 'saved' | 'saving' | 'unsaved';
+  saveStatus: 'saved' | 'saving' | 'unsaved' | 'error';
   
+  // Artifact Versioning
+  commitArtifact: (section: ArtifactSectionName, content: string) => void;
+  cycleArtifactVersion: (section: ArtifactSectionName, direction: -1 | 1) => void;
+
   // Generation Status & Cancellation
   generationPhase: string;
   cancelGeneration: () => void;
@@ -89,7 +94,7 @@ const createNewProjectState = (): ProjectState => ({
   id: crypto.randomUUID(),
   name: 'Untitled Project',
   lastModified: Date.now(),
-  persona: getGlobalSettings().defaultPersona || null, // Auto-apply default persona if set
+  persona: getGlobalSettings().defaultPersona || null,
   answers: {},
   validationErrors: {},
   researchOutput: '',
@@ -102,8 +107,93 @@ const createNewProjectState = (): ProjectState => ({
   toolSettings: { claudeAdapterMode: false, geminiAdapterMode: false, antigravityAdapterMode: false },
   isGenerating: false,
   settings: getGlobalSettings(),
-  sectionTimestamps: {}
+  sectionTimestamps: {},
+  artifactVersions: { research: [], prd: [], tech: [], build: [] },
+  artifactIndices: { research: -1, prd: -1, tech: -1, build: -1 },
+  tokenUsage: { input: 0, output: 0, groundingRequests: 0, estimatedCost: 0 }
 });
+
+const createExampleProject = (): ProjectState => {
+  const base = createNewProjectState();
+  const researchText = `## Deep Research Report: PlantPal\n\n### Market Validation\nThe "Plant Parenting" trend is still growing...`;
+  const prdText = `## PRD: PlantPal\n\n### Executive Summary\nPlantPal is a cozy, AI-powered plant care companion...`;
+  const techText = `## Tech Design: PlantPal\n\n### Recommended Stack (Vibe-Coder Optimized)\n- **Framework**: React Native with **Expo**...`;
+  const now = Date.now();
+
+  return {
+    ...base,
+    id: 'example-plantpal',
+    name: 'PlantPal 🌿 (Example)',
+    persona: Persona.VibeCoder,
+    answers: {
+      'project_description': 'An AI-powered mobile app that helps people keep their house plants alive...',
+      // ... (Rest of answers truncated for brevity, same as original)
+      'research_vibe_who': 'Urban millennials, busy professionals, and plant parents who kill their plants by accident.',
+      'research_vibe_problem': 'Overwatering, underwatering, not knowing what plant it is, and forgetting to check on them until they droop.',
+      'research_vibe_existing': 'PlantSnap, PictureThis - they identify well but the care scheduling is clunky and notifications are annoying.',
+      'research_vibe_unique': 'Vibe-first design (cozy/chill aesthetic), simple "water me" notifications that aren\'t spammy, and an AI chat bot "Dr. Green" for specific questions.',
+      'research_vibe_features': '1. Camera scan to identify & diagnose. 2. Auto-schedule creation. 3. "Dr. Green" AI chat.',
+      'research_vibe_platform': 'Mobile (iOS/Android)',
+      'research_vibe_timeline': 'ASAP – a few weeks',
+      'research_vibe_budget': '<$50/month',
+      'prd_vibe_name': 'PlantPal',
+      'prd_vibe_goal': 'Help 1000 users keep a plant alive for 6 months.',
+      'prd_vibe_users': 'Busy urbanites with house plants.',
+      'prd_vibe_story': 'Jane buys a Monstera. She takes a pic with PlantPal. It says "That\'s a Monstera Deliciosa! It needs water every 7 days." She gets a chill notification next week. Her plant thrives.',
+      'prd_vibe_features': 'Scan & Identify, Care Scheduler, AI Chat.',
+      'prd_vibe_non_features': 'Plant marketplace, social sharing.',
+      'prd_vibe_metric': 'Daily Active Users (checking schedule)',
+      'prd_vibe_vibe': 'Cozy, organic, calming, green & beige palette.',
+      'prd_vibe_constraints': 'Must be built with free tools initially.',
+      'tech_vibe_platform': 'Cross-Platform',
+      'tech_vibe_coding': 'AI writes all code',
+      'tech_vibe_budget': 'Up to $50/month',
+      'tech_vibe_timeline': 'About 1 month',
+      'tech_vibe_worry': 'Getting stuck on camera integration.',
+      'tech_vibe_tools': 'Tried ChatGPT for coding before.',
+      'tech_vibe_priority': 'Simple to build'
+    },
+    researchOutput: researchText,
+    researchSources: [],
+    prdOutput: prdText,
+    techOutput: techText,
+    agentOutputs: {
+      'AGENTS.md': `# AGENTS.md\n\n> **SYSTEM INSTRUCTION FOR AI AGENTS:**...`
+    },
+    tools: ['cursor', 'lovable'],
+    sectionTimestamps: {
+        research: now,
+        prd: now,
+        tech: now,
+        agent: now
+    },
+    lastModified: now,
+    artifactVersions: {
+      research: [{ content: researchText, timestamp: now }],
+      prd: [{ content: prdText, timestamp: now }],
+      tech: [{ content: techText, timestamp: now }],
+      build: []
+    },
+    artifactIndices: {
+      research: 0,
+      prd: 0,
+      tech: 0,
+      build: -1
+    },
+    tokenUsage: { input: 2500, output: 8000, groundingRequests: 2, estimatedCost: 0.12 }
+  };
+};
+
+// Helper to migrate string[] history to ArtifactVersion[] history
+const migrateArtifactVersions = (versions: any, lastMod: number): ArtifactVersion[] => {
+    if (!Array.isArray(versions)) return [];
+    if (versions.length === 0) return [];
+    if (typeof versions[0] === 'string') {
+        // Migration: Convert string to object
+        return (versions as string[]).map(v => ({ content: v, timestamp: lastMod }));
+    }
+    return versions as ArtifactVersion[];
+};
 
 interface StorageData {
   projects: Record<string, ProjectState>;
@@ -116,8 +206,10 @@ type Action =
   | { type: 'CREATE_PROJECT'; payload: { name: string } }
   | { type: 'DELETE_PROJECT'; payload: string }
   | { type: 'SWITCH_PROJECT'; payload: string }
-  | { type: 'UPDATE_PROJECT'; payload: Partial<ProjectState> }
-  | { type: 'RESTORE_PROJECT'; payload: ProjectState };
+  | { type: 'UPDATE_PROJECT'; payload: Partial<ProjectState>; projectId?: string }
+  | { type: 'RESTORE_PROJECT'; payload: ProjectState }
+  | { type: 'IMPORT_PROJECTS'; payload: ProjectState[] }
+  | { type: 'UPDATE_GLOBAL_SETTINGS'; payload: Partial<GeminiSettings> };
 
 const projectReducer = (state: StorageData, action: Action): StorageData => {
   switch (action.type) {
@@ -148,31 +240,115 @@ const projectReducer = (state: StorageData, action: Action): StorageData => {
     case 'SWITCH_PROJECT':
       return { ...state, currentId: action.payload };
     case 'UPDATE_PROJECT': {
-      const current = state.projects[state.currentId];
+      const targetId = action.projectId || state.currentId;
+      const current = state.projects[targetId];
       if (!current) return state;
 
       const updated = { ...current, ...action.payload, lastModified: Date.now() };
 
-      // Auto-update name if description changes and name is default
+      // Auto-update name logic
       if (action.payload.answers && action.payload.answers['project_description'] && (current.name === 'Untitled Project' || current.name.startsWith('Legacy'))) {
         const desc = action.payload.answers['project_description'] || '';
         updated.name = desc.length > 30 ? desc.substring(0, 30) + '...' : desc;
       }
-      // Also check specific name fields
       if (action.payload.answers && (action.payload.answers['prd_vibe_name'] || action.payload.answers['prd_dev_name'])) {
         updated.name = action.payload.answers['prd_vibe_name'] || action.payload.answers['prd_dev_name'] || updated.name;
       }
 
       return {
         ...state,
-        projects: { ...state.projects, [state.currentId]: updated }
+        projects: { ...state.projects, [targetId]: updated }
       };
+    }
+    case 'UPDATE_GLOBAL_SETTINGS': {
+        const newProjects = { ...state.projects };
+        const newSettingsPayload = action.payload;
+        
+        // Iterate through all projects and update their settings
+        Object.keys(newProjects).forEach(key => {
+            const proj = newProjects[key];
+            newProjects[key] = {
+                ...proj,
+                settings: { ...proj.settings, ...newSettingsPayload }
+            };
+        });
+        
+        return {
+            ...state,
+            projects: newProjects
+        };
     }
     case 'RESTORE_PROJECT':
       return {
         ...state,
         projects: { ...state.projects, [state.currentId]: action.payload }
       };
+    case 'IMPORT_PROJECTS': {
+      const newProjects = { ...state.projects };
+      action.payload.forEach(p => {
+        if (p.id && p.name && p.answers) {
+            // Ensure imported projects have versioning structure and token usage
+            if (!p.artifactVersions) {
+                p.artifactVersions = {
+                    research: p.researchOutput ? [{ content: p.researchOutput, timestamp: p.lastModified }] : [],
+                    prd: p.prdOutput ? [{ content: p.prdOutput, timestamp: p.lastModified }] : [],
+                    tech: p.techOutput ? [{ content: p.techOutput, timestamp: p.lastModified }] : [],
+                    build: p.buildPlan ? [{ content: p.buildPlan, timestamp: p.lastModified }] : []
+                };
+                p.artifactIndices = {
+                    research: p.researchOutput ? 0 : -1,
+                    prd: p.prdOutput ? 0 : -1,
+                    tech: p.techOutput ? 0 : -1,
+                    build: p.buildPlan ? 0 : -1
+                };
+            } else {
+                // Migrate potentially old imports
+                const sections: ArtifactSectionName[] = ['research', 'prd', 'tech', 'build'];
+                sections.forEach(sec => {
+                    if (p.artifactVersions[sec]) {
+                        p.artifactVersions[sec] = migrateArtifactVersions(p.artifactVersions[sec], p.lastModified);
+                    }
+                });
+            }
+
+            // Validate Artifact Indices against Versions
+            const sections: ArtifactSectionName[] = ['research', 'prd', 'tech', 'build'];
+            if (!p.artifactIndices) {
+                p.artifactIndices = { research: -1, prd: -1, tech: -1, build: -1 };
+            }
+
+            sections.forEach(sec => {
+                const versions = p.artifactVersions?.[sec] || [];
+                let idx = p.artifactIndices?.[sec];
+                if (typeof idx !== 'number') idx = -1;
+                
+                if (versions.length === 0) idx = -1;
+                else if (idx >= versions.length) idx = versions.length - 1;
+                else if (idx < 0) idx = versions.length - 1;
+                
+                if (p.artifactIndices) p.artifactIndices[sec] = idx;
+            });
+
+            if (!p.tokenUsage) {
+                p.tokenUsage = { input: 0, output: 0, groundingRequests: 0, estimatedCost: 0 };
+            }
+            if (!p.toolSettings) {
+                p.toolSettings = { claudeAdapterMode: false, geminiAdapterMode: false, antigravityAdapterMode: false };
+            } else {
+                if (typeof p.toolSettings.claudeAdapterMode === 'undefined') p.toolSettings.claudeAdapterMode = false;
+                if (typeof p.toolSettings.geminiAdapterMode === 'undefined') p.toolSettings.geminiAdapterMode = false;
+                if (typeof p.toolSettings.antigravityAdapterMode === 'undefined') p.toolSettings.antigravityAdapterMode = false;
+            }
+
+           if (!p.settings) {
+               p.settings = getGlobalSettings();
+           }
+
+           newProjects[p.id] = { ...p, lastModified: Date.now() };
+        }
+      });
+      return { ...state, projects: newProjects };
+    }
     default:
       return state;
   }
@@ -226,57 +402,101 @@ const THEMES = {
 const API_KEY_STORAGE = 'VIBE_GEMINI_API_KEY';
 const ANALYTICS_STORAGE = 'VIBE_ANALYTICS_EVENTS';
 
-/**
- * Provider component for the ProjectContext.
- * Manages state persistence, history (undo/redo), and interaction with Gemini API.
- */
+const calculateIncrementalCost = (modelName: string, inputTokens: number, outputTokens: number, groundingRequests: number = 0): number => {
+    const modelKey = Object.keys(PRICING).find(k => modelName.includes(k)) || MODELS.GEMINI_PRO;
+    const pricing = PRICING[modelKey as keyof typeof PRICING] || PRICING[MODELS.GEMINI_PRO];
+    
+    const inputCost = (inputTokens / 1_000_000) * pricing.input;
+    const outputCost = (outputTokens / 1_000_000) * pricing.output;
+    const groundingCost = groundingRequests * (pricing.grounding || 0);
+    
+    return inputCost + outputCost + groundingCost;
+};
+
+const estimateTokens = (text: string) => Math.ceil((text || '').length / 4);
+
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { addToast } = useToast();
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
-  
-  // Generation Status & Cancellation State
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'error'>('saved');
   const [generationPhase, setGenerationPhase] = useState<string>('');
   const abortControllerRef = useRef<AbortController | null>(null);
-
-  // API Key State
   const [apiKey, setApiKeyState] = useState<string | null>(() => localStorage.getItem(API_KEY_STORAGE));
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
-
-  // Session ID Management
   const sessionIdRef = useRef<string>(sessionStorage.getItem('VIBE_SESSION_ID') || crypto.randomUUID());
+
+  // Refs for Throttled Dispatch
+  const activeUsageRef = useRef<TokenUsage | null>(null);
+  const streamBufferTimeoutRef = useRef<number | null>(null);
+  const streamTextBufferRef = useRef<{field: ArtifactSectionName, text: string} | null>(null);
 
   useEffect(() => {
     sessionStorage.setItem('VIBE_SESSION_ID', sessionIdRef.current);
   }, []);
 
-  // Initialize Reducer first to make state available
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (streamBufferTimeoutRef.current) {
+        clearTimeout(streamBufferTimeoutRef.current);
+      }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   const [state, dispatch] = useReducer(projectReducer, { projects: {}, currentId: '' } as StorageData, (initial): StorageData => {
     try {
-        // 1. Try load V2
         const savedV2 = localStorage.getItem(STORAGE_KEYS.V2);
         if (savedV2) {
           const parsed = JSON.parse(savedV2);
           if (parsed.projects && parsed.currentId) {
-            // Ensure sectionTimestamps & validationErrors exists for old V2 data
+            const globalSettings = getGlobalSettings();
             Object.values(parsed.projects).forEach((p: any) => {
               if (!p.sectionTimestamps) p.sectionTimestamps = {};
               if (!p.validationErrors) p.validationErrors = {};
-              if (!p.settings) p.settings = { ...defaultSettings };
-              else p.settings = { ...defaultSettings, ...p.settings }; // Merge defaults
+              if (!p.settings) p.settings = { ...globalSettings };
+              else p.settings = { ...globalSettings, ...p.settings };
               
-              if (!p.settings.preset) p.settings.preset = 'thorough'; // Migration for existing projects
-              if (!p.toolSettings) p.toolSettings = { claudeAdapterMode: false, geminiAdapterMode: false, antigravityAdapterMode: false }; // Migration
-              // Ensure Antigravity key exists if not present
-              if (p.toolSettings && !('antigravityAdapterMode' in p.toolSettings)) {
-                  p.toolSettings.antigravityAdapterMode = false;
+              if (!p.settings.preset) p.settings.preset = 'thorough';
+              if (!p.toolSettings) p.toolSettings = { claudeAdapterMode: false, geminiAdapterMode: false, antigravityAdapterMode: false };
+              else {
+                  if (typeof p.toolSettings.claudeAdapterMode === 'undefined') p.toolSettings.claudeAdapterMode = false;
+                  if (typeof p.toolSettings.geminiAdapterMode === 'undefined') p.toolSettings.geminiAdapterMode = false;
+                  if (typeof p.toolSettings.antigravityAdapterMode === 'undefined') p.toolSettings.antigravityAdapterMode = false;
+              }
+              
+              if (!p.artifactVersions) {
+                p.artifactVersions = {
+                    research: p.researchOutput ? [{ content: p.researchOutput, timestamp: p.lastModified }] : [],
+                    prd: p.prdOutput ? [{ content: p.prdOutput, timestamp: p.lastModified }] : [],
+                    tech: p.techOutput ? [{ content: p.techOutput, timestamp: p.lastModified }] : [],
+                    build: p.buildPlan ? [{ content: p.buildPlan, timestamp: p.lastModified }] : []
+                };
+                p.artifactIndices = {
+                    research: p.researchOutput ? 0 : -1,
+                    prd: p.prdOutput ? 0 : -1,
+                    tech: p.techOutput ? 0 : -1,
+                    build: p.buildPlan ? 0 : -1
+                };
+              } else {
+                  const sections: ArtifactSectionName[] = ['research', 'prd', 'tech', 'build'];
+                  sections.forEach(sec => {
+                      if (p.artifactVersions[sec]) {
+                          p.artifactVersions[sec] = migrateArtifactVersions(p.artifactVersions[sec], p.lastModified);
+                      }
+                  });
+              }
+              
+              if (!p.tokenUsage) {
+                  p.tokenUsage = { input: 0, output: 0, groundingRequests: 0, estimatedCost: 0 };
               }
             });
             return { projects: parsed.projects, currentId: parsed.currentId } as StorageData;
           }
         }
   
-        // 2. Try load V1 (Migration)
         const savedV1 = localStorage.getItem(STORAGE_KEYS.V1);
         if (savedV1) {
           const parsedV1 = JSON.parse(savedV1);
@@ -287,6 +507,21 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             settings: { ...defaultSettings, ...(parsedV1.settings || {}) },
             sectionTimestamps: {}
           };
+          const now = Date.now();
+          newProject.artifactVersions = {
+            research: newProject.researchOutput ? [{ content: newProject.researchOutput, timestamp: now }] : [],
+            prd: newProject.prdOutput ? [{ content: newProject.prdOutput, timestamp: now }] : [],
+            tech: newProject.techOutput ? [{ content: newProject.techOutput, timestamp: now }] : [],
+            build: newProject.buildPlan ? [{ content: newProject.buildPlan, timestamp: now }] : []
+          };
+          newProject.artifactIndices = {
+            research: newProject.researchOutput ? 0 : -1,
+            prd: newProject.prdOutput ? 0 : -1,
+            tech: newProject.techOutput ? 0 : -1,
+            build: newProject.buildPlan ? 0 : -1
+          };
+          newProject.tokenUsage = { input: 0, output: 0, groundingRequests: 0, estimatedCost: 0 };
+
           const derivedName = parsedV1.answers?.['project_description'] || parsedV1.answers?.['prd_vibe_name'] || 'Legacy Project';
           newProject.name = derivedName.length > 30 ? derivedName.substring(0, 30) + '...' : derivedName;
   
@@ -296,62 +531,47 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.warn("Failed to load state", e);
       }
       
-      // 3. Default
-      const defaultProject = createNewProjectState();
-      return { projects: { [defaultProject.id]: defaultProject }, currentId: defaultProject.id };
+      const example = createExampleProject();
+      const fresh = createNewProjectState();
+      
+      return { 
+          projects: { 
+              [example.id]: example,
+              [fresh.id]: fresh 
+          }, 
+          currentId: fresh.id
+      };
   });
 
-  // Analytics Engine
   const logEvent = useCallback(async (eventName: AnalyticsEvent['eventName'], data?: any) => {
-    // 1. Log to Local Storage (Backup / Immediate Client Access)
     try {
         const timestamp = Date.now();
-        const event: AnalyticsEvent = {
-            id: crypto.randomUUID(),
-            eventName,
-            timestamp,
-            data
-        };
+        const event: AnalyticsEvent = { id: crypto.randomUUID(), eventName, timestamp, data };
         const existingEvents = JSON.parse(localStorage.getItem(ANALYTICS_STORAGE) || '[]');
         existingEvents.push(event);
-        // Keep last 1000 events locally
-        const trimmed = existingEvents.slice(-1000);
-        localStorage.setItem(ANALYTICS_STORAGE, JSON.stringify(trimmed));
+        localStorage.setItem(ANALYTICS_STORAGE, JSON.stringify(existingEvents.slice(-1000)));
     } catch (e) {
         console.warn('Local Analytics Error:', e);
     }
-
-    // Check Analytics Setting
     const currentProj = state.projects[state.currentId];
-    // Default to true if undefined
     const analyticsEnabled = currentProj?.settings?.enableAnalytics ?? true;
-
     if (!analyticsEnabled) return;
-
-    // 2. Log to Supabase (Primary Source of Truth)
     if (supabase) {
         try {
-            const { error } = await supabase.from('events').insert({
+            await supabase.from('events').insert({
               event_name: eventName,
               event_type: 'app_event',
               user_session_id: sessionIdRef.current,
               metadata: data
             });
-            
-            if (error) {
-               console.warn('Supabase Insert Error:', error.message);
-            }
         } catch (e) {
             console.warn('Supabase Connection Error:', e);
         }
     }
   }, [state.projects, state.currentId]);
 
-  // Auto-open modal if no key on mount
   useEffect(() => {
-    if (!apiKey) {
-      setIsApiKeyModalOpen(true);
-    }
+    if (!apiKey) setIsApiKeyModalOpen(true);
   }, [apiKey]);
 
   const setApiKey = useCallback((key: string) => {
@@ -369,13 +589,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const handleApiError = useCallback((error: any) => {
     const msg = error?.message || '';
-    
-    // Ignore abort errors
-    if (msg.includes('Aborted') || msg.includes('AbortError') || error.name === 'AbortError') {
-       return;
-    }
-
-    // The "Rebound" Logic: If key is bad, wipe it and show modal
+    if (msg.includes('Aborted') || msg.includes('AbortError') || error.name === 'AbortError') return;
     if (msg.includes('400') || msg.includes('401') || msg.includes('403') || msg.includes('API key') || msg.includes('valid')) {
       clearApiKey();
       addToast('API Key invalid or expired. Please update.', 'error');
@@ -384,23 +598,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [clearApiKey, addToast]);
 
-  // --- History Management (Undo/Redo) ---
   const [history, setHistory] = useState<{ past: ProjectState[], future: ProjectState[] }>({ past: [], future: [] });
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Reset history when switching projects
   useEffect(() => {
     setHistory({ past: [], future: [] });
   }, [state.currentId]);
 
   const pushToHistory = useCallback((projectState: ProjectState) => {
-    // Sanitize state before saving (e.g., ensure isGenerating is false)
     const safeState = { ...projectState, isGenerating: false };
-    setHistory(prev => {
-        // Limit history size to 50
-        const newPast = [...prev.past, safeState].slice(-50);
-        return { past: newPast, future: [] };
-    });
+    setHistory(prev => ({ past: [...prev.past, safeState].slice(-50), future: [] }));
   }, []);
 
   const undo = useCallback(() => {
@@ -408,16 +615,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const previous = history.past[history.past.length - 1];
     const newPast = history.past.slice(0, -1);
     const current = state.projects[state.currentId];
-    
     if (!current) return;
-
-    // Sanitize current before pushing to future
-    const safeCurrent = { ...current, isGenerating: false };
-
-    setHistory({
-        past: newPast,
-        future: [safeCurrent, ...history.future]
-    });
+    setHistory({ past: newPast, future: [{ ...current, isGenerating: false }, ...history.future] });
     dispatch({ type: 'RESTORE_PROJECT', payload: previous });
     addToast('Undo', 'info');
     setSaveStatus('unsaved');
@@ -428,112 +627,131 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const next = history.future[0];
     const newFuture = history.future.slice(1);
     const current = state.projects[state.currentId];
-
     if (!current) return;
-
-    const safeCurrent = { ...current, isGenerating: false };
-
-    setHistory({
-        past: [...history.past, safeCurrent],
-        future: newFuture
-    });
+    setHistory({ past: [...history.past, { ...current, isGenerating: false }], future: newFuture });
     dispatch({ type: 'RESTORE_PROJECT', payload: next });
     addToast('Redo', 'info');
     setSaveStatus('unsaved');
   }, [history, state.projects, state.currentId, addToast]);
 
-  // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         const target = e.target as HTMLElement;
         const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-        
-        // Native undo handles input fields, only global override if desired (usually not)
         if (isInput) return;
-
         if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
-            if (e.shiftKey) {
-                e.preventDefault();
-                redo();
-            } else {
-                e.preventDefault();
-                undo();
-            }
+            if (e.shiftKey) { e.preventDefault(); redo(); } else { e.preventDefault(); undo(); }
         }
-        if ((e.metaKey || e.ctrlKey) && e.key === 'y') {
-            e.preventDefault();
-            redo();
-        }
+        if ((e.metaKey || e.ctrlKey) && e.key === 'y') { e.preventDefault(); redo(); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
-  // --- Wrapper for State Updates with History ---
   const updateCurrentProject = useCallback((updates: Partial<ProjectState>, options: { snapshot?: boolean, debounce?: boolean } = { snapshot: true }) => {
     const currentProject = state.projects[state.currentId];
     if (!currentProject) return;
 
     if (options.snapshot) {
         if (options.debounce) {
-             // Debounce logic for typing
-             if (!typingTimeoutRef.current) {
-                // Snapshot state BEFORE the burst of typing
-                pushToHistory(currentProject);
-             }
+             if (!typingTimeoutRef.current) pushToHistory(currentProject);
              if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-             typingTimeoutRef.current = setTimeout(() => {
-                typingTimeoutRef.current = null;
-             }, 1000); // 1 second commit window
+             typingTimeoutRef.current = setTimeout(() => { typingTimeoutRef.current = null; }, 1000);
         } else {
-             // Immediate snapshot
-             // Avoid snapshotting pure 'isGenerating' toggles if that's the only change
              const keys = Object.keys(updates);
-             if (!(keys.length === 1 && keys[0] === 'isGenerating')) {
-                 pushToHistory(currentProject);
-             }
+             if (!(keys.length === 1 && keys[0] === 'isGenerating')) pushToHistory(currentProject);
         }
     }
-
     dispatch({ type: 'UPDATE_PROJECT', payload: updates });
     setSaveStatus('unsaved');
   }, [state.projects, state.currentId, pushToHistory]);
 
+  const commitArtifact = useCallback((section: ArtifactSectionName, content: string) => {
+    const current = state.projects[state.currentId];
+    if (!current) return;
+    if (!content.trim()) return;
 
-  // Persistence Effect - Configurable Auto-Save
+    const now = Date.now();
+    const versions = current.artifactVersions[section] || [];
+    const currentIndex = current.artifactIndices[section] || -1;
+    
+    let newVersions = versions.slice(0, currentIndex + 1);
+    newVersions.push({ content, timestamp: now });
+    
+    // LIMIT HISTORY: Keep only last 10 versions to prevent localStorage quota issues
+    const MAX_VERSIONS = 10;
+    if (newVersions.length > MAX_VERSIONS) {
+        newVersions = newVersions.slice(newVersions.length - MAX_VERSIONS);
+    }
+    
+    const newVersionsMap = { ...current.artifactVersions, [section]: newVersions };
+    const newIndicesMap = { ...current.artifactIndices, [section]: newVersions.length - 1 };
+    
+    const timestamps = { ...current.sectionTimestamps, [section]: now };
+    const payload: Partial<ProjectState> = {
+        artifactVersions: newVersionsMap,
+        artifactIndices: newIndicesMap,
+        sectionTimestamps: timestamps
+    };
+
+    if (section === 'research') payload.researchOutput = content;
+    if (section === 'prd') payload.prdOutput = content;
+    if (section === 'tech') payload.techOutput = content;
+    if (section === 'build') payload.buildPlan = content;
+    
+    updateCurrentProject(payload, { snapshot: true });
+  }, [state.projects, state.currentId, updateCurrentProject]);
+
+  const cycleArtifactVersion = useCallback((section: ArtifactSectionName, direction: -1 | 1) => {
+      const current = state.projects[state.currentId];
+      if (!current) return;
+      
+      const versions = current.artifactVersions[section];
+      const currentIndex = current.artifactIndices[section];
+      if (!versions || versions.length === 0) return;
+
+      const newIndex = currentIndex + direction;
+      if (newIndex < 0 || newIndex >= versions.length) return;
+
+      const content = versions[newIndex].content;
+      const payload: Partial<ProjectState> = {
+          artifactIndices: { ...current.artifactIndices, [section]: newIndex }
+      };
+      
+      if (section === 'research') payload.researchOutput = content;
+      if (section === 'prd') payload.prdOutput = content;
+      if (section === 'tech') payload.techOutput = content;
+      if (section === 'build') payload.buildPlan = content;
+      
+      updateCurrentProject(payload, { snapshot: false });
+  }, [state.projects, state.currentId, updateCurrentProject]);
+
   const currentProject = state.projects[state.currentId];
   const autoSaveInterval = currentProject?.settings?.autoSaveInterval || 1000;
 
   useEffect(() => {
-    // Only save if dirty
     if (saveStatus !== 'unsaved') return;
-
     const handler = setTimeout(() => {
       setSaveStatus('saving');
       try {
-        // Ensure we don't persist 'isGenerating: true'
         const projectsToSave = Object.entries(state.projects).reduce((acc, [id, proj]) => {
           acc[id] = { ...(proj as any), isGenerating: false };
           return acc;
         }, {} as Record<string, ProjectState>);
-
-        localStorage.setItem(STORAGE_KEYS.V2, JSON.stringify({
-          projects: projectsToSave,
-          currentId: state.currentId
-        }));
-        
-        // Short delay to let user see "Saving..."
+        localStorage.setItem(STORAGE_KEYS.V2, JSON.stringify({ projects: projectsToSave, currentId: state.currentId }));
         setTimeout(() => setSaveStatus('saved'), 500);
-      } catch (e) {
+      } catch (e: any) {
         console.warn("Failed to save state", e);
-        setSaveStatus('saved'); // Reset to avoid getting stuck
+        if (e.name === 'QuotaExceededError' || e.message?.toLowerCase().includes('quota')) {
+             setSaveStatus('error');
+        } else {
+             setSaveStatus('unsaved');
+        }
       }
     }, autoSaveInterval); 
-
     return () => clearTimeout(handler);
   }, [state, saveStatus, autoSaveInterval]);
 
-  // Prevent Navigation when unsaved
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
         if (saveStatus === 'unsaved' || saveStatus === 'saving') {
@@ -552,45 +770,28 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           acc[id] = { ...(proj as any), isGenerating: false };
           return acc;
         }, {} as Record<string, ProjectState>);
-
-        localStorage.setItem(STORAGE_KEYS.V2, JSON.stringify({
-          projects: projectsToSave,
-          currentId: state.currentId
-        }));
-        
+        localStorage.setItem(STORAGE_KEYS.V2, JSON.stringify({ projects: projectsToSave, currentId: state.currentId }));
         setTimeout(() => setSaveStatus('saved'), 500);
         addToast('Project saved successfully', 'success');
-    } catch (e) {
-        setSaveStatus('unsaved');
-        addToast('Failed to save project', 'error');
+    } catch (e: any) {
+        if (e.name === 'QuotaExceededError' || e.message?.toLowerCase().includes('quota')) {
+            setSaveStatus('error');
+            addToast('Storage Limit Reached. Please delete old projects or export data.', 'error');
+        } else {
+            setSaveStatus('unsaved');
+            addToast('Failed to save project', 'error');
+        }
     }
   }, [state, addToast]);
 
-  // Reduced Motion Effect
-  const reducedMotion = currentProject?.settings?.reducedMotion || false;
-  useEffect(() => {
-      if (reducedMotion) {
-          document.body.classList.add('reduce-motion');
-      } else {
-          document.body.classList.remove('reduce-motion');
-      }
-  }, [reducedMotion]);
-
-  // Theme Effect
   const activePersona = currentProject?.persona;
-
   useEffect(() => {
     if (activePersona) {
       const theme = THEMES[activePersona];
       if (theme) {
         const root = document.documentElement;
-        root.style.setProperty('--color-primary-400', theme.primary[400]);
-        root.style.setProperty('--color-primary-500', theme.primary[500]);
-        root.style.setProperty('--color-primary-600', theme.primary[600]);
-        root.style.setProperty('--color-primary-900', theme.primary[900]);
-        root.style.setProperty('--color-secondary-400', theme.secondary[400]);
-        root.style.setProperty('--color-secondary-500', theme.secondary[500]);
-        root.style.setProperty('--color-secondary-900', theme.secondary[900]);
+        Object.entries(theme.primary).forEach(([k, v]) => root.style.setProperty(`--color-primary-${k}`, v));
+        Object.entries(theme.secondary).forEach(([k, v]) => root.style.setProperty(`--color-secondary-${k}`, v));
       }
     } else {
         const root = document.documentElement;
@@ -601,36 +802,40 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [activePersona]);
 
-  // --- Project Actions ---
+  const cancelGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+    }
+    if (streamBufferTimeoutRef.current) {
+        clearTimeout(streamBufferTimeoutRef.current);
+        streamBufferTimeoutRef.current = null;
+    }
+    updateCurrentProject({ isGenerating: false });
+    setGenerationPhase('');
+    addToast('Generation cancelled', 'info');
+  }, [updateCurrentProject, addToast]);
 
   const createProject = useCallback((name: string) => {
+    cancelGeneration();
     dispatch({ type: 'CREATE_PROJECT', payload: { name } });
     logEvent('project_created', { name });
     addToast('New project created', 'success');
     return null; 
-  }, [addToast, logEvent]);
+  }, [addToast, logEvent, cancelGeneration]);
 
-  const loadProject = useCallback((id: string) => {
-    dispatch({ type: 'SWITCH_PROJECT', payload: id });
-  }, []);
+  const loadProject = useCallback((id: string) => { 
+      cancelGeneration();
+      dispatch({ type: 'SWITCH_PROJECT', payload: id }); 
+  }, [cancelGeneration]);
 
-  const deleteProject = useCallback((id: string) => {
-    dispatch({ type: 'DELETE_PROJECT', payload: id });
-    addToast('Project deleted', 'info');
-  }, [addToast]);
-
-  const setPersona = useCallback((persona: Persona) => {
-      updateCurrentProject({ persona });
-      logEvent('persona_selected', { persona });
-  }, [updateCurrentProject, logEvent]);
+  const deleteProject = useCallback((id: string) => { dispatch({ type: 'DELETE_PROJECT', payload: id }); addToast('Project deleted', 'info'); }, [addToast]);
+  const setPersona = useCallback((persona: Persona) => { updateCurrentProject({ persona }); logEvent('persona_selected', { persona }); }, [updateCurrentProject, logEvent]);
+  const importProjects = useCallback((projects: ProjectState[]) => { dispatch({ type: 'IMPORT_PROJECTS', payload: projects }); addToast(`Imported ${projects.length} project(s)`, 'success'); }, [addToast]);
+  const setValidationErrors = useCallback((validationErrors: Partial<Record<ProjectFieldKey, string>>) => { updateCurrentProject({ validationErrors }, { snapshot: false }); }, [updateCurrentProject]);
   
-  const setValidationErrors = useCallback((validationErrors: Partial<Record<ProjectFieldKey, string>>) => {
-      updateCurrentProject({ validationErrors }, { snapshot: false });
-  }, [updateCurrentProject]);
-
   const clearValidationError = useCallback((key: ProjectFieldKey) => {
       const current = state.projects[state.currentId];
-      // Safely access validationErrors
       const validationErrors = current?.validationErrors;
       if (validationErrors?.[key]) {
           const newErrors = { ...validationErrors };
@@ -642,60 +847,25 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const setAnswer = useCallback((key: ProjectFieldKey, value: string) => {
     const current = state.projects[state.currentId];
     const answers = current?.answers || {};
-    
-    updateCurrentProject({ 
-        answers: { ...answers, [key]: value }
-    }, { snapshot: true, debounce: true });
+    updateCurrentProject({ answers: { ...answers, [key]: value } }, { snapshot: true, debounce: true });
   }, [state.projects, state.currentId, updateCurrentProject]);
 
-  const setResearchOutput = useCallback((researchOutput: string) => {
+  const setResearchOutput = useCallback((researchOutput: string) => { commitArtifact('research', researchOutput); }, [commitArtifact]);
+  const setPrdOutput = useCallback((prdOutput: string) => { commitArtifact('prd', prdOutput); }, [commitArtifact]);
+  const setTechOutput = useCallback((techOutput: string) => { commitArtifact('tech', techOutput); }, [commitArtifact]);
+  const setBuildPlan = useCallback((buildPlan: string) => { commitArtifact('build', buildPlan); }, [commitArtifact]);
+  const setAgentOutputs = useCallback((agentOutputs: Record<string, string>) => { 
       const current = state.projects[state.currentId];
-      if (!current) return;
-      const currentTimestamps = current.sectionTimestamps || {};
-      const sectionTimestamps = { ...currentTimestamps, research: Date.now() };
-      updateCurrentProject({ researchOutput, sectionTimestamps });
-  }, [updateCurrentProject, state.projects, state.currentId]);
-
-  const setPrdOutput = useCallback((prdOutput: string) => {
-      const current = state.projects[state.currentId];
-      if (!current) return;
-      const currentTimestamps = current.sectionTimestamps || {};
-      const sectionTimestamps = { ...currentTimestamps, prd: Date.now() };
-      updateCurrentProject({ prdOutput, sectionTimestamps });
-  }, [updateCurrentProject, state.projects, state.currentId]);
-
-  const setTechOutput = useCallback((techOutput: string) => {
-      const current = state.projects[state.currentId];
-      if (!current) return;
-      const currentTimestamps = current.sectionTimestamps || {};
-      const sectionTimestamps = { ...currentTimestamps, tech: Date.now() };
-      updateCurrentProject({ techOutput, sectionTimestamps });
-  }, [updateCurrentProject, state.projects, state.currentId]);
-
-  const setBuildPlan = useCallback((buildPlan: string) => {
-      const current = state.projects[state.currentId];
-      if (!current) return;
-      const currentTimestamps = current.sectionTimestamps || {};
-      const sectionTimestamps = { ...currentTimestamps, build: Date.now() };
-      updateCurrentProject({ buildPlan, sectionTimestamps });
-  }, [updateCurrentProject, state.projects, state.currentId]);
-
-  const setAgentOutputs = useCallback((agentOutputs: Record<string, string>) => {
-      const current = state.projects[state.currentId];
-      if (!current) return;
-      const currentTimestamps = current.sectionTimestamps || {};
-      const sectionTimestamps = { ...currentTimestamps, agent: Date.now() };
-      updateCurrentProject({ agentOutputs, sectionTimestamps });
+      const timestamps = { ...(current?.sectionTimestamps || {}), agent: Date.now() };
+      updateCurrentProject({ agentOutputs, sectionTimestamps: timestamps });
   }, [updateCurrentProject, state.projects, state.currentId]);
 
   const updateSettingsWrapper = useCallback((newSettings: Partial<GeminiSettings>) => {
-    const currentSettings = state.projects[state.currentId]?.settings || defaultSettings;
-    const updated = { ...currentSettings, ...newSettings };
-    updateCurrentProject({ settings: updated });
-    
-    // Also update global default settings in storage
-    localStorage.setItem(STORAGE_KEYS.GLOBAL_SETTINGS, JSON.stringify(updated));
-  }, [state.projects, state.currentId, updateCurrentProject]);
+    const currentGlobal = getGlobalSettings();
+    const updatedGlobal = { ...currentGlobal, ...newSettings };
+    localStorage.setItem(STORAGE_KEYS.GLOBAL_SETTINGS, JSON.stringify(updatedGlobal));
+    dispatch({ type: 'UPDATE_GLOBAL_SETTINGS', payload: newSettings });
+  }, []);
   
   const updateToolSettings = useCallback((settings: Partial<ToolSettings>) => {
     const current = state.projects[state.currentId];
@@ -706,270 +876,270 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const toggleTool = useCallback((toolId: string) => {
     const currentTools = state.projects[state.currentId]?.tools || [];
-    const tools = currentTools.includes(toolId)
-      ? currentTools.filter(t => t !== toolId)
-      : [...currentTools, toolId];
+    const tools = currentTools.includes(toolId) ? currentTools.filter(t => t !== toolId) : [...currentTools, toolId];
     updateCurrentProject({ tools });
   }, [state.projects, state.currentId, updateCurrentProject]);
 
-  const generateAgentOutputs = useCallback(() => { /* Component handled */ }, []);
+  const generateAgentOutputs = useCallback(() => {}, []);
+  
+  // Unified stream handler with Throttling
+  const handleStreamUpdate = useCallback((chunk: string, field: ArtifactSectionName, accumulatedText: string, modelName: string, projectId: string) => {
+      const outputDiff = estimateTokens(chunk);
+      const costDelta = calculateIncrementalCost(modelName, 0, outputDiff, 0);
 
-  // --- Cancellation Logic ---
-  const cancelGeneration = useCallback(() => {
-    if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-    }
-    updateCurrentProject({ isGenerating: false });
-    setGenerationPhase('');
-    addToast('Generation cancelled', 'info');
-  }, [updateCurrentProject, addToast]);
+      if (activeUsageRef.current) {
+          activeUsageRef.current = {
+              ...activeUsageRef.current,
+              output: activeUsageRef.current.output + outputDiff,
+              estimatedCost: activeUsageRef.current.estimatedCost + costDelta
+          };
+      }
 
-  // --- Gemini Actions with Streaming ---
+      streamTextBufferRef.current = { field, text: accumulatedText };
+
+      if (streamBufferTimeoutRef.current === null) {
+          streamBufferTimeoutRef.current = window.setTimeout(() => {
+              const updatePayload: Partial<ProjectState> = {};
+              
+              if (streamTextBufferRef.current) {
+                  const { field: f, text: t } = streamTextBufferRef.current;
+                  if (f === 'research') updatePayload.researchOutput = t;
+                  else if (f === 'prd') updatePayload.prdOutput = t;
+                  else if (f === 'tech') updatePayload.techOutput = t;
+                  else if (f === 'build') updatePayload.buildPlan = t;
+              }
+
+              if (activeUsageRef.current) {
+                  updatePayload.tokenUsage = activeUsageRef.current;
+              }
+
+              dispatch({ type: 'UPDATE_PROJECT', payload: updatePayload, projectId });
+              streamBufferTimeoutRef.current = null;
+          }, 100);
+      }
+  }, []);
 
   const performGeminiResearch = useCallback(async (prompt: string, mode: 'standard' | 'deep' = 'standard') => {
-    const proj = state.projects[state.currentId];
-    if (!proj) return;
-    if (!apiKey) {
-      setIsApiKeyModalOpen(true);
-      return;
-    }
-
-    // Reset abort controller
+    const projectId = state.currentId;
+    const proj = state.projects[projectId];
+    if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
     abortControllerRef.current = new AbortController();
     
-    updateCurrentProject({ isGenerating: true, researchOutput: '', researchSources: [] });
+    const estimatedInputTokens = estimateTokens(prompt);
+    const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
+    const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
+
+    const startUsage = {
+        ...proj.tokenUsage,
+        input: proj.tokenUsage.input + estimatedInputTokens,
+        groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
+        estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
+    };
     
-    // -- Deep Research (Agent Mode) --
+    updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
+    activeUsageRef.current = startUsage; 
+    
     if (mode === 'deep') {
         setGenerationPhase('Starting Deep Research Agent...');
         try {
-            const { text, sources } = await runDeepResearchInteraction(
-                prompt, 
-                apiKey, 
-                (status) => setGenerationPhase(status),
-                abortControllerRef.current.signal
-            );
+            const { text, sources } = await runDeepResearchInteraction(prompt, apiKey, (status) => setGenerationPhase(status), abortControllerRef.current.signal);
             
-            const currentTimestamps = proj.sectionTimestamps || {};
-            const sectionTimestamps = { ...currentTimestamps, research: Date.now() };
-            
-            updateCurrentProject({ 
-                researchOutput: text, 
-                researchSources: sources, 
-                isGenerating: false, 
-                sectionTimestamps
-            });
+            const finalOutputTokens = estimateTokens(text);
+            const outputCostDelta = calculateIncrementalCost(proj.settings.modelName, 0, finalOutputTokens, 0);
+
+            const endUsage = { 
+                ...startUsage, 
+                output: startUsage.output + finalOutputTokens,
+                estimatedCost: startUsage.estimatedCost + outputCostDelta
+            };
+
+            updateCurrentProject({ researchSources: sources, isGenerating: false, tokenUsage: endUsage });
+            commitArtifact('research', text);
             logEvent('generation_complete', { type: 'research_deep', project: proj.name });
             setGenerationPhase('');
             addToast('Deep Research Report ready', 'success');
         } catch (error: any) {
-             // Fallback Logic: If Agent fails (404/Not Found), fallback to Gemini Pro + Grounding
-             if (error?.message?.includes('not found') || error?.message?.includes('404') || error?.status === 404) {
+             const isFallbackCandidate = 
+                error?.message?.includes('not found') || 
+                error?.message?.includes('404') || 
+                error?.status === 404 ||
+                error?.status === 400 ||
+                error?.status === 403 ||
+                error?.message?.includes('400') ||
+                error?.message?.includes('403');
+
+             if (isFallbackCandidate) {
                  console.warn("Deep Research fallback triggered:", error.message);
-                 addToast('Deep Research Agent unavailable (Beta). Falling back to Gemini Pro + Search.', 'warning');
+                 addToast('Deep Research Agent unavailable. Falling back.', 'warning');
                  setGenerationPhase('Falling back to Standard Research...');
-                 
-                 // Fallback execution
                  try {
                     let accumulatedText = '';
-                    const fallbackSettings = { ...proj.settings, useGrounding: true, thinkingBudget: 8192 }; // Enhance fallback settings
-                    
+                    const fallbackSettings = { ...proj.settings, useGrounding: true, thinkingBudget: 8192 };
                     const { text, sources } = await streamDeepResearch(
-                        prompt, 
-                        fallbackSettings, 
-                        apiKey, 
-                        (chunk) => {
-                            accumulatedText += chunk;
-                            dispatch({ 
-                                type: 'UPDATE_PROJECT', 
-                                payload: { researchOutput: accumulatedText } 
-                            });
+                        prompt, fallbackSettings, apiKey, 
+                        (chunk) => { 
+                            accumulatedText += chunk; 
+                            handleStreamUpdate(chunk, 'research', accumulatedText, fallbackSettings.modelName, projectId);
                         },
-                        (status) => setGenerationPhase(status),
-                        abortControllerRef.current.signal
+                        (status) => setGenerationPhase(status), abortControllerRef.current.signal
                     );
-
-                    const currentTimestamps = proj.sectionTimestamps || {};
-                    const sectionTimestamps = { ...currentTimestamps, research: Date.now() };
-                    updateCurrentProject({ 
-                        researchOutput: text, 
-                        researchSources: sources, 
-                        isGenerating: false, 
-                        sectionTimestamps
-                    });
+                    updateCurrentProject({ researchSources: sources, isGenerating: false });
+                    commitArtifact('research', text);
                     logEvent('generation_complete', { type: 'research_fallback', project: proj.name });
                     setGenerationPhase('');
-                    addToast('Research completed (Standard Mode)', 'success');
-                    return; // Exit successfully after fallback
-                 } catch (fallbackError: any) {
-                     handleApiError(fallbackError);
-                     updateCurrentProject({ 
-                        researchOutput: `[Deep Research Failed: ${error.message}]\n[Fallback Failed: ${fallbackError.message}]`, 
-                        isGenerating: false 
-                     });
-                     setGenerationPhase('');
-                     return;
-                 }
+                    addToast('Research completed', 'success');
+                 } catch (fallbackError: any) { handleApiError(fallbackError); updateCurrentProject({ isGenerating: false }); setGenerationPhase(''); }
+                 return;
              }
-
-             // Standard Error Handling for other errors
              handleApiError(error);
-             updateCurrentProject({ 
-                researchOutput: `[Deep Research Failed: ${error.message}]`, 
-                isGenerating: false 
-             });
+             updateCurrentProject({ isGenerating: false });
              setGenerationPhase('');
         }
         return;
     }
 
-    // -- Standard Mode --
     setGenerationPhase('Initializing AI...');
     let accumulatedText = '';
-    
     try {
       const { text, sources } = await streamDeepResearch(
-        prompt, 
-        proj.settings, 
-        apiKey, 
-        (chunk) => {
-            accumulatedText += chunk;
-            dispatch({ 
-                type: 'UPDATE_PROJECT', 
-                payload: { researchOutput: accumulatedText } 
-            });
+        prompt, proj.settings, apiKey, 
+        (chunk) => { 
+            accumulatedText += chunk; 
+            handleStreamUpdate(chunk, 'research', accumulatedText, proj.settings.modelName, projectId);
         },
-        (status) => setGenerationPhase(status),
-        abortControllerRef.current.signal
+        (status) => setGenerationPhase(status), abortControllerRef.current.signal
       );
-
-      const currentTimestamps = proj.sectionTimestamps || {};
-      const sectionTimestamps = { ...currentTimestamps, research: Date.now() };
-      updateCurrentProject({ 
-          researchOutput: text, 
-          researchSources: sources, 
-          isGenerating: false, 
-          sectionTimestamps
-      });
+      updateCurrentProject({ researchSources: sources, isGenerating: false });
+      commitArtifact('research', text);
       logEvent('generation_complete', { type: 'research', project: proj.name });
       setGenerationPhase('');
       addToast('Research completed', 'success');
-
     } catch (error: any) {
       handleApiError(error);
-      const errorMessage = error?.message || "Unknown error";
-      
-      // Don't overwrite if aborted
-      if (!errorMessage.includes("Aborted")) {
-          updateCurrentProject({ 
-            researchOutput: accumulatedText + `\n\n[Generation Failed: ${errorMessage}]`, 
-            isGenerating: false 
-          });
+      if (!error?.message?.includes("Aborted")) {
+          updateCurrentProject({ isGenerating: false });
       }
       setGenerationPhase('');
     }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent]);
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent, commitArtifact, handleStreamUpdate]);
 
   const performGeminiPRD = useCallback(async (prompt: string) => {
-    const proj = state.projects[state.currentId];
-    if (!proj) return;
-    if (!apiKey) {
-      setIsApiKeyModalOpen(true);
-      return;
-    }
-
+    const projectId = state.currentId;
+    const proj = state.projects[projectId];
+    if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
     abortControllerRef.current = new AbortController();
-    updateCurrentProject({ isGenerating: true, prdOutput: '' });
-    setGenerationPhase('Initializing AI...');
+    
+    const estimatedInputTokens = estimateTokens(getPRDSystemInstruction() + prompt);
+    const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
+    const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
+    const startUsage = {
+        ...proj.tokenUsage,
+        input: proj.tokenUsage.input + estimatedInputTokens,
+        groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
+        estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
+    };
+
+    updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
+    activeUsageRef.current = startUsage;
+
+    setGenerationPhase('Initializing AI...');
     let accumulatedText = '';
     try {
-        await streamArtifact(
-            getPRDSystemInstruction(), 
-            prompt, 
-            proj.settings, 
-            apiKey, 
-            (chunk) => {
-                accumulatedText += chunk;
-                dispatch({ type: 'UPDATE_PROJECT', payload: { prdOutput: accumulatedText } });
+        const text = await streamArtifact(
+            getPRDSystemInstruction(), prompt, proj.settings, apiKey, 
+            (chunk) => { 
+                accumulatedText += chunk; 
+                handleStreamUpdate(chunk, 'prd', accumulatedText, proj.settings.modelName, projectId);
             },
-            (status) => setGenerationPhase(status),
-            abortControllerRef.current.signal
+            (status) => setGenerationPhase(status), abortControllerRef.current.signal
         );
-        
-        const currentTimestamps = proj.sectionTimestamps || {};
-        const sectionTimestamps = { ...currentTimestamps, prd: Date.now() };
-        updateCurrentProject({ prdOutput: accumulatedText, isGenerating: false, sectionTimestamps });
+        updateCurrentProject({ isGenerating: false });
+        commitArtifact('prd', text);
         logEvent('generation_complete', { type: 'prd', project: proj.name });
         setGenerationPhase('');
         addToast('PRD generated', 'success');
     } catch (error: any) {
         handleApiError(error);
-        if (!error?.message?.includes('Aborted')) {
-            updateCurrentProject({ isGenerating: false });
-        }
+        if (!error?.message?.includes('Aborted')) updateCurrentProject({ isGenerating: false });
         setGenerationPhase('');
     }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent]);
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent, commitArtifact, handleStreamUpdate]);
 
   const performGeminiTech = useCallback(async (prompt: string) => {
-    const proj = state.projects[state.currentId];
-    if (!proj) return;
-    if (!apiKey) {
-      setIsApiKeyModalOpen(true);
-      return;
-    }
-
+    const projectId = state.currentId;
+    const proj = state.projects[projectId];
+    if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
     abortControllerRef.current = new AbortController();
-    updateCurrentProject({ isGenerating: true, techOutput: '' });
-    setGenerationPhase('Initializing AI...');
+    
+    const estimatedInputTokens = estimateTokens(getTechDesignSystemInstruction() + prompt);
+    const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
+    const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
+    const startUsage = {
+        ...proj.tokenUsage,
+        input: proj.tokenUsage.input + estimatedInputTokens,
+        groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
+        estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
+    };
+
+    updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
+    activeUsageRef.current = startUsage;
+
+    setGenerationPhase('Initializing AI...');
     let accumulatedText = '';
     try {
-        await streamArtifact(
-            getTechDesignSystemInstruction(), 
-            prompt, 
-            proj.settings, 
-            apiKey, 
-            (chunk) => {
-                accumulatedText += chunk;
-                dispatch({ type: 'UPDATE_PROJECT', payload: { techOutput: accumulatedText } });
+        const text = await streamArtifact(
+            getTechDesignSystemInstruction(), prompt, proj.settings, apiKey, 
+            (chunk) => { 
+                accumulatedText += chunk; 
+                handleStreamUpdate(chunk, 'tech', accumulatedText, proj.settings.modelName, projectId);
             },
-            (status) => setGenerationPhase(status),
-            abortControllerRef.current.signal
+            (status) => setGenerationPhase(status), abortControllerRef.current.signal
         );
-        
-        const currentTimestamps = proj.sectionTimestamps || {};
-        const sectionTimestamps = { ...currentTimestamps, tech: Date.now() };
-        updateCurrentProject({ techOutput: accumulatedText, isGenerating: false, sectionTimestamps });
+        updateCurrentProject({ isGenerating: false });
+        commitArtifact('tech', text);
         logEvent('generation_complete', { type: 'tech', project: proj.name });
         setGenerationPhase('');
         addToast('Tech Design generated', 'success');
     } catch (error: any) {
         handleApiError(error);
-        if (!error?.message?.includes('Aborted')) {
-            updateCurrentProject({ isGenerating: false });
-        }
+        if (!error?.message?.includes('Aborted')) updateCurrentProject({ isGenerating: false });
         setGenerationPhase('');
     }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent]);
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent, commitArtifact, handleStreamUpdate]);
 
   const performGeminiAgent = useCallback(async (prompt: string) => {
       const proj = state.projects[state.currentId];
       if (!proj) return "";
-      if (!apiKey) {
-        setIsApiKeyModalOpen(true);
-        return "";
-      }
+      if (!apiKey) { setIsApiKeyModalOpen(true); return ""; }
+      
+      const estimatedInputTokens = estimateTokens(getAgentSystemInstruction() + prompt);
+      const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
+      const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
-      updateCurrentProject({ isGenerating: true });
+      const startUsage = {
+          ...proj.tokenUsage,
+          input: proj.tokenUsage.input + estimatedInputTokens,
+          groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
+          estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
+      };
+
+      updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
       setGenerationPhase('Generating Agent Config...');
       try {
-          // Agent generation is usually fast/single-shot, so using non-streaming is fine, 
-          // but we still want standard error handling.
           const text = await generateArtifact(getAgentSystemInstruction(), prompt, proj.settings, apiKey);
-          updateCurrentProject({ isGenerating: false });
+          
+          const estimatedOutput = estimateTokens(text);
+          const outputCostDelta = calculateIncrementalCost(proj.settings.modelName, 0, estimatedOutput, 0);
+
+          const endUsage = { 
+              ...startUsage, 
+              output: startUsage.output + estimatedOutput,
+              estimatedCost: startUsage.estimatedCost + outputCostDelta
+          };
+
+          updateCurrentProject({ isGenerating: false, tokenUsage: endUsage });
           logEvent('generation_complete', { type: 'agent', project: proj.name });
           setGenerationPhase('');
           addToast('Agent config generated', 'success');
@@ -983,144 +1153,153 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent]);
 
   const performGeminiBuildPlan = useCallback(async (prompt: string) => {
-    const proj = state.projects[state.currentId];
-    if (!proj) return;
-    if (!apiKey) {
-      setIsApiKeyModalOpen(true);
-      return;
-    }
-
+    const projectId = state.currentId;
+    const proj = state.projects[projectId];
+    if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
     abortControllerRef.current = new AbortController();
-    updateCurrentProject({ isGenerating: true, buildPlan: '' });
-    setGenerationPhase('Initializing AI...');
+    
+    const estimatedInputTokens = estimateTokens(getBuildPlanSystemInstruction() + prompt);
+    const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
+    const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
+    const startUsage = {
+        ...proj.tokenUsage,
+        input: proj.tokenUsage.input + estimatedInputTokens,
+        groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
+        estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
+    };
+
+    updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
+    activeUsageRef.current = startUsage;
+
+    setGenerationPhase('Initializing AI...');
     let accumulatedText = '';
     try {
-        await streamArtifact(
-            getBuildPlanSystemInstruction(), 
-            prompt, 
-            proj.settings, 
-            apiKey, 
-            (chunk) => {
-                accumulatedText += chunk;
-                dispatch({ type: 'UPDATE_PROJECT', payload: { buildPlan: accumulatedText } });
+        const text = await streamArtifact(
+            getBuildPlanSystemInstruction(), prompt, proj.settings, apiKey, 
+            (chunk) => { 
+                accumulatedText += chunk; 
+                handleStreamUpdate(chunk, 'build', accumulatedText, proj.settings.modelName, projectId);
             },
-            (status) => setGenerationPhase(status),
-            abortControllerRef.current.signal
+            (status) => setGenerationPhase(status), abortControllerRef.current.signal
         );
-        
-        const currentTimestamps = proj.sectionTimestamps || {};
-        const sectionTimestamps = { ...currentTimestamps, build: Date.now() };
-        updateCurrentProject({ buildPlan: accumulatedText, isGenerating: false, sectionTimestamps });
+        updateCurrentProject({ isGenerating: false });
+        commitArtifact('build', text);
         logEvent('generation_complete', { type: 'build_plan', project: proj.name });
         setGenerationPhase('');
         addToast('Build Plan generated', 'success');
     } catch (error: any) {
         handleApiError(error);
-        if (!error?.message?.includes('Aborted')) {
-            updateCurrentProject({ isGenerating: false });
-        }
+        if (!error?.message?.includes('Aborted')) updateCurrentProject({ isGenerating: false });
         setGenerationPhase('');
     }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent]);
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent, commitArtifact, handleStreamUpdate]);
 
   const performRefinement = useCallback(async (type: 'research' | 'prd' | 'tech' | 'build', instruction: string) => {
-    updateCurrentProject({ isGenerating: true });
+    const projectId = state.currentId;
+    const currentProj = state.projects[projectId];
+    if (!currentProj) return; 
     
-    const currentProj = state.projects[state.currentId];
-    if (!currentProj) return; // Guard clause
-    if (!apiKey) {
-      setIsApiKeyModalOpen(true);
-      updateCurrentProject({ isGenerating: false });
-      return;
-    }
+    let originalContent = '';
+    if (type === 'research') originalContent = currentProj.researchOutput;
+    if (type === 'prd') originalContent = currentProj.prdOutput;
+    if (type === 'tech') originalContent = currentProj.techOutput;
+    if (type === 'build') originalContent = currentProj.buildPlan;
+    
+    const prompt = generateRefinePrompt(originalContent, instruction);
+    
+    const estimatedInputTokens = estimateTokens(getRefineSystemInstruction() + prompt);
+    const groundingCostCount = currentProj.settings.useGrounding ? 1 : 0;
+    const inputCostDelta = calculateIncrementalCost(currentProj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
+    const startUsage = {
+        ...currentProj.tokenUsage,
+        input: currentProj.tokenUsage.input + estimatedInputTokens,
+        groundingRequests: currentProj.tokenUsage.groundingRequests + groundingCostCount,
+        estimatedCost: currentProj.tokenUsage.estimatedCost + inputCostDelta
+    };
+
+    updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
+    activeUsageRef.current = startUsage;
+    
+    if (!apiKey) { setIsApiKeyModalOpen(true); updateCurrentProject({ isGenerating: false }); return; }
     abortControllerRef.current = new AbortController();
     setGenerationPhase('Refining Content...');
 
-    let currentContent = '';
-    if (type === 'research') currentContent = currentProj.researchOutput;
-    if (type === 'prd') currentContent = currentProj.prdOutput;
-    if (type === 'tech') currentContent = currentProj.techOutput;
-    if (type === 'build') currentContent = currentProj.buildPlan;
-    
-    const prompt = generateRefinePrompt(currentContent, instruction);
     let accumulatedText = '';
 
     try {
-      await streamArtifact(
-          getRefineSystemInstruction(), 
-          prompt, 
-          currentProj.settings, 
-          apiKey, 
+      const text = await streamArtifact(
+          getRefineSystemInstruction(), prompt, currentProj.settings, apiKey, 
           (chunk) => {
               accumulatedText += chunk;
-              const update: any = {};
-              if (type === 'research') update.researchOutput = accumulatedText;
-              if (type === 'prd') update.prdOutput = accumulatedText;
-              if (type === 'tech') update.techOutput = accumulatedText;
-              if (type === 'build') update.buildPlan = accumulatedText;
-              dispatch({ type: 'UPDATE_PROJECT', payload: update });
+              handleStreamUpdate(chunk, type, accumulatedText, currentProj.settings.modelName, projectId);
           },
-          (status) => setGenerationPhase(status),
-          abortControllerRef.current.signal
+          (status) => setGenerationPhase(status), abortControllerRef.current.signal
       );
-      
-      const currentTimestamps = currentProj.sectionTimestamps || {};
-      const finalUpdate: any = { isGenerating: false, sectionTimestamps: { ...currentTimestamps } };
-      
-      if (type === 'research') {
-        finalUpdate.researchOutput = accumulatedText;
-        finalUpdate.sectionTimestamps.research = Date.now();
-      }
-      if (type === 'prd') {
-        finalUpdate.prdOutput = accumulatedText;
-        finalUpdate.sectionTimestamps.prd = Date.now();
-      }
-      if (type === 'tech') {
-        finalUpdate.techOutput = accumulatedText;
-        finalUpdate.sectionTimestamps.tech = Date.now();
-      }
-      if (type === 'build') {
-        finalUpdate.buildPlan = accumulatedText;
-        finalUpdate.sectionTimestamps.build = Date.now();
-      }
-      
-      updateCurrentProject(finalUpdate);
+      updateCurrentProject({ isGenerating: false });
+      commitArtifact(type, text);
       setGenerationPhase('');
       addToast('Content refined', 'success');
-
     } catch (error: any) {
       handleApiError(error);
-      if (!error?.message?.includes('Aborted')) {
-          updateCurrentProject({ isGenerating: false });
-      }
+      
+      const restorePayload: Partial<ProjectState> = { isGenerating: false };
+      if (type === 'research') restorePayload.researchOutput = originalContent;
+      if (type === 'prd') restorePayload.prdOutput = originalContent;
+      if (type === 'tech') restorePayload.techOutput = originalContent;
+      if (type === 'build') restorePayload.buildPlan = originalContent;
+      
+      updateCurrentProject(restorePayload, { snapshot: false });
       setGenerationPhase('');
+      
+      if (!error?.message?.includes('Aborted')) {
+          addToast('Refinement failed. Original content restored.', 'info');
+      } else {
+          addToast('Refinement cancelled. Content reverted.', 'info');
+      }
     }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError]);
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, commitArtifact, handleStreamUpdate]);
 
   const queryGemini = useCallback(async (prompt: string, systemInstruction?: string) => {
      try {
-         if (!apiKey) {
-           setIsApiKeyModalOpen(true);
-           throw new Error("API Key missing");
-         }
-         return await generateArtifact(systemInstruction || "You are a helpful AI assistant.", prompt, state.projects[state.currentId].settings, apiKey);
+         const proj = state.projects[state.currentId];
+         if (!apiKey) { setIsApiKeyModalOpen(true); throw new Error("API Key missing"); }
+         
+         const estimatedInput = estimateTokens((systemInstruction || '') + prompt);
+         const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInput, 0, 0);
+
+         const startUsage = {
+             ...proj.tokenUsage,
+             input: proj.tokenUsage.input + estimatedInput,
+             estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
+         };
+         
+         updateCurrentProject({ tokenUsage: startUsage }, { snapshot: false });
+
+         const text = await generateArtifact(systemInstruction || "You are a helpful AI assistant.", prompt, proj.settings, apiKey);
+         
+         const estimatedOutput = estimateTokens(text);
+         const outputCostDelta = calculateIncrementalCost(proj.settings.modelName, 0, estimatedOutput, 0);
+
+         const endUsage = {
+             ...startUsage,
+             output: startUsage.output + estimatedOutput,
+             estimatedCost: startUsage.estimatedCost + outputCostDelta
+         };
+         
+         updateCurrentProject({ tokenUsage: endUsage }, { snapshot: false });
+
+         return text;
      } catch (error: any) {
          handleApiError(error);
          throw error;
      }
-  }, [state.projects, state.currentId, handleApiError, apiKey]);
+  }, [state.projects, state.currentId, handleApiError, apiKey, updateCurrentProject]);
 
-  // Safe accessor for current state
   const activeProjectState = state.projects[state.currentId] || createNewProjectState();
+  const sortedProjects = useMemo(() => Object.values(state.projects).sort((a: ProjectState, b: ProjectState) => b.lastModified - a.lastModified), [state.projects]);
 
-  // Memoize the projects array
-  const sortedProjects = useMemo(() => {
-    return Object.values(state.projects).sort((a: ProjectState, b: ProjectState) => b.lastModified - a.lastModified);
-  }, [state.projects]);
-
-  // Memoize the context value
   const contextValue = useMemo(() => ({ 
     state: activeProjectState,
     projects: sortedProjects,
@@ -1128,6 +1307,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     createProject,
     loadProject,
     deleteProject,
+    importProjects,
     setPersona, 
     setAnswer,
     setValidationErrors,
@@ -1163,49 +1343,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setIsApiKeyModalOpen,
     generationPhase,
     cancelGeneration,
-    logEvent
-  }), [
-    activeProjectState, 
-    sortedProjects, 
-    state.currentId,
-    createProject,
-    loadProject,
-    deleteProject,
-    setPersona,
-    setAnswer,
-    setValidationErrors,
-    clearValidationError,
-    setResearchOutput,
-    setPrdOutput,
-    setTechOutput,
-    setBuildPlan,
-    setAgentOutputs,
-    updateSettingsWrapper,
-    updateToolSettings,
-    generateAgentOutputs,
-    toggleTool,
-    performGeminiResearch,
-    performGeminiPRD,
-    performGeminiTech,
-    performGeminiAgent,
-    performGeminiBuildPlan,
-    performRefinement,
-    queryGemini,
-    isSettingsOpen,
-    undo,
-    redo,
-    history.past.length,
-    history.future.length,
-    saveProject,
-    saveStatus,
-    apiKey,
-    setApiKey,
-    clearApiKey,
-    isApiKeyModalOpen,
-    generationPhase,
-    cancelGeneration,
-    logEvent
-  ]);
+    logEvent,
+    commitArtifact,
+    cycleArtifactVersion
+  }), [activeProjectState, sortedProjects, state.currentId, createProject, loadProject, deleteProject, importProjects, setPersona, setAnswer, setValidationErrors, clearValidationError, setResearchOutput, setPrdOutput, setTechOutput, setBuildPlan, setAgentOutputs, updateSettingsWrapper, updateToolSettings, generateAgentOutputs, toggleTool, performGeminiResearch, performGeminiPRD, performGeminiTech, performGeminiAgent, performGeminiBuildPlan, performRefinement, queryGemini, isSettingsOpen, undo, redo, history.past.length, history.future.length, saveProject, saveStatus, apiKey, setApiKey, clearApiKey, isApiKeyModalOpen, generationPhase, cancelGeneration, logEvent, commitArtifact, cycleArtifactVersion]);
 
   return (
     <ProjectContext.Provider value={contextValue}>

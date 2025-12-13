@@ -1,7 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Clipboard, Check, X, Info, ChevronDown, Sparkles, Send, Loader2, AlertTriangle, AlertCircle, Download, Printer, Edit2, Save, FileText, FileJson, Clock, ArrowLeft, ArrowRight, CheckCircle, StopCircle } from 'lucide-react';
+
+import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { Clipboard, Check, X, Info, ChevronDown, Sparkles, Send, Loader2, AlertCircle, Download, Printer, Edit2, Save, FileText, FileJson, Clock, ArrowLeft, ArrowRight, Minimize2, Maximize2, Type, AlignLeft, Keyboard, Columns, List, Hash, Scissors, Briefcase, Plus, Search, Replace, ArrowUp, ArrowDown, CaseSensitive, WholeWord, StopCircle, CheckCircle, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence, HTMLMotionProps } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 // --- Animations ---
 export const PageTransition: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -209,6 +213,7 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; children: R
               <button 
                 onClick={onClose}
                 className="p-2 hover:bg-white/10 rounded-lg text-slate-400 hover:text-white transition-colors"
+                aria-label="Close modal"
               >
                 <X size={20} />
               </button>
@@ -370,7 +375,6 @@ export const TextArea: React.FC<TextAreaProps> = ({
   onChange,
   ...props 
 }) => {
-  // Rely on controlled updates from parent to avoid race conditions with validation on blur
   const currentLength = value ? String(value).length : 0;
   const isNearLimit = maxLength && currentLength > maxLength * 0.9;
   const isOverLimit = maxLength && currentLength > maxLength;
@@ -432,6 +436,311 @@ export const Select: React.FC<SelectProps> = ({ label, tooltip, error, rightLabe
   </FieldWrapper>
 );
 
+// --- Advanced Markdown Helpers ---
+
+// Sanitize ID for anchors
+const slugify = (text: string) => {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+};
+
+// Markdown Preview Component
+const MarkdownPreview: React.FC<{ content: string; scrollRef?: React.RefObject<HTMLDivElement> }> = ({ content, scrollRef }) => {
+  
+  const renderedContent = useMemo(() => {
+    // Safe inline parser returning React Nodes instead of dangerouslySetInnerHTML
+    const parseInline = (text: string): React.ReactNode[] => {
+        const elements: React.ReactNode[] = [];
+        let cursor = 0;
+
+        // Match tokens: Code (`...`), Link ([...](...)), Bold (**...**)
+        // We use a loop to find the earliest match
+        while (cursor < text.length) {
+            const remaining = text.slice(cursor);
+            
+            // Find first match of any type
+            const codeMatch = remaining.match(/`([^`]+)`/);
+            const linkMatch = remaining.match(/\[([^\]]+)\]\(([^)]+)\)/);
+            const boldMatch = remaining.match(/\*\*([^*]+)\*\*/);
+
+            // Determine which match is earliest
+            let firstMatch: { type: 'code' | 'link' | 'bold', index: number, length: number, match: RegExpMatchArray } | null = null;
+
+            if (codeMatch && codeMatch.index !== undefined) {
+                firstMatch = { type: 'code', index: codeMatch.index, length: codeMatch[0].length, match: codeMatch };
+            }
+
+            if (linkMatch && linkMatch.index !== undefined) {
+                if (!firstMatch || linkMatch.index < firstMatch.index) {
+                    firstMatch = { type: 'link', index: linkMatch.index, length: linkMatch[0].length, match: linkMatch };
+                }
+            }
+
+            if (boldMatch && boldMatch.index !== undefined) {
+                if (!firstMatch || boldMatch.index < firstMatch.index) {
+                    firstMatch = { type: 'bold', index: boldMatch.index, length: boldMatch[0].length, match: boldMatch };
+                }
+            }
+
+            if (!firstMatch) {
+                // No more tokens, push remaining text
+                elements.push(remaining);
+                break;
+            }
+
+            // Push text before match
+            if (firstMatch.index > 0) {
+                elements.push(remaining.slice(0, firstMatch.index));
+            }
+
+            // Push Token
+            if (firstMatch.type === 'code') {
+                elements.push(
+                    <code key={`code-${cursor}-${firstMatch.index}`} className="bg-white/10 px-1 py-0.5 rounded text-emerald-300 font-mono text-sm">
+                        {firstMatch.match[1]}
+                    </code>
+                );
+            } else if (firstMatch.type === 'link') {
+                elements.push(
+                    <a key={`link-${cursor}-${firstMatch.index}`} href={firstMatch.match[2]} target="_blank" rel="noopener noreferrer" className="text-primary-400 hover:underline">
+                        {parseInline(firstMatch.match[1])}
+                    </a>
+                );
+            } else if (firstMatch.type === 'bold') {
+                elements.push(
+                    <strong key={`bold-${cursor}-${firstMatch.index}`} className="text-white font-bold">
+                        {parseInline(firstMatch.match[1])}
+                    </strong>
+                );
+            }
+
+            // Advance cursor
+            cursor += firstMatch.index + firstMatch.length;
+        }
+
+        return elements;
+    };
+
+    if (!content) return null;
+    
+    // Split by code blocks, handling potential unclosed blocks at the end (streaming safe)
+    // Regex matches: ``` ... ``` OR ``` ... end-of-string
+    const parts = content.split(/(```(?:[\s\S]*?```|[\s\S]*$))/g);
+    
+    return parts.map((part, index) => {
+      if (part.startsWith('```')) {
+        // Render Code Block
+        const lines = part.split('\n');
+        // Extract language from first line (remove backticks)
+        const langLine = lines[0]; 
+        const language = langLine.replace(/`/g, '').trim() || 'text';
+        
+        // Code content is everything after first line
+        let code = lines.slice(1).join('\n');
+        
+        // Remove closing backticks if they exist
+        if (code.endsWith('```')) {
+            code = code.slice(0, -3);
+        } else if (code.endsWith('```\n')) { // Handle newline before backticks
+             code = code.slice(0, -4);
+        } else if (code.trim().endsWith('```')) { // Loose check
+             const lastIndex = code.lastIndexOf('```');
+             if (lastIndex !== -1) code = code.substring(0, lastIndex);
+        }
+        
+        return (
+          <div key={index} className="my-4 rounded-lg overflow-hidden border border-white/10 bg-[#0d0d0d]">
+             <SyntaxHighlighter
+                language={language}
+                style={vscDarkPlus}
+                customStyle={{ margin: 0, padding: '1rem', background: 'transparent', fontSize: '13px' }}
+                wrapLines={true}
+                wrapLongLines={true}
+             >
+                {code}
+             </SyntaxHighlighter>
+          </div>
+        );
+      } else {
+        // Render Markdown Text
+        return (
+          <div key={index}>
+            {part.split('\n').map((line, i) => {
+              // Empty line
+              if (!line.trim()) return <br key={i} />;
+
+              // Headers
+              if (line.startsWith('# ')) return <h1 id={slugify(line.replace('# ', ''))} key={i} className="text-3xl font-display font-bold text-white mt-8 mb-4 border-b border-white/10 pb-2">{line.replace('# ', '')}</h1>;
+              if (line.startsWith('## ')) return <h2 id={slugify(line.replace('## ', ''))} key={i} className="text-2xl font-display font-bold text-primary-400 mt-6 mb-3">{line.replace('## ', '')}</h2>;
+              if (line.startsWith('### ')) return <h3 id={slugify(line.replace('### ', ''))} key={i} className="text-xl font-bold text-slate-200 mt-5 mb-2">{line.replace('### ', '')}</h3>;
+              
+              // Lists
+              if (line.trim().startsWith('- ')) return <li key={i} className="ml-4 list-disc text-slate-300 mb-1 pl-1">{parseInline(line.replace(/^\s*-\s/, ''))}</li>;
+              if (line.trim().match(/^\d+\. /)) return <li key={i} className="ml-4 list-decimal text-slate-300 mb-1 pl-1">{parseInline(line.replace(/^\s*\d+\.\s/, ''))}</li>;
+              
+              // Blockquotes
+              if (line.startsWith('> ')) return <blockquote key={i} className="border-l-4 border-primary-500/50 pl-4 py-1 my-4 bg-primary-500/5 text-slate-400 italic">{parseInline(line.replace(/^>\s/, ''))}</blockquote>;
+
+              // Paragraphs
+              return <p key={i} className="text-slate-300 leading-relaxed mb-2">{parseInline(line)}</p>;
+            })}
+          </div>
+        );
+      }
+    });
+  }, [content]);
+
+  return (
+    <div 
+        ref={scrollRef}
+        className="w-full h-full p-8 md:p-12 overflow-y-auto custom-scrollbar bg-[#050505] selection:bg-primary-500/30"
+    >
+        <div className="max-w-3xl mx-auto pb-32">
+            {renderedContent}
+        </div>
+    </div>
+  );
+};
+
+// Floating Table of Contents
+const TableOfContents: React.FC<{ content: string; onSelect: (id: string) => void }> = ({ content, onSelect }) => {
+    const headers = useMemo(() => {
+        const lines = content.split('\n');
+        const extracted = [];
+        for (const line of lines) {
+            const match = line.match(/^(#{1,3})\s+(.*)$/);
+            if (match) {
+                extracted.push({
+                    level: match[1].length,
+                    text: match[2],
+                    id: slugify(match[2])
+                });
+            }
+        }
+        return extracted;
+    }, [content]);
+
+    if (headers.length === 0) return null;
+
+    return (
+        <div className="absolute top-20 right-6 w-64 max-h-[70vh] overflow-y-auto custom-scrollbar bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-xl p-4 shadow-2xl z-50 animate-fade-in hidden xl:block">
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Hash size={12} /> Table of Contents
+            </h4>
+            <div className="space-y-1">
+                {headers.map((h, i) => (
+                    <button
+                        key={i}
+                        onClick={() => onSelect(h.id)}
+                        className={`block w-full text-left text-xs truncate py-1 px-2 rounded hover:bg-white/5 transition-colors ${
+                            h.level === 1 ? 'font-bold text-white' : 
+                            h.level === 2 ? 'pl-4 text-slate-300' : 'pl-6 text-slate-400'
+                        }`}
+                    >
+                        {h.text}
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+interface MagicWandMenuProps {
+  position: { x: number, y: number };
+  onSelect: (option: string) => void;
+  isLoading: boolean;
+  onClose: () => void;
+}
+
+const MagicWandMenu: React.FC<MagicWandMenuProps> = ({ position, onSelect, isLoading, onClose }) => {
+  if (isLoading) {
+    return (
+      <div 
+        className="fixed z-[9999] p-2 bg-slate-900 border border-primary-500/50 rounded-lg shadow-xl flex items-center gap-2 pointer-events-none"
+        style={{ left: position.x, top: position.y }}
+      >
+        <Loader2 size={16} className="animate-spin text-primary-400" />
+        <span className="text-xs text-white">Refining...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className="fixed z-[9999] bg-slate-900 border border-white/10 rounded-lg shadow-2xl overflow-hidden flex flex-col min-w-[160px] animate-in fade-in zoom-in-95 duration-200"
+      style={{ left: position.x, top: position.y }}
+    >
+      <div className="bg-slate-800 px-3 py-2 flex justify-between items-center border-b border-white/5">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+          <Sparkles size={10} className="text-primary-400" /> Magic Wand
+        </span>
+        <button onClick={onClose} className="text-slate-500 hover:text-white" aria-label="Close menu"><X size={12} /></button>
+      </div>
+      <div className="p-1 space-y-0.5">
+        <button onClick={() => onSelect('Make shorter')} className="w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-primary-500/20 hover:text-primary-300 rounded flex items-center gap-2 transition-colors">
+          <Scissors size={14} /> Make Shorter
+        </button>
+        <button onClick={() => onSelect('Make professional')} className="w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-blue-500/20 hover:text-blue-300 rounded flex items-center gap-2 transition-colors">
+          <Briefcase size={14} /> Make Professional
+        </button>
+        <button onClick={() => onSelect('Fix grammar')} className="w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-emerald-500/20 hover:text-emerald-300 rounded flex items-center gap-2 transition-colors">
+          <Check size={14} /> Fix Grammar
+        </button>
+        <button onClick={() => onSelect('Expand')} className="w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-purple-500/20 hover:text-purple-300 rounded flex items-center gap-2 transition-colors">
+          <Plus size={14} /> Expand
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Helper to render highlights behind textarea
+const HighlightOverlay: React.FC<{ 
+    content: string; 
+    matches: { start: number, end: number }[]; 
+    currentMatchIdx: number;
+    scrollRef: React.RefObject<HTMLDivElement>;
+}> = ({ content, matches, currentMatchIdx, scrollRef }) => {
+    if (matches.length === 0) return <div ref={scrollRef} className="absolute inset-0 p-8 md:p-12 font-mono text-sm md:text-base leading-relaxed whitespace-pre-wrap break-words text-transparent pointer-events-none overflow-hidden">{content}</div>;
+
+    const parts = [];
+    let lastIndex = 0;
+
+    matches.forEach((match, i) => {
+        // Text before match
+        if (match.start > lastIndex) {
+            parts.push(<span key={`text-${lastIndex}`}>{content.substring(lastIndex, match.start)}</span>);
+        }
+        
+        // Match text
+        const isCurrent = i === currentMatchIdx;
+        parts.push(
+            <span 
+                key={`match-${i}`} 
+                className={`${isCurrent ? 'bg-amber-500/60 text-transparent' : 'bg-yellow-500/30 text-transparent'} rounded-[2px]`}
+            >
+                {content.substring(match.start, match.end)}
+            </span>
+        );
+        
+        lastIndex = match.end;
+    });
+
+    // Remaining text
+    if (lastIndex < content.length) {
+        parts.push(<span key={`text-end`}>{content.substring(lastIndex)}</span>);
+    }
+
+    return (
+        <div 
+            ref={scrollRef}
+            className="absolute inset-0 p-8 md:p-12 font-mono text-sm md:text-base leading-relaxed whitespace-pre-wrap break-words text-transparent pointer-events-none overflow-hidden z-0"
+            aria-hidden="true"
+        >
+            {parts}
+        </div>
+    );
+};
+
 export const CopyBlock: React.FC<{ 
     content: string; 
     label?: string; 
@@ -439,20 +748,158 @@ export const CopyBlock: React.FC<{
     onEdit?: (newContent: string) => void;
     timestamp?: number;
     fileName?: string;
-}> = ({ content, label, isStreaming, onEdit, timestamp, fileName = 'vibe-document' }) => {
+    onInlineRefine?: (selection: string, instruction: string) => Promise<string>;
+}> = ({ content, label, isStreaming, onEdit, timestamp, fileName = 'vibe-document', onInlineRefine }) => {
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(content);
   const [showExport, setShowExport] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Sync local edit state with external content updates (e.g. streaming) if not currently editing
+  // Inline Refinement State
+  const [selection, setSelection] = useState<{ start: number, end: number, text: string } | null>(null);
+  const [menuPos, setMenuPos] = useState<{ x: number, y: number } | null>(null);
+  const [isRefining, setIsRefining] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Advanced Editor States
+  const [splitView, setSplitView] = useState(false);
+  const [showTOC, setShowTOC] = useState(true);
+  
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null); // Ref for highlighter overlay
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  // New Hint State
+  const [showHint, setShowHint] = useState(false);
+
+  // Smart Search States
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [replaceQuery, setReplaceQuery] = useState('');
+  const [searchOptions, setSearchOptions] = useState({ caseSensitive: false, wholeWord: false });
+  const [currentMatchIdx, setCurrentMatchIdx] = useState(-1);
+  const [matches, setMatches] = useState<{start: number, end: number}[]>([]);
+  const [showReplace, setShowReplace] = useState(false);
+
+  // Hint Logic
   useEffect(() => {
-    if (!isEditing) {
+      if ((isFullscreen) && onInlineRefine) {
+          const seen = localStorage.getItem('VIBE_WAND_HINT_SEEN');
+          if (!seen) setShowHint(true);
+      } else {
+          setShowHint(false);
+      }
+  }, [isFullscreen, onInlineRefine]);
+
+  // Sync local edit state with external content updates
+  useEffect(() => {
+    if (!isEditing && !isFullscreen) {
         setEditValue(content);
     }
-  }, [content, isEditing]);
+  }, [content, isEditing, isFullscreen]);
+
+  // Handle Ctrl+F for search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (!isFullscreen) return;
+        
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            setShowSearch(true);
+            // Search input autofocus is handled by the input element itself
+        }
+        
+        if (e.key === 'Escape' && showSearch) {
+            setShowSearch(false);
+            setSearchQuery('');
+            setMatches([]);
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen, showSearch]);
+
+  const escapeRegExp = (string: string) => {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  };
+
+  // Search Logic
+  useEffect(() => {
+      if (!searchQuery) {
+          setMatches([]);
+          setCurrentMatchIdx(-1);
+          return;
+      }
+
+      try {
+          const flags = searchOptions.caseSensitive ? 'g' : 'gi';
+          const pattern = searchOptions.wholeWord ? `\\b${escapeRegExp(searchQuery)}\\b` : escapeRegExp(searchQuery);
+          const regex = new RegExp(pattern, flags);
+          
+          const newMatches = [];
+          let match;
+          while ((match = regex.exec(editValue)) !== null) {
+              newMatches.push({ start: match.index, end: match.index + match[0].length });
+          }
+          setMatches(newMatches);
+          if (newMatches.length > 0) {
+              setCurrentMatchIdx(0); // Reset to first match
+          } else {
+              setCurrentMatchIdx(-1);
+          }
+      } catch (e) {
+          console.warn("Invalid regex", e);
+      }
+  }, [searchQuery, editValue, searchOptions]);
+
+  const navigateMatch = (direction: 1 | -1) => {
+      if (matches.length === 0) return;
+      let nextIdx = currentMatchIdx + direction;
+      if (nextIdx >= matches.length) nextIdx = 0;
+      if (nextIdx < 0) nextIdx = matches.length - 1;
+      
+      setCurrentMatchIdx(nextIdx);
+      
+      // Scroll to match
+      const match = matches[nextIdx];
+      if (editorRef.current) {
+          editorRef.current.focus();
+          editorRef.current.setSelectionRange(match.start, match.end);
+          
+          // Auto-scroll calculation
+          // We can use blur/focus hack or calculate coordinates. 
+          // Simple blur/focus forces scroll on most browsers.
+          const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+          if (!isFirefox) {
+             editorRef.current.blur();
+             editorRef.current.focus();
+          } else {
+             // Firefox doesn't always scroll on focus, but setSelectionRange usually does if input.
+          }
+      }
+  };
+
+  const handleReplace = () => {
+      if (currentMatchIdx === -1 || matches.length === 0) return;
+      const match = matches[currentMatchIdx];
+      const before = editValue.substring(0, match.start);
+      const after = editValue.substring(match.end);
+      const newValue = before + replaceQuery + after;
+      setEditValue(newValue);
+      // Logic to keep index or find next will naturally happen via useEffect dependency on editValue
+  };
+
+  const handleReplaceAll = () => {
+      if (!searchQuery) return;
+      const flags = searchOptions.caseSensitive ? 'g' : 'gi';
+      const pattern = searchOptions.wholeWord ? `\\b${escapeRegExp(searchQuery)}\\b` : escapeRegExp(searchQuery);
+      const regex = new RegExp(pattern, flags);
+      const newValue = editValue.replace(regex, replaceQuery);
+      setEditValue(newValue);
+  };
 
   const handleCopy = () => {
     navigator.clipboard.writeText(content);
@@ -463,11 +910,98 @@ export const CopyBlock: React.FC<{
   const handleSaveEdit = () => {
       if (onEdit) onEdit(editValue);
       setIsEditing(false);
+      setIsFullscreen(false);
   };
 
   const handleCancelEdit = () => {
       setEditValue(content);
       setIsEditing(false);
+      setIsFullscreen(false);
+  };
+
+  // Fix: Use useLayoutEffect to attach direct DOM event listener for synchronous updates
+  useLayoutEffect(() => {
+      const textarea = editorRef.current;
+      const overlay = overlayRef.current;
+      const preview = previewRef.current;
+
+      if (!textarea) return;
+
+      const handleScroll = () => {
+          // Sync Highlight Overlay
+          if (overlay) {
+              overlay.scrollTop = textarea.scrollTop;
+              overlay.scrollLeft = textarea.scrollLeft;
+          }
+          
+          // Sync Preview Pane (Split View)
+          if (splitView && preview) {
+              const scrollableHeight = textarea.scrollHeight - textarea.clientHeight;
+              if (scrollableHeight > 0) {
+                  const percentage = textarea.scrollTop / scrollableHeight;
+                  preview.scrollTop = percentage * (preview.scrollHeight - preview.clientHeight);
+              }
+          }
+      };
+
+      textarea.addEventListener('scroll', handleScroll, { passive: true });
+      return () => textarea.removeEventListener('scroll', handleScroll);
+  }, [splitView]);
+
+  // NEW: handleMouseUp replaces handleSelect logic
+  const handleMouseUp = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    if (e.button !== 0) return; // Only left click
+
+    const target = e.target as HTMLTextAreaElement;
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    
+    if (start !== end) {
+      const selectedText = target.value.substring(start, end);
+      if (selectedText.trim().length > 0 && onInlineRefine) {
+        setSelection({ start, end, text: selectedText });
+        setMenuPos({ x: e.clientX, y: e.clientY + 15 });
+        
+        if (showHint) {
+            setShowHint(false);
+            localStorage.setItem('VIBE_WAND_HINT_SEEN', 'true');
+        }
+      } else {
+        setSelection(null);
+        setMenuPos(null);
+      }
+    } else {
+      setSelection(null);
+      setMenuPos(null);
+    }
+  };
+
+  const handleMouseDown = () => {
+      setMenuPos(null);
+  };
+
+  const executeInlineRefinement = async (instruction: string) => {
+    if (!selection || !onInlineRefine) return;
+    
+    setIsRefining(true);
+    try {
+      const refinedText = await onInlineRefine(selection.text, instruction);
+      
+      // Replace text
+      const before = editValue.substring(0, selection.start);
+      const after = editValue.substring(selection.end);
+      const newValue = before + refinedText + after;
+      
+      setEditValue(newValue);
+      
+      // Clear selection
+      setSelection(null);
+      setMenuPos(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsRefining(false);
+    }
   };
 
   const downloadFile = (format: 'md' | 'json') => {
@@ -519,10 +1053,14 @@ export const CopyBlock: React.FC<{
           if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
               setShowExport(false);
           }
+          // Also close menu if clicking outside
+          if (menuPos && !(event.target as HTMLElement).closest('button')) {
+             if (!isRefining) setMenuPos(null);
+          }
       };
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [menuPos, isRefining]);
 
   // Auto-scroll to bottom when streaming
   useEffect(() => {
@@ -531,7 +1069,18 @@ export const CopyBlock: React.FC<{
     }
   }, [content, isStreaming, isEditing]);
 
+  const handleTOCNavigation = (id: string) => {
+      const el = document.getElementById(id);
+      if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+  };
+
+  // Guess Language for Highlighter
+  const language = fileName?.endsWith('.json') ? 'json' : fileName?.endsWith('.md') ? 'markdown' : 'markdown';
+
   return (
+    <>
     <motion.div 
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -549,11 +1098,21 @@ export const CopyBlock: React.FC<{
          </div>
          
          <div className="flex items-center gap-1">
+            <button 
+                onClick={() => setIsFullscreen(true)}
+                className="p-1.5 text-slate-500 hover:text-white hover:bg-white/10 rounded transition-colors"
+                title="Fullscreen Editor"
+                aria-label="Enter fullscreen"
+            >
+                <Maximize2 size={14} />
+            </button>
+
             {onEdit && !isEditing && (
                 <button 
                     onClick={() => setIsEditing(true)} 
-                    className="p-1.5 text-slate-500 hover:text-primary-400 hover:bg-white/5 rounded transition-colors"
+                    className="p-1.5 text-slate-500 hover:text-primary-400 hover:bg-white/10 rounded transition-colors"
                     title="Edit content"
+                    aria-label="Edit content"
                 >
                     <Edit2 size={14} />
                 </button>
@@ -562,8 +1121,9 @@ export const CopyBlock: React.FC<{
             <div className="relative" ref={dropdownRef}>
                 <button 
                     onClick={() => setShowExport(!showExport)}
-                    className="p-1.5 text-slate-500 hover:text-primary-400 hover:bg-white/5 rounded transition-colors"
+                    className="p-1.5 text-slate-500 hover:text-primary-400 hover:bg-white/10 rounded transition-colors"
                     title="Export options"
+                    aria-label="Export options"
                 >
                     <Download size={14} />
                 </button>
@@ -584,8 +1144,9 @@ export const CopyBlock: React.FC<{
 
             <button 
                 onClick={handleCopy}
-                className="p-1.5 text-slate-500 hover:text-primary-400 hover:bg-white/5 rounded transition-colors"
+                className="p-1.5 text-slate-500 hover:text-primary-400 hover:bg-white/10 rounded transition-colors"
                 title="Copy to clipboard"
+                aria-label="Copy to clipboard"
             >
                 {copied ? <Check size={14} className="text-emerald-400"/> : <Clipboard size={14} />}
             </button>
@@ -593,145 +1154,430 @@ export const CopyBlock: React.FC<{
       </div>
 
       {isEditing ? (
-        <div className="bg-[#050505] border border-primary-500/30 rounded-xl p-4 shadow-[0_0_20px_rgba(16,185,129,0.1)]">
+        <div className="bg-[#050505] border border-primary-500/30 rounded-xl p-4 shadow-[0_0_20px_rgba(16,185,129,0.1)] relative">
             <textarea
+                ref={textareaRef}
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
+                onMouseUp={handleMouseUp}
+                onMouseDown={handleMouseDown}
                 className="w-full h-[400px] bg-transparent text-sm font-mono text-slate-300 focus:outline-none resize-none custom-scrollbar p-2"
                 autoFocus
             />
+            
+            {/* Inline Magic Wand Menu */}
+            {menuPos && onInlineRefine && (
+                <MagicWandMenu 
+                    position={menuPos} 
+                    onSelect={executeInlineRefinement} 
+                    isLoading={isRefining} 
+                    onClose={() => setMenuPos(null)}
+                />
+            )}
+
             <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-white/10">
                 <Button variant="secondary" onClick={handleCancelEdit} className="h-8 text-xs">Cancel</Button>
                 <Button onClick={handleSaveEdit} className="h-8 text-xs bg-primary-600 hover:bg-primary-500"><Save size={14}/> Save Changes</Button>
             </div>
         </div>
       ) : (
-        <div 
-            ref={scrollRef}
-            className="bg-[#050505] border border-white/10 rounded-xl p-4 md:p-6 font-mono text-sm text-slate-300 whitespace-pre-wrap max-h-[500px] overflow-y-auto shadow-inner custom-scrollbar relative"
-        >
-            <div className="absolute top-0 right-0 p-4 bg-gradient-to-l from-[#050505] to-transparent w-20 h-full pointer-events-none" />
-            {content || <span className="text-slate-700 italic">Generate content to view code...</span>}
+        <div className="relative rounded-xl border border-white/10 bg-[#050505] shadow-inner group-hover:border-white/20 transition-colors overflow-hidden">
+            {/* Scrollable Content */}
+            <div 
+                ref={scrollRef}
+                className="font-mono text-sm max-h-[500px] overflow-y-auto custom-scrollbar relative p-0"
+            >
+                {content ? (
+                  <SyntaxHighlighter
+                     language={language}
+                     style={vscDarkPlus}
+                     customStyle={{ margin: 0, padding: '1.5rem', background: 'transparent', fontSize: '13px', lineHeight: '1.5' }}
+                     wrapLines={true}
+                     wrapLongLines={true}
+                  >
+                    {content}
+                  </SyntaxHighlighter>
+                ) : (
+                   <div className="p-6 text-slate-700 italic">Generate content to view code...</div>
+                )}
+            </div>
+
+            {/* Fixed Overlay Elements (Gradient + Streaming Indicator) */}
+            <div className="absolute top-0 right-0 w-20 h-full bg-gradient-to-l from-[#050505] to-transparent pointer-events-none z-10" />
+
             {isStreaming && (
-            <span className="inline-block w-2 h-4 bg-primary-500 ml-1 animate-pulse align-middle shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+                <div className="absolute bottom-4 left-4 z-20">
+                     <div className="flex items-center gap-2 px-3 py-2 bg-slate-900/90 backdrop-blur-md rounded-full border border-primary-500/20 shadow-lg shadow-black/50">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-primary-500"></span>
+                        </span>
+                        <span className="text-[10px] font-bold text-primary-200 tracking-widest uppercase">Streaming</span>
+                     </div>
+                </div>
             )}
         </div>
       )}
     </motion.div>
-  );
-};
 
-export const RefinementControl: React.FC<{ 
-  onRefine: (text: string) => void; 
-  isRefining: boolean; 
-  placeholder?: string;
-}> = ({ onRefine, isRefining, placeholder = "Suggest changes (e.g., 'Make it more detailed', 'Focus on mobile')" }) => {
-  const [text, setText] = useState('');
-  const [isDebouncing, setIsDebouncing] = useState(false);
+    {/* Fullscreen Editor Overlay - Portal to Body */}
+    {createPortal(
+      <AnimatePresence>
+        {isFullscreen && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[9999] bg-[#050505] flex flex-col"
+          >
+            {/* Editor Toolbar */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#09090b] relative z-50">
+               <div className="flex items-center gap-4">
+                  <div className="p-2 bg-white/5 rounded-lg border border-white/10">
+                     <Type size={18} className="text-primary-400" />
+                  </div>
+                  <div>
+                     <h3 className="text-sm font-bold text-slate-200">{fileName}</h3>
+                     <div className="flex items-center gap-3 text-[10px] text-slate-500 font-mono">
+                        <span>{editValue.length} chars</span>
+                        <span>•</span>
+                        <span>{Math.ceil(editValue.length / 4)} tokens</span>
+                     </div>
+                  </div>
+               </div>
+               
+               <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowSearch(!showSearch)}
+                    className={`p-2 rounded-lg border transition-colors flex items-center gap-2 ${showSearch ? 'bg-primary-500/10 border-primary-500/30 text-primary-400' : 'bg-slate-800 border-white/10 text-slate-400 hover:text-white'}`}
+                    title="Find (Ctrl+F)"
+                    aria-label="Find"
+                  >
+                      <Search size={14} />
+                  </button>
 
-  const handleSubmit = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (text.trim() && !isRefining && !isDebouncing) {
-      setIsDebouncing(true);
-      onRefine(text);
-      setText('');
-      // Reset debounce after a short delay to allow UI to catch up
-      setTimeout(() => setIsDebouncing(false), 2000);
-    }
-  };
+                  {/* Split Screen Toggle */}
+                  <div className="hidden md:flex bg-slate-800 rounded-lg p-1 border border-white/10">
+                      <button 
+                        onClick={() => setSplitView(false)}
+                        className={`p-1.5 rounded transition-colors ${!splitView ? 'bg-primary-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                        title="Code View"
+                        aria-label="Code View"
+                      >
+                          <Edit2 size={14} />
+                      </button>
+                      <button 
+                        onClick={() => setSplitView(true)}
+                        className={`p-1.5 rounded transition-colors ${splitView ? 'bg-primary-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                        title="Split Preview"
+                        aria-label="Split Preview"
+                      >
+                          <Columns size={14} />
+                      </button>
+                  </div>
 
-  return (
-    <motion.div 
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mt-6 bg-surface/50 backdrop-blur-md border border-white/10 rounded-2xl p-4 shadow-lg"
-    >
-      <div className="flex items-center gap-2 mb-3">
-        <Sparkles size={16} className="text-primary-400" />
-        <h4 className="text-sm font-semibold text-slate-200">Refine with AI</h4>
-      </div>
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <input 
-          type="text" 
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={placeholder}
-          disabled={isRefining || isDebouncing}
-          className="flex-1 bg-[#050505]/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-primary-500/50 focus:ring-1 focus:ring-primary-500/20 transition-all disabled:opacity-50"
-        />
-        <Button 
-          type="submit" 
-          disabled={!text.trim() || isRefining || isDebouncing}
-          variant="secondary"
-          className="h-auto py-0 px-4"
-        >
-          {isRefining || isDebouncing ? (
-             <Loader2 size={18} className="animate-spin text-primary-400" />
-          ) : (
-             <Send size={18} />
-          )}
-        </Button>
-      </form>
-      <p className="text-[10px] text-slate-500 mt-2 pl-1">
-        Use this to tweak the output without regenerating from scratch. Context is preserved.
-      </p>
-    </motion.div>
-  );
-};
+                  {splitView && (
+                      <button
+                        onClick={() => setShowTOC(!showTOC)}
+                        className={`hidden xl:flex items-center gap-2 p-2 rounded-lg border transition-colors text-xs font-medium ${
+                            showTOC ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' : 'bg-slate-800 border-white/10 text-slate-400'
+                        }`}
+                        title="Toggle Table of Contents"
+                        aria-label={showTOC ? "Hide Table of Contents" : "Show Table of Contents"}
+                      >
+                          <List size={14} /> {showTOC ? 'Hide TOC' : 'Show TOC'}
+                      </button>
+                  )}
 
-export const ManualEntryControl: React.FC<{
-  onUpdate: (text: string) => void;
-  placeholder?: string;
-}> = ({ onUpdate, placeholder = "Paste content here to overwrite..." }) => {
-  const [text, setText] = useState('');
+                  {onEdit && (
+                     <div className="flex items-center gap-2 mx-4 border-l border-white/10 pl-4">
+                        <Button variant="secondary" onClick={handleCancelEdit} className="h-8 text-xs bg-white/5 hover:bg-white/10">
+                           Cancel
+                        </Button>
+                        <Button onClick={handleSaveEdit} className="h-8 text-xs bg-primary-600 hover:bg-primary-500 text-white">
+                           <Save size={14} className="mr-1.5"/> Save
+                        </Button>
+                     </div>
+                  )}
+                  
+                  <div className="flex items-center gap-2">
+                    <Button variant="secondary" onClick={handleCopy} className="h-8 w-8 p-0 flex items-center justify-center bg-white/5 hover:bg-white/10" aria-label="Copy to clipboard">
+                        {copied ? <Check size={14} className="text-emerald-400"/> : <Clipboard size={14}/>}
+                    </Button>
+                    <Button variant="secondary" onClick={() => setIsFullscreen(false)} className="h-8 w-8 p-0 flex items-center justify-center bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white" aria-label="Exit fullscreen">
+                        <Minimize2 size={16} />
+                    </Button>
+                  </div>
+               </div>
+            </div>
 
-  const handleSubmit = () => {
-    if (text.trim()) {
-      onUpdate(text);
-      setText('');
-    }
-  };
+            {/* Editor Area */}
+            <div className="flex-1 relative flex overflow-hidden">
+               {/* Left Pane: Raw Editor */}
+               <div className={`h-full flex flex-col relative transition-all duration-300 ${splitView ? 'w-1/2 border-r border-white/10' : 'w-full'}`}>
+                   
+                   {/* Search Panel Overlay */}
+                   <AnimatePresence>
+                       {showSearch && (
+                           <motion.div 
+                               initial={{ opacity: 0, y: -20, x: 20 }}
+                               animate={{ opacity: 1, y: 0, x: 0 }}
+                               exit={{ opacity: 0, y: -10 }}
+                               className="absolute top-4 right-8 z-50 w-80 bg-[#0a0a0c]/95 border border-white/10 rounded-xl shadow-2xl backdrop-blur-xl p-3 flex flex-col gap-2"
+                           >
+                               {/* Search Input Row */}
+                               <div className="flex items-center gap-2 bg-[#1a1a1c] border border-white/5 rounded-lg px-2 py-1.5 focus-within:border-primary-500/50 transition-colors">
+                                   <Search size={14} className="text-slate-500 shrink-0" />
+                                   <input 
+                                      autoFocus
+                                      type="text" 
+                                      placeholder="Find"
+                                      value={searchQuery}
+                                      onChange={(e) => setSearchQuery(e.target.value)}
+                                      onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                              e.preventDefault();
+                                              navigateMatch(e.shiftKey ? -1 : 1);
+                                          }
+                                      }}
+                                      className="bg-transparent border-none outline-none text-xs text-slate-200 w-full placeholder-slate-600"
+                                   />
+                                   <div className="flex items-center gap-1">
+                                       <button 
+                                          onClick={() => setSearchOptions(prev => ({ ...prev, caseSensitive: !prev.caseSensitive }))}
+                                          className={`p-1 rounded hover:bg-white/10 ${searchOptions.caseSensitive ? 'text-primary-400 bg-primary-500/10' : 'text-slate-500'}`}
+                                          title="Match Case"
+                                          aria-label="Match Case"
+                                       >
+                                           <CaseSensitive size={14} />
+                                       </button>
+                                       <button 
+                                          onClick={() => setSearchOptions(prev => ({ ...prev, wholeWord: !prev.wholeWord }))}
+                                          className={`p-1 rounded hover:bg-white/10 ${searchOptions.wholeWord ? 'text-primary-400 bg-primary-500/10' : 'text-slate-500'}`}
+                                          title="Match Whole Word"
+                                          aria-label="Match Whole Word"
+                                       >
+                                           <WholeWord size={14} />
+                                       </button>
+                                   </div>
+                               </div>
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="mt-6 bg-surface/50 backdrop-blur-md border border-white/10 rounded-2xl p-4 shadow-lg"
-    >
-      <div className="flex items-center gap-2 mb-3">
-        <Edit2 size={16} className="text-blue-400" />
-        <h4 className="text-sm font-semibold text-slate-200">Update Content Manually</h4>
-      </div>
-      <div className="flex flex-col gap-2">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={placeholder}
-          className="w-full h-24 bg-[#050505]/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all resize-none custom-scrollbar"
-        />
-        <Button
-          onClick={handleSubmit}
-          disabled={!text.trim()}
-          className="self-end h-auto py-2 px-4 bg-blue-600 hover:bg-blue-500 border-0"
-        >
-          <CheckCircle size={16} className="mr-2" /> Save Update
-        </Button>
-      </div>
-    </motion.div>
+                               {/* Replace Input Row */}
+                               <AnimatePresence>
+                                   {showReplace && (
+                                       <motion.div 
+                                          initial={{ height: 0, opacity: 0 }}
+                                          animate={{ height: 'auto', opacity: 1 }}
+                                          exit={{ height: 0, opacity: 0 }}
+                                          className="overflow-hidden"
+                                       >
+                                           <div className="flex items-center gap-2 bg-[#1a1a1c] border border-white/5 rounded-lg px-2 py-1.5 focus-within:border-primary-500/50 transition-colors mb-2">
+                                               <Replace size={14} className="text-slate-500 shrink-0" />
+                                               <input 
+                                                  type="text" 
+                                                  placeholder="Replace"
+                                                  value={replaceQuery}
+                                                  onChange={(e) => setReplaceQuery(e.target.value)}
+                                                  className="bg-transparent border-none outline-none text-xs text-slate-200 w-full placeholder-slate-600"
+                                               />
+                                               <div className="flex gap-1">
+                                                   <button onClick={handleReplace} className="p-1 hover:bg-white/10 rounded text-slate-400 hover:text-white" title="Replace One" aria-label="Replace One"><Check size={12}/></button>
+                                                   <button onClick={handleReplaceAll} className="p-1 hover:bg-white/10 rounded text-slate-400 hover:text-white" title="Replace All" aria-label="Replace All"><List size={12}/></button>
+                                               </div>
+                                           </div>
+                                       </motion.div>
+                                   )}
+                               </AnimatePresence>
+
+                               {/* Controls Row */}
+                               <div className="flex items-center justify-between">
+                                   <div className="text-[10px] text-slate-500 font-mono pl-1">
+                                       {matches.length > 0 ? `${currentMatchIdx + 1} of ${matches.length}` : 'No results'}
+                                   </div>
+                                   <div className="flex items-center gap-1">
+                                       <button onClick={() => setShowReplace(!showReplace)} className={`p-1.5 rounded hover:bg-white/10 transition-colors ${showReplace ? 'text-slate-200' : 'text-slate-500'}`} title="Toggle Replace" aria-label="Toggle Replace">
+                                           <ChevronDown size={14} className={`transition-transform ${showReplace ? 'rotate-180' : ''}`}/>
+                                       </button>
+                                       <div className="w-px h-3 bg-white/10 mx-1"></div>
+                                       <button onClick={() => navigateMatch(-1)} className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded" title="Previous Match" aria-label="Previous Match">
+                                           <ArrowUp size={14} />
+                                       </button>
+                                       <button onClick={() => navigateMatch(1)} className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded" title="Next Match" aria-label="Next Match">
+                                           <ArrowDown size={14} />
+                                       </button>
+                                       <button onClick={() => setShowSearch(false)} className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded ml-1" title="Close" aria-label="Close Search">
+                                           <X size={14} />
+                                       </button>
+                                   </div>
+                               </div>
+                           </motion.div>
+                       )}
+                   </AnimatePresence>
+
+                   {/* Editor Stack: Overlay + Textarea */}
+                   <div className="relative w-full h-full bg-[#050505] overflow-hidden">
+                       <HighlightOverlay 
+                           content={editValue}
+                           matches={matches}
+                           currentMatchIdx={currentMatchIdx}
+                           scrollRef={overlayRef}
+                       />
+                       <textarea 
+                          ref={editorRef}
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onMouseUp={handleMouseUp}
+                          onMouseDown={handleMouseDown}
+                          className="absolute inset-0 w-full h-full p-8 md:p-12 bg-transparent text-slate-200 font-mono text-sm md:text-base resize-none focus:outline-none leading-relaxed custom-scrollbar selection:bg-primary-500/30 z-10"
+                          spellCheck={false}
+                          placeholder="Start typing..."
+                          readOnly={!onEdit}
+                       />
+                   </div>
+                   
+                   {/* Scrollbar Minimap - Visual Indicators for Matches */}
+                   {matches.length > 0 && (
+                       <div className="absolute right-0 top-0 bottom-0 w-3 bg-transparent z-20 pointer-events-none">
+                           {matches.map((m, i) => (
+                               <div 
+                                  key={i} 
+                                  className={`absolute w-full h-[2px] right-0 ${i === currentMatchIdx ? 'bg-primary-400' : 'bg-yellow-500/50'}`}
+                                  style={{ top: `${(m.start / editValue.length) * 100}%` }}
+                               />
+                           ))}
+                       </div>
+                   )}
+                   
+                   {/* Fullscreen Magic Wand Menu */}
+                   {menuPos && onInlineRefine && (
+                        <MagicWandMenu 
+                            position={menuPos} 
+                            onSelect={executeInlineRefinement} 
+                            isLoading={isRefining} 
+                            onClose={() => setMenuPos(null)}
+                        />
+                   )}
+
+                   {/* Hint Overlay */}
+                   <AnimatePresence>
+                        {showHint && isFullscreen && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute bottom-12 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-primary-600/90 text-white text-xs font-bold rounded-full shadow-lg backdrop-blur-sm pointer-events-none flex items-center gap-2 border border-white/20"
+                            >
+                                <Sparkles size={14} className="animate-pulse text-yellow-300" />
+                                <span>Select words to use Magic Wand</span>
+                            </motion.div>
+                        )}
+                   </AnimatePresence>
+
+                   {!splitView && (
+                       <div className="absolute bottom-6 right-8 pointer-events-none opacity-50 z-30">
+                          <div className="flex flex-col items-end gap-1 text-[10px] font-mono text-slate-600">
+                             <div className="flex items-center gap-1"><AlignLeft size={10} /> {editValue.split('\n').length} lines</div>
+                             <div className="flex items-center gap-1"><Keyboard size={10} /> UTF-8</div>
+                          </div>
+                       </div>
+                   )}
+               </div>
+
+               {/* Right Pane: Live Preview */}
+               <AnimatePresence>
+                   {splitView && (
+                       <motion.div 
+                          initial={{ opacity: 0, x: 20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 20 }}
+                          transition={{ duration: 0.3 }}
+                          className="w-1/2 h-full bg-[#080808] relative border-l border-white/10"
+                       >
+                           {/* Floating TOC */}
+                           {showTOC && <TableOfContents content={editValue} onSelect={handleTOCNavigation} />}
+                           
+                           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary-500 to-blue-500 opacity-30 z-10" />
+                           <MarkdownPreview content={editValue} scrollRef={previewRef} />
+                       </motion.div>
+                   )}
+               </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>,
+      document.body
+    )}
+    </>
   );
 };
 
 export const PersonaError: React.FC = () => (
-  <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-6 animate-fade-in px-4">
-    <div className="p-6 bg-slate-900/50 rounded-full border border-slate-800">
-      <AlertTriangle size={48} className="text-amber-500" />
+  <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-6">
+    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20">
+      <AlertTriangle size={32} className="text-red-400" />
     </div>
-    <h2 className="text-2xl font-bold text-slate-100">Persona Not Selected</h2>
-    <p className="text-slate-400 max-w-md">
-      To generate content, we need to know your vibe (Vibe-Coder vs Developer). Please go back to the home page.
-    </p>
+    <div>
+      <h2 className="text-xl font-bold text-white mb-2">Persona Not Selected</h2>
+      <p className="text-slate-400 max-w-md mx-auto">
+        Please return to the home page and select a persona (Vibe-Coder, Developer, or Learner) to continue.
+      </p>
+    </div>
     <Link to="/">
-      <Button variant="primary">Return Home</Button>
+      <Button variant="primary">Select Persona</Button>
     </Link>
   </div>
 );
+
+export const RefinementControl: React.FC<{ 
+  onRefine: (instruction: string) => void; 
+  isRefining: boolean; 
+  placeholder?: string 
+}> = ({ onRefine, isRefining, placeholder }) => {
+  const [instruction, setInstruction] = useState('');
+
+  const handleSubmit = () => {
+    if (!instruction.trim()) return;
+    onRefine(instruction);
+    setInstruction('');
+  };
+
+  return (
+    <div className="mt-4 flex gap-2">
+      <div className="relative flex-1">
+        <input
+          type="text"
+          value={instruction}
+          onChange={(e) => setInstruction(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+          placeholder={placeholder || "Refine this output..."}
+          className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-primary-500/50 transition-colors pr-10"
+          disabled={isRefining}
+        />
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+            <Sparkles size={16} className="text-slate-600" />
+        </div>
+      </div>
+      <Button 
+        onClick={handleSubmit} 
+        disabled={isRefining || !instruction.trim()}
+        className="h-auto"
+      >
+        {isRefining ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+      </Button>
+    </div>
+  );
+};
+
+export const ManualEntryControl: React.FC<{
+    onUpdate: (content: string) => void;
+}> = () => {
+    return (
+        <div className="mt-4 p-3 bg-slate-900/50 border border-white/10 rounded-xl flex items-center justify-between text-sm text-slate-400">
+            <span className="flex items-center gap-2">
+                <Edit2 size={16} />
+                <span>You are in Manual Mode. Edit the text above directly or paste external results.</span>
+            </span>
+        </div>
+    );
+};

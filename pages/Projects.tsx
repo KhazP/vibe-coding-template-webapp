@@ -1,16 +1,20 @@
+
 import React, { useState } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { GlassCard, Button, PageTransition, Modal, Input } from '../components/UI';
-import { Plus, Trash2, Calendar, FolderOpen, User } from 'lucide-react';
+import { Plus, Trash2, Calendar, FolderOpen, User, Upload, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Persona } from '../types';
+import { Persona, ProjectState } from '../types';
+import { useToast } from '../components/Toast';
 
 const Projects: React.FC = () => {
-  const { projects, currentProjectId, createProject, loadProject, deleteProject } = useProject();
+  const { projects, currentProjectId, createProject, loadProject, deleteProject, importProjects } = useProject();
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleOpen = (id: string) => {
     loadProject(id);
@@ -34,6 +38,64 @@ const Projects: React.FC = () => {
   const handleDeleteClick = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     setDeleteId(id);
+  };
+
+  const handleExport = (e: React.MouseEvent, project: ProjectState) => {
+    e.stopPropagation();
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(project, null, 2));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", `${project.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_vibe.json`);
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+      addToast('Project exported successfully', 'success');
+    } catch (err) {
+      addToast('Failed to export project', 'error');
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        // Support importing a single project object or an array of them
+        // Also possibly support the raw storage dump format { projects: {}, currentId: '' }
+        
+        let projectsToImport: ProjectState[] = [];
+        
+        if (Array.isArray(json)) {
+            projectsToImport = json;
+        } else if (json.id && json.name) {
+            // Single project
+            projectsToImport = [json];
+        } else if (json.projects) {
+            // Full storage dump
+            projectsToImport = Object.values(json.projects);
+        }
+
+        const valid = projectsToImport.every((p: any) => p.id && p.name);
+        
+        if (valid && projectsToImport.length > 0) {
+            importProjects(projectsToImport);
+        } else {
+             addToast('Invalid project file format', 'error');
+        }
+      } catch (err) {
+        addToast('Failed to parse JSON file', 'error');
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const confirmDelete = () => {
@@ -66,9 +128,15 @@ const Projects: React.FC = () => {
             <h2 className="text-3xl font-bold text-slate-100 mb-2">My Projects</h2>
             <p className="text-slate-400">Manage your saved vibe-coding sessions.</p>
           </div>
-          <Button onClick={openCreateModal} variant="primary">
-            <Plus size={18} /> New Project
-          </Button>
+          <div className="flex items-center gap-3">
+             <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".json" />
+             <Button onClick={handleImportClick} variant="secondary" className="border-white/10 text-slate-300">
+                <Upload size={18} className="mr-2"/> Import
+             </Button>
+             <Button onClick={openCreateModal} variant="primary">
+                <Plus size={18} /> New Project
+             </Button>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -126,7 +194,14 @@ const Projects: React.FC = () => {
                      title={Object.keys(project.agentOutputs).length > 0 ? "Agent Configured" : "Agent Config Pending"} 
                    />
                    
-                   <div className="ml-auto">
+                   <div className="ml-auto flex items-center gap-1">
+                        <button 
+                          onClick={(e) => handleExport(e, project)}
+                          className="p-2 text-slate-600 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                          title="Export Project JSON"
+                        >
+                          <Download size={14} />
+                        </button>
                         <button 
                           onClick={(e) => handleDeleteClick(e, project.id)}
                           className="p-2 text-slate-600 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"

@@ -6,7 +6,7 @@ import {
   Terminal, Download, FileText, Copy, FileJson, 
   Command, Package, CheckSquare, Square, 
   ExternalLink, Sparkles, AlertCircle, PlayCircle, FolderOpen,
-  ArrowRight, Monitor, BookOpen
+  ArrowRight, Monitor, BookOpen, Check
 } from 'lucide-react';
 import { ModelStatus } from '../components/ModelStatus';
 import { TOOL_IDS, FILE_NAMES, TOOLS } from '../utils/constants';
@@ -14,6 +14,8 @@ import { getLaunchProtocol, LAUNCH_PROTOCOL_INDEX } from '../utils/launchProtoco
 import JSZip from 'jszip';
 import { useToast } from '../components/Toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 // --- Sub-Components ---
 
@@ -60,6 +62,7 @@ const FileRow: React.FC<{
                 onClick={() => onCopy(content)}
                 className="p-2 text-slate-600 hover:text-white hover:bg-white/10 rounded-md transition-colors opacity-0 group-hover:opacity-100"
                 title="Copy content"
+                aria-label="Copy content"
             >
                 <Copy size={14} />
             </button>
@@ -67,20 +70,37 @@ const FileRow: React.FC<{
     </div>
 );
 
-const CodeBlock: React.FC<{ code: string; onCopy: (text: string) => void }> = ({ code, onCopy }) => (
-    <div className="bg-black rounded-lg border border-white/10 p-3 group relative my-2">
-        <pre className="font-mono text-xs text-emerald-400 whitespace-pre-wrap break-all overflow-x-auto custom-scrollbar">
-            {code}
-        </pre>
-        <button 
-            onClick={() => onCopy(code)}
-            className="absolute top-2 right-2 p-1.5 text-slate-500 hover:text-white hover:bg-white/10 rounded-md transition-all opacity-0 group-hover:opacity-100 bg-black/50 backdrop-blur"
-            title="Copy command"
-        >
-            <Copy size={12} />
-        </button>
-    </div>
-);
+const CodeBlock: React.FC<{ code: string; language?: string; onCopy: (text: string) => void }> = ({ code, language = 'text', onCopy }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        onCopy(code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <div className="bg-[#050505] rounded-lg border border-white/10 group relative my-2 overflow-hidden">
+            <button 
+                className="absolute top-2 right-2 z-10 p-1.5 text-slate-500 hover:text-white hover:bg-white/10 rounded-md transition-all opacity-0 group-hover:opacity-100 bg-black/50 backdrop-blur cursor-pointer" 
+                onClick={handleCopy} 
+                title="Copy command"
+                aria-label="Copy command"
+            >
+                 {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+            </button>
+            <SyntaxHighlighter
+                language={language}
+                style={vscDarkPlus}
+                customStyle={{ margin: 0, padding: '1rem', background: 'transparent', fontSize: '12px' }}
+                wrapLines={true}
+                wrapLongLines={true}
+            >
+                {code}
+            </SyntaxHighlighter>
+        </div>
+    );
+};
 
 const MarkdownRenderer: React.FC<{ content: string; onCopy: (text: string) => void }> = ({ content, onCopy }) => {
     // Helper to render inline markdown (bold, code, links)
@@ -161,16 +181,19 @@ const MarkdownRenderer: React.FC<{ content: string; onCopy: (text: string) => vo
                     const elements: React.ReactNode[] = [];
                     let inCodeBlock = false;
                     let codeBuffer = '';
+                    let currentLang = 'text';
                     
                     bodyLines.forEach((line, lineIdx) => {
                         if (line.trim().startsWith('```')) {
                             if (inCodeBlock) {
                                 // End of block
-                                elements.push(<CodeBlock key={`code-${idx}-${lineIdx}`} code={codeBuffer.trim()} onCopy={onCopy} />);
+                                elements.push(<CodeBlock key={`code-${idx}-${lineIdx}`} code={codeBuffer.trim()} language={currentLang} onCopy={onCopy} />);
                                 codeBuffer = '';
                                 inCodeBlock = false;
                             } else {
-                                // Start of block
+                                // Start of block - capture language
+                                const match = line.trim().match(/^```(\w+)?/);
+                                currentLang = match ? match[1] || 'text' : 'text';
                                 inCodeBlock = true;
                             }
                         } else if (inCodeBlock) {

@@ -1,12 +1,21 @@
 
-
-
-
 import { Persona } from '../types';
 import { FILE_NAMES, TOOL_IDS } from './constants';
 
+/**
+ * Sanitizes user input to prevent prompt injection or formatting breakage.
+ * Escapes critical Markdown characters (#, **, ```) that could confuse the LLM's structure parsing.
+ */
+const sanitizeForPrompt = (text: string | undefined) => {
+  if (!text) return '';
+  return text
+    .replace(/^#+/gm, (match) => '\\' + match) // Escape headers at start of line
+    .replace(/\*\*/g, '\\*\\*') // Escape bolding
+    .replace(/```/g, '\\`\\`\\`'); // Escape code blocks
+};
+
 export const generateResearchPrompt = (persona: Persona, answers: Record<string, string>) => {
-  const idea = answers['project_description'] || 'A new software project';
+  const idea = sanitizeForPrompt(answers['project_description']) || 'A new software project';
 
   if (persona === Persona.VibeCoder) {
     return `## Deep Research Request: ${idea} (Vibe-Coder Persona)
@@ -15,19 +24,19 @@ I am a non-technical "Vibe-Coder" building: ${idea}.
 I need you to act as my Lead Product Researcher.
 
 ### My Inputs
-1. **Target Audience**: ${answers['research_vibe_who']}
-2. **User Problems**: ${answers['research_vibe_problem']}
-3. **Current Solutions**: ${answers['research_vibe_existing']}
-4. **Secret Sauce**: ${answers['research_vibe_unique']}
-5. **Must-Have Features**: ${answers['research_vibe_features']}
-6. **Platform**: ${answers['research_vibe_platform']}
-7. **Timeline**: ${answers['research_vibe_timeline']}
-8. **Budget**: ${answers['research_vibe_budget']}
+1. **Target Audience**: ${sanitizeForPrompt(answers['research_vibe_who'])}
+2. **User Problems**: ${sanitizeForPrompt(answers['research_vibe_problem'])}
+3. **Current Solutions**: ${sanitizeForPrompt(answers['research_vibe_existing'])}
+4. **Secret Sauce**: ${sanitizeForPrompt(answers['research_vibe_unique'])}
+5. **Must-Have Features**: ${sanitizeForPrompt(answers['research_vibe_features'])}
+6. **Platform**: ${sanitizeForPrompt(answers['research_vibe_platform'])}
+7. **Timeline**: ${sanitizeForPrompt(answers['research_vibe_timeline'])}
+8. **Budget**: ${sanitizeForPrompt(answers['research_vibe_budget'])}
 
 ### Research Goals
 1. **Market Validation**: Analyze the audience and problems.
 2. **Competitive Analysis**: Review current solutions and my "Secret Sauce".
-3. **Feasibility Check**: Can this be built with ${answers['research_vibe_budget']} on ${answers['research_vibe_platform']}?
+3. **Feasibility Check**: Can this be built with ${sanitizeForPrompt(answers['research_vibe_budget'])} on ${sanitizeForPrompt(answers['research_vibe_platform'])}?
 
 Please provide a report in plain English, avoiding jargon.`;
   }
@@ -39,16 +48,16 @@ I am a Developer architecting: ${idea}.
 I need a rigorous technical validation.
 
 ### Context & Directives
-1. **Project Focus & Context**: ${answers['project_description']}
-2. **Specific Questions**: ${answers['research_dev_questions']}
-3. **Stack/API Specifics**: ${answers['research_dev_stack_specifics']}
-4. **Decisions to Inform**: ${answers['research_dev_decisions']}
-5. **Why Now**: ${answers['research_dev_timing']}
-6. **Scope Boundaries**: ${answers['research_dev_scope']}
-7. **Research Depth**: ${answers['research_dev_depth']}
-8. **Source Priority**: ${answers['research_dev_sources']}
-9. **Technical Constraints**: ${answers['research_dev_constraints']}
-10. **Broader Context**: ${answers['research_dev_context']}
+1. **Project Focus & Context**: ${sanitizeForPrompt(answers['project_description'])}
+2. **Specific Questions**: ${sanitizeForPrompt(answers['research_dev_questions'])}
+3. **Stack/API Specifics**: ${sanitizeForPrompt(answers['research_dev_stack_specifics'])}
+4. **Decisions to Inform**: ${sanitizeForPrompt(answers['research_dev_decisions'])}
+5. **Why Now**: ${sanitizeForPrompt(answers['research_dev_timing'])}
+6. **Scope Boundaries**: ${sanitizeForPrompt(answers['research_dev_scope'])}
+7. **Research Depth**: ${sanitizeForPrompt(answers['research_dev_depth'])}
+8. **Source Priority**: ${sanitizeForPrompt(answers['research_dev_sources'])}
+9. **Technical Constraints**: ${sanitizeForPrompt(answers['research_dev_constraints'])}
+10. **Broader Context**: ${sanitizeForPrompt(answers['research_dev_context'])}
 
 ### Research Goals
 1. **Technical Feasibility**: Analyze specific constraints and questions.
@@ -65,42 +74,42 @@ I am learning to code while building: ${idea}.
 I need research that bridges the gap between easy-to-build and industry-standard.
 
 ### My Inputs
-1. **Project Idea & Coding Experience**: ${answers['project_description']}
-2. **Problem & User**: ${answers['research_mid_problem']}
-3. **Research Topics (Tech & Biz)**: ${answers['research_mid_learn']}
-4. **Similar Solutions**: ${answers['research_mid_existing']}
-5. **Validation Strategy**: ${answers['research_mid_validation']}
-6. **Platform Preference**: ${answers['research_mid_platform']}
-7. **Technical Comfort Zone**: ${answers['research_mid_comfort']}
-8. **Timeline & Success**: ${answers['research_mid_timeline']}
-9. **Budget**: ${answers['research_mid_budget']}
+1. **Project Idea & Coding Experience**: ${sanitizeForPrompt(answers['project_description'])}
+2. **Problem & User**: ${sanitizeForPrompt(answers['research_mid_problem'])}
+3. **Research Topics (Tech & Biz)**: ${sanitizeForPrompt(answers['research_mid_learn'])}
+4. **Similar Solutions**: ${sanitizeForPrompt(answers['research_mid_existing'])}
+5. **Validation Strategy**: ${sanitizeForPrompt(answers['research_mid_validation'])}
+6. **Platform Preference**: ${sanitizeForPrompt(answers['research_mid_platform'])}
+7. **Technical Comfort Zone**: ${sanitizeForPrompt(answers['research_mid_comfort'])}
+8. **Timeline & Success**: ${sanitizeForPrompt(answers['research_mid_timeline'])}
+9. **Budget**: ${sanitizeForPrompt(answers['research_mid_budget'])}
 
 ### Research Goals
-1. **Educational Path**: How can I build this while learning ${answers['research_mid_comfort']}?
-2. **Market & Tech Check**: specific advice for ${answers['research_mid_platform']}.
+1. **Educational Path**: How can I build this while learning ${sanitizeForPrompt(answers['research_mid_comfort'])}?
+2. **Market & Tech Check**: specific advice for ${sanitizeForPrompt(answers['research_mid_platform'])}.
 3. **Validation**: Feedback on my validation strategy.
 
 Explain complex concepts but treat me like an intelligent student.`;
 };
 
-export const getPRDSystemInstruction = () => "You are an expert Product Manager. You write clear, comprehensive Product Requirements Documents (PRDs) suitable for development. You prioritize clarity, user value, and technical feasibility."
+export const getPRDSystemInstruction = () => "You are an expert Product Manager. You write clear, comprehensive Product Requirements Documents (PRDs) suitable for development. You prioritize clarity, user value, and technical feasibility.";
 
 export const generatePRDPrompt = (persona: Persona, answers: Record<string, string>, researchContext: string) => {
-  const name = answers['prd_vibe_name'] || answers['prd_dev_name'] || answers['prd_mid_name'] || 'The App';
+  const name = sanitizeForPrompt(answers['prd_vibe_name'] || answers['prd_dev_name'] || answers['prd_mid_name']) || 'The App';
 
   if (persona === Persona.VibeCoder) {
     return `Create a Narrative-Driven PRD for ${name}.
 
 ### User Inputs (Vibe-Coder)
-1. **One-Sentence Problem**: ${answers['project_description']}
-2. **Launch Goal**: ${answers['prd_vibe_goal']}
-3. **Users**: ${answers['prd_vibe_users']}
-4. **User Journey Story**: ${answers['prd_vibe_story']}
-5. **Must-Have Features**: ${answers['prd_vibe_features']}
-6. **Deferred Features**: ${answers['prd_vibe_non_features']}
-7. **Success Metric**: ${answers['prd_vibe_metric']}
-8. **Vibe/Style**: ${answers['prd_vibe_vibe']}
-9. **Constraints**: ${answers['prd_vibe_constraints']}
+1. **One-Sentence Problem**: ${sanitizeForPrompt(answers['project_description'])}
+2. **Launch Goal**: ${sanitizeForPrompt(answers['prd_vibe_goal'])}
+3. **Users**: ${sanitizeForPrompt(answers['prd_vibe_users'])}
+4. **User Journey Story**: ${sanitizeForPrompt(answers['prd_vibe_story'])}
+5. **Must-Have Features**: ${sanitizeForPrompt(answers['prd_vibe_features'])}
+6. **Deferred Features**: ${sanitizeForPrompt(answers['prd_vibe_non_features'])}
+7. **Success Metric**: ${sanitizeForPrompt(answers['prd_vibe_metric'])}
+8. **Vibe/Style**: ${sanitizeForPrompt(answers['prd_vibe_vibe'])}
+9. **Constraints**: ${sanitizeForPrompt(answers['prd_vibe_constraints'])}
 
 ### Research Context
 ${researchContext}
@@ -110,8 +119,8 @@ Generate a PRD that focuses on the *Story* and *Vibe*.
 1. **Executive Summary**: The vision for ${name}.
 2. **User Journey Map**: Step-by-step flow based on the story.
 3. **Functional Requirements**: Extracted from the narrative.
-4. **UI/UX Guidelines**: Based on the "${answers['prd_vibe_vibe']}" vibe.
-5. **Success Definition**: Based on ${answers['prd_vibe_metric']}.
+4. **UI/UX Guidelines**: Based on the "${sanitizeForPrompt(answers['prd_vibe_vibe'])}" vibe.
+5. **Success Definition**: Based on ${sanitizeForPrompt(answers['prd_vibe_metric'])}.
 
 Keep it simple, inspiring, and ready for a developer/AI to build.`;
   }
@@ -120,16 +129,16 @@ Keep it simple, inspiring, and ready for a developer/AI to build.`;
     return `Create a Technical PRD for ${name}.
 
 ### User Inputs (Developer)
-1. **One-Liner**: ${answers['prd_dev_oneliner']}
-2. **Goal**: ${answers['prd_dev_goal']}
-3. **Audience**: ${answers['prd_dev_audience']}
-4. **User Stories**: ${answers['prd_dev_stories']}
-5. **Features (MoSCoW)**: ${answers['prd_dev_features']}
-6. **Metrics**: ${answers['prd_dev_metrics']}
-7. **Tech/UX Requirements**: ${answers['prd_dev_tech']}
-8. **Compliance**: ${answers['prd_dev_compliance']}
-9. **Risks**: ${answers['prd_dev_risks']}
-10. **Business Constraints**: ${answers['prd_dev_biz']}
+1. **One-Liner**: ${sanitizeForPrompt(answers['prd_dev_oneliner'])}
+2. **Goal**: ${sanitizeForPrompt(answers['prd_dev_goal'])}
+3. **Audience**: ${sanitizeForPrompt(answers['prd_dev_audience'])}
+4. **User Stories**: ${sanitizeForPrompt(answers['prd_dev_stories'])}
+5. **Features (MoSCoW)**: ${sanitizeForPrompt(answers['prd_dev_features'])}
+6. **Metrics**: ${sanitizeForPrompt(answers['prd_dev_metrics'])}
+7. **Tech/UX Requirements**: ${sanitizeForPrompt(answers['prd_dev_tech'])}
+8. **Compliance**: ${sanitizeForPrompt(answers['prd_dev_compliance'])}
+9. **Risks**: ${sanitizeForPrompt(answers['prd_dev_risks'])}
+10. **Business Constraints**: ${sanitizeForPrompt(answers['prd_dev_biz'])}
 
 ### Research Context
 ${researchContext}
@@ -150,15 +159,15 @@ Standard Engineering PRD format:
   return `Create a Learning-Oriented PRD for ${name}.
 
 ### User Inputs (Learner)
-1. **Purpose**: ${answers['prd_mid_purpose']}
-2. **Goal**: ${answers['prd_mid_goal']}
-3. **Users**: ${answers['prd_mid_users']}
-4. **Flow**: ${answers['prd_mid_flow']}
-5. **Core Features**: ${answers['prd_mid_features']}
-6. **Future Features**: ${answers['prd_mid_non_features']}
-7. **Metrics**: ${answers['prd_mid_metric']}
-8. **Design**: ${answers['prd_mid_design']}
-9. **Constraints**: ${answers['prd_mid_constraints']}
+1. **Purpose**: ${sanitizeForPrompt(answers['prd_mid_purpose'])}
+2. **Goal**: ${sanitizeForPrompt(answers['prd_mid_goal'])}
+3. **Users**: ${sanitizeForPrompt(answers['prd_mid_users'])}
+4. **Flow**: ${sanitizeForPrompt(answers['prd_mid_flow'])}
+5. **Core Features**: ${sanitizeForPrompt(answers['prd_mid_features'])}
+6. **Future Features**: ${sanitizeForPrompt(answers['prd_mid_non_features'])}
+7. **Metrics**: ${sanitizeForPrompt(answers['prd_mid_metric'])}
+8. **Design**: ${sanitizeForPrompt(answers['prd_mid_design'])}
+9. **Constraints**: ${sanitizeForPrompt(answers['prd_mid_constraints'])}
 
 ### Research Context
 ${researchContext}
@@ -178,19 +187,19 @@ Tone: Educational but professional.
 export const getTechDesignSystemInstruction = () => "You are an expert Software Architect. You design scalable, secure, and maintainable systems. You provide clear technical specifications, database schemas, and API definitions suitable for implementation.";
 
 export const generateTechDesignPrompt = (persona: Persona, answers: Record<string, string>, prdContext: string) => {
-    const name = answers['prd_vibe_name'] || answers['prd_dev_name'] || answers['prd_mid_name'] || 'The App';
+    const name = sanitizeForPrompt(answers['prd_vibe_name'] || answers['prd_dev_name'] || answers['prd_mid_name']) || 'The App';
     
     if (persona === Persona.VibeCoder) {
         return `Create a "Vibe-Code" Tech Design for ${name}.
 
 ### User Inputs (Vibe-Coder)
-1. **Platform**: ${answers['tech_vibe_platform']}
-2. **Coding Approach**: ${answers['tech_vibe_coding']}
-3. **Budget**: ${answers['tech_vibe_budget']}
-4. **Timeline**: ${answers['tech_vibe_timeline']}
-5. **Fears/Risks**: ${answers['tech_vibe_worry']}
-6. **Existing Tools**: ${answers['tech_vibe_tools']}
-7. **Priority**: ${answers['tech_vibe_priority']}
+1. **Platform**: ${sanitizeForPrompt(answers['tech_vibe_platform'])}
+2. **Coding Approach**: ${sanitizeForPrompt(answers['tech_vibe_coding'])}
+3. **Budget**: ${sanitizeForPrompt(answers['tech_vibe_budget'])}
+4. **Timeline**: ${sanitizeForPrompt(answers['tech_vibe_timeline'])}
+5. **Fears/Risks**: ${sanitizeForPrompt(answers['tech_vibe_worry'])}
+6. **Existing Tools**: ${sanitizeForPrompt(answers['tech_vibe_tools'])}
+7. **Priority**: ${sanitizeForPrompt(answers['tech_vibe_priority'])}
 
 ### PRD Context
 ${prdContext}
@@ -210,365 +219,193 @@ Focus on simplicity and speed.`;
         return `Create a System Architecture Document for ${name}.
 
 ### User Inputs (Developer)
-1. **Platform Strategy**: ${answers['tech_dev_platform']}
-2. **Preferred Stack**: ${answers['tech_dev_stack']}
-3. **Architecture**: ${answers['tech_dev_architecture']}
-4. **State Management**: ${answers['tech_dev_state']}
-5. **Components**: ${answers['tech_dev_components']}
-6. **AI Strategy**: ${answers['tech_dev_ai']}
-7. **Workflow**: ${answers['tech_dev_workflow']}
-8. **Performance**: ${answers['tech_dev_perf']}
-9. **Security**: ${answers['tech_dev_security']}
+1. **Platform Strategy**: ${sanitizeForPrompt(answers['tech_dev_platform'])}
+2. **Preferred Stack**: ${sanitizeForPrompt(answers['tech_dev_stack'])}
+3. **Architecture**: ${sanitizeForPrompt(answers['tech_dev_architecture'])}
+4. **State Management**: ${sanitizeForPrompt(answers['tech_dev_state'])}
+5. **Components**: ${sanitizeForPrompt(answers['tech_dev_components'])}
+6. **AI Strategy**: ${sanitizeForPrompt(answers['tech_dev_ai'])}
+7. **Workflow**: ${sanitizeForPrompt(answers['tech_dev_workflow'])}
+8. **Performance**: ${sanitizeForPrompt(answers['tech_dev_perf'])}
+9. **Security**: ${sanitizeForPrompt(answers['tech_dev_security'])}
 
 ### PRD Context
 ${prdContext}
 
 ### Output Requirements
-Professional Architecture Document.
-1. **System Overview**: High-level diagram description.
-2. **Tech Stack Decision Record**: Justification for choices.
-3. **Database Schema**: ER Diagram description or SQL/Prisma schema.
-4. **API Design**: Key endpoints and logic.
-5. **Component Architecture**: Frontend/Backend split.
-6. **Security & Scalability**: Addressing specific constraints.
+Comprehensive Engineering Spec:
+1. **System Architecture**: Diagrammatic description.
+2. **Tech Stack & Libraries**: With justification.
+3. **Database Schema**: ERD or Schema definition (SQL/NoSQL).
+4. **API Design**: Key endpoints and protocols.
+5. **Security & Auth**: Implementation details.
+6. **Deployment & CI/CD**: Pipeline strategy.
 `;
     }
 
-    return `Create a "Learner's" Tech Spec for ${name}.
+    // In-Between / Learner
+    return `Create an Educational Tech Design for ${name}.
 
 ### User Inputs (Learner)
-1. **Platform**: ${answers['tech_mid_platform']}
-2. **Comfort Zone**: ${answers['tech_mid_comfort']}
-3. **MVP Approach**: ${answers['tech_mid_approach']}
-4. **Complexity**: ${answers['tech_mid_complexity']}
-5. **Budget**: ${answers['tech_mid_budget']}
-6. **AI Assistance**: ${answers['tech_mid_ai']}
-7. **Timeline**: ${answers['tech_mid_timeline']}
+1. **Platform**: ${sanitizeForPrompt(answers['tech_mid_platform'])}
+2. **Comfort Zone**: ${sanitizeForPrompt(answers['tech_mid_comfort'])}
+3. **Approach**: ${sanitizeForPrompt(answers['tech_mid_approach'])}
+4. **Complexity**: ${sanitizeForPrompt(answers['tech_mid_complexity'])}
+5. **Budget**: ${sanitizeForPrompt(answers['tech_mid_budget'])}
+6. **AI Preference**: ${sanitizeForPrompt(answers['tech_mid_ai'])}
+7. **Timeline**: ${sanitizeForPrompt(answers['tech_mid_timeline'])}
 
 ### PRD Context
 ${prdContext}
 
 ### Output Requirements
-A Tech Spec that teaches while defining.
-1. **Chosen Stack**: Explain *what* we are using and *why* it fits the skill level.
-2. **Database Schema**: Explained simply (e.g. "Users table holds...").
-3. **Key Concepts**: Explain any complex patterns needed (e.g., "WebSockets" or "Auth").
-4. **Development Roadmap**: Logical steps to build and learn.
-5. **Resources**: Links or keywords to learn more.
-`;
+A Spec that teaches *how* to build it.
+1. **Chosen Stack**: Why these tools match the user's comfort zone.
+2. **Architecture Explained**: Concept of Frontend vs Backend for this app.
+3. **Data Model**: Schema with explanation of relationships.
+4. **Key Logic**: How the main features will work under the hood.
+5. **Learning Resources**: Links or terms to search for.
+
+Tone: Encouraging and educational.`;
 };
 
-export const getAgentSystemInstruction = () => `You are an expert AI Configuration Specialist. You generate comprehensive, standardized ${FILE_NAMES.AGENTS_MD} files that serve as the single source of truth for AI coding agents (Cursor, Windsurf, Copilot, etc.). You ensure the instructions are clear, context-aware, and actionable.`;
+// --- Missing Functions ---
 
-export const getRefineSystemInstruction = () => "You are an expert technical editor and product consultant. You refine and improve technical documents based on specific feedback while maintaining the original format and structured depth.";
-
-export const generateRefinePrompt = (originalContent: string, instruction: string) => {
-    return `Original Content:
-"""
-${originalContent}
-"""
-
-Refinement Instruction:
-"${instruction}"
-
-Task: Rewrite the content to incorporate the instruction. Maintain the original markdown structure/headers unless asked to change them. Return the full updated document.`;
-};
+export const getAgentSystemInstruction = () => "You are an expert AI configuration specialist. You create optimized system instructions and configuration files for AI coding agents to ensure they follow project guidelines and persona preferences.";
 
 export const generateAgentsMdPrompt = (persona: Persona, answers: Record<string, string>, prd: string, tech: string) => {
-    return `Create a comprehensive '${FILE_NAMES.AGENTS_MD}' file for this project.
-This file will serve as the "Universal Brain" for all AI coding agents (Cursor, Copilot, Cline, etc.).
+  return `Generate a comprehensive AGENTS.md file for the project.
 
-### Context
-- **Project Name**: ${answers['project_description'] || 'The App'}
-- **Persona**: ${persona} (Adjust tone: VibeCoder = Helpful/Educational, Developer = Concise/Technical).
-- **Stack**: ${answers['tech_dev_stack'] || answers['tech_vibe_platform']}
-
-### Input Documents
-PRD Summary:
-${prd.substring(0, 1500)}...
-
-Tech Design Summary:
-${tech.substring(0, 1500)}...
-
-### Output Format
-Generate a Markdown file named ${FILE_NAMES.AGENTS_MD} containing these specific sections:
-1. **Project Overview**: High-level goal and "Secret Sauce".
-2. **User Persona & Role**: Who the user is (e.g., "I am a vibe coder, explain things simply") and how the Agent should behave.
-3. **Tech Stack & Architecture**: Bullet points of the stack, db, and key libraries.
-4. **Development Setup**: Standard commands (install, run, test) inferred from the stack.
-5. **Coding Standards**: Rules for code quality (e.g. "TypeScript Strict", "Functional Components").
-6. **Documentation Index**: Reference the other docs (docs/PRD.md, docs/TechDesign.md).
-
-The goal is that ANY AI agent reading this file knows exactly what to do without hallucinations.`;
-};
-
-export interface ToolOptions {
-    claudeAdapterMode?: boolean; // true = adapter (@AGENTS.md), false = full config
-    geminiAdapterMode?: boolean; // true = adapter, false = full config
-    antigravityAdapterMode?: boolean; // true = adapter, false = full config
-}
-
-export const generateToolConfig = (toolId: string, appName: string, persona: Persona, answers: Record<string, string>, options?: ToolOptions) => {
-    // Adapter generation logic
-    const commonContext = `Project: ${appName}`;
-    const agentsMd = FILE_NAMES.AGENTS_MD;
-    
-    // Helper to infer stack-based commands for Claude/Gemini
-    const getStackCommands = () => {
-        const stack = (answers['tech_dev_stack'] || answers['tech_vibe_platform'] || '').toLowerCase();
-        
-        if (stack.includes('python') || stack.includes('django') || stack.includes('flask')) {
-            return `# Bash commands
-- pip install -r requirements.txt: Install dependencies
-- python manage.py runserver: Start dev server
-- pytest: Run tests`;
-        }
-        if (stack.includes('go') || stack.includes('golang')) {
-             return `# Bash commands
-- go run main.go: Start application
-- go test ./...: Run all tests
-- go mod tidy: Clean dependencies`;
-        }
-        if (stack.includes('rust')) {
-             return `# Bash commands
-- cargo run: Start application
-- cargo test: Run tests
-- cargo build: Build project`;
-        }
-        // Default to Node/JS
-        return `# Bash commands
-- npm install: Install dependencies
-- npm run dev: Start development server
-- npm run build: Build for production
-- npm test: Run test suite`;
-    };
-
-    const getCodingStandards = () => {
-        if (persona === Persona.VibeCoder) {
-            return `- Keep solutions simple and beginner-friendly
-- Comment complex logic extensively
-- Use modern, stable libraries`;
-        } else {
-             return `- Follow patterns defined in ${agentsMd}
-- Prefer functional paradigms where possible
-- Keep components small and focused
-- Write comments for complex logic only`;
-        }
-    };
-
-    switch (toolId) {
-        case TOOL_IDS.CURSOR:
-            return `# ${FILE_NAMES.CURSOR_RULES}
-# This file inherits instructions from ${agentsMd}
-
-Read and strictly follow the rules in ${agentsMd}.
-`;
-        case TOOL_IDS.CLINE:
-             return `# ${FILE_NAMES.CLINE_RULES}
-# This file inherits instructions from ${agentsMd}
-
-Read and strictly follow the rules in ${agentsMd}.
-`;
-        case TOOL_IDS.WINDSURF:
-             return `# ${FILE_NAMES.WINDSURF_RULES}
-# This file inherits instructions from ${agentsMd}
-
-Read and strictly follow the rules in ${agentsMd}.
-`;
-        case TOOL_IDS.COPILOT:
-            return `# ${FILE_NAMES.COPILOT_INSTR}
-
-# This file inherits instructions from ${agentsMd}
-
-Read and strictly follow the rules in ${agentsMd}.
-`;
-        case TOOL_IDS.AIDER:
-            return `# ${FILE_NAMES.AIDER_CONF}
-read: ${agentsMd}
-`;
-        case TOOL_IDS.GEMINI_CLI:
-        case TOOL_IDS.ANTIGRAVITY:
-            // Check specific adapter mode based on tool ID
-            const isGemini = toolId === TOOL_IDS.GEMINI_CLI;
-            const useAdapter = isGemini ? options?.geminiAdapterMode : options?.antigravityAdapterMode;
-
-            if (useAdapter) {
-                 // Adapter Mode
-                 return `# ${FILE_NAMES.GEMINI_MD} Adapter
-# This file inherits instructions from ${agentsMd}
-
-# Context for Google Antigravity / Gemini
-@${agentsMd}
-`;
-            } else {
-                // Optimized Mode (Best Practice GEMINI.md)
-                return `# GEMINI.MD: AI Collaboration Guide
-
-This document provides essential context for AI models interacting with this project. Adhering to these guidelines will ensure consistency and maintain code quality.
-
-## 1. Project Overview & Purpose
-
-* **Primary Goal:** ${answers['project_description'] || 'Build a functional application.'}
-* **Business Domain:** ${answers['research_vibe_who'] || answers['prd_dev_audience'] || 'General User Base'}
-
-## 2. Core Technologies & Stack
-
-* **Stack:** ${answers['tech_dev_stack'] || answers['tech_vibe_platform'] || 'Standard Web Stack'}
-
-## 3. Architectural Patterns
-
-* **Overall Architecture:** ${answers['tech_dev_architecture'] || 'Modular Monolith (Default)'}
-* **Directory Structure Philosophy:** (Inferred)
-    * \`/src\`: Contains all primary source code.
-    * \`/tests\`: Contains all unit and integration tests.
-    * \`/config\`: Holds environment and configuration files.
-
-## 4. Coding Conventions & Style Guide
-
-* **Formatting:** Standard formatting (e.g. Prettier/Black).
-* **Naming Conventions:** CamelCase for vars/funcs, PascalCase for classes/components.
-* **API Design:** RESTful principles (unless otherwise specified).
-* **Error Handling:** Use try...catch blocks and custom error classes.
-
-## 5. Key Files & Entrypoints
-
-* **Main Entrypoint(s):** (Inferred from stack, e.g., index.js, app.py)
-* **Configuration:** .env, config files.
-* **CI/CD Pipeline:** GitHub Actions (inferred).
-
-## 6. Development & Testing Workflow
-
-* **Local Development Environment:**
-${getStackCommands()}
-
-* **Testing:**
-    * Run tests via standard commands.
-    * New code requires corresponding unit tests.
-
-## 7. Specific Instructions for AI Collaboration
-
-* **Contribution Guidelines:** All changes must review ${agentsMd}.
-* **Security:** Do not hardcode secrets. Ensure auth logic is secure.
-* **Dependencies:** Use standard package managers (npm/pip) to add libs.
-`;
-            }
-
-        case TOOL_IDS.CLAUDE:
-            if (options?.claudeAdapterMode) {
-                // Switch ON: Generate Adapter
-                return `@${agentsMd}`;
-            } else {
-                // Switch OFF: Generate Full Best-Practice Config
-                return `# ${FILE_NAMES.CLAUDE_MD}
-
-# Bash commands
-${getStackCommands()}
-
-# Code style
-- Framework: ${answers['tech_dev_stack'] || 'Standard'}
-${getCodingStandards()}
-
-# Workflow
-- Review ${agentsMd} before starting complex tasks
-- Run tests after every significant change
-- Use descriptive commit messages
-- Create small, focused pull requests
-
-# Environment
-- Project: ${appName}
-- Persona: ${persona}
-`;
-            }
-
-        // Generators (Keep prompt style for copy-paste tools)
-        case TOOL_IDS.LOVABLE:
-        case TOOL_IDS.V0:
-            return `# ${toolId.toUpperCase()}_PROMPT.md
-
-I want you to build ${appName}.
-
-## Instructions
-Please read the attached ${agentsMd} (if available) or the following context.
-
-${commonContext}
-
-Start by building the core layout and navigation.
-`;
-        default:
-            return `# ${agentsMd} Adapter
-
-Read and strictly follow the rules in ${agentsMd}.
-`;
-    }
-};
-
-export const getBuildPlanSystemInstruction = () => "You are a Senior Engineering Manager. Your goal is to break down a technical design into a concrete, step-by-step execution plan for an AI coding agent. You focus on file structure, dependencies, and logical implementation order.";
-
-export const generateBuildPlanPrompt = (persona: Persona, answers: Record<string, string>, prd: string, tech: string) => {
-  const stack = answers['tech_dev_stack'] || answers['tech_vibe_platform'] || 'Standard Web Stack';
-  
-  return `Create a ${FILE_NAMES.BUILD_PLAN} for ${answers['project_description'] || 'the project'}.
-
-### Context
-Persona: ${persona}
-Tech Stack: ${stack}
-Primary Instruction File: ${FILE_NAMES.AGENTS_MD}
+### Project Context
+- **Name**: ${sanitizeForPrompt(answers['project_description']) || 'The App'}
+- **Persona**: ${persona} (Affects tone and detail level)
 
 ### Inputs
-PRD Summary:
-${prd.substring(0, 2000)}...
+**PRD Summary**:
+${prd.substring(0, 2000)}... (truncated)
 
-Tech Design Summary:
-${tech.substring(0, 2000)}...
+**Tech Stack**:
+${tech.substring(0, 2000)}... (truncated)
+
+### Requirements for AGENTS.md
+The file should act as the "Universal Brain" for any AI agent (Cursor, Windsurf, Aider, etc.) working on this project.
+It must include:
+1. **Project Mission**: One sentence summary.
+2. **Tech Stack & Standards**: Strict rules on what to use.
+3. **Coding Rules**: Formatting, naming conventions, error handling.
+4. **Project Structure**: High-level folder structure.
+5. **Persona Instructions**: specific to ${persona} (e.g. if VibeCoder, explain code more; if Developer, be concise).
+
+Format the output as a single valid Markdown file starting with # AGENTS.md`;
+};
+
+export const generateToolConfig = (
+  toolId: string, 
+  projectName: string, 
+  persona: Persona, 
+  answers: Record<string, string>,
+  settings: { claudeAdapterMode: boolean, geminiAdapterMode: boolean, antigravityAdapterMode: boolean }
+) => {
+  const basePrompt = `Project: ${sanitizeForPrompt(projectName)}\nPersona: ${persona}`;
+  
+  switch (toolId) {
+    case TOOL_IDS.CURSOR:
+      return `# .cursorrules\n\n# This project uses AGENTS.md as the source of truth.\n# Always read AGENTS.md before starting any task.\n\nconst fs = require('fs');\nif (fs.existsSync('AGENTS.md')) {\n  console.log("Loaded AGENTS.md context");\n}`;
+    case TOOL_IDS.WINDSURF:
+      return `# .windsurfrules\n\n@AGENTS.md\n\n# Windsurf will automatically index the above file.`;
+    case TOOL_IDS.AIDER:
+      return `read: [AGENTS.md]\n`;
+    case TOOL_IDS.CLINE:
+        return `You are Cline. Please strictly follow the project rules defined in AGENTS.md in the root directory.`;
+    case TOOL_IDS.GEMINI_CLI:
+        if (settings.geminiAdapterMode) {
+            return `You are a Gemini CLI agent working on ${sanitizeForPrompt(projectName)}. Read AGENTS.md for context.`;
+        }
+        return `You are a Gemini CLI agent. Context: ${basePrompt}.`;
+    case TOOL_IDS.CLAUDE:
+        if (settings.claudeAdapterMode) {
+             return `You are Claude Code. Please use AGENTS.md as your primary context file.`;
+        }
+        return `You are Claude Code. Project: ${sanitizeForPrompt(projectName)}.`;
+    case TOOL_IDS.ANTIGRAVITY:
+        return `Project: ${sanitizeForPrompt(projectName)}. Context: AGENTS.md.`;
+    default:
+      return `# Config for ${toolId}\n\nSee AGENTS.md`;
+  }
+};
+
+export const getBuildPlanSystemInstruction = () => "You are an expert Technical Project Manager. You break down complex software projects into a step-by-step, file-by-file build plan that an AI agent can execute.";
+
+export const generateBuildPlanPrompt = (persona: Persona, answers: Record<string, string>, prd: string, tech: string) => {
+    return `Create a Master Build Plan (BUILD_PLAN.md) for the project.
+
+### Context
+PRD and Tech Design are provided.
+Persona: ${persona}
 
 ### Output Requirements
-1. **File Tree**: A complete ASCII file tree of the project structure. THIS IS CRITICAL.
-2. **Phase 1: Scaffolding**: Command to init project and initial config.
-3. **Phase 2: Core Components**: List of files to create, including dependencies.
-4. **Phase 3: Features**: Logical order of implementation.
-5. **Verification**: How to test each phase.
+1. **File Tree**: A complete ASCII tree of the project structure.
+2. **Phase 1: Scaffolding**: Setup commands and base files.
+3. **Phase 2: Core Features**: List of files to create/edit for MVP.
+4. **Phase 3: Polish**: UI/UX and Testing.
 
-Format as a Markdown file ready to be read by an AI agent. Make sure the File Tree is at the top.`;
+Format as a Markdown file.`;
 };
 
 export const generatePhasePrompt = (persona: Persona, answers: Record<string, string>, buildPlan: string, phase: string) => {
-    const stack = answers['tech_dev_stack'] || answers['tech_vibe_platform'] || 'Standard Web Stack';
+    return `Generate a specific prompt for an AI agent to execute **${phase}**.
 
-    return `Act as a Technical Lead. I need a specific prompt to give to my AI Code Agent (like Cursor or Windsurf) to execute **${phase}** of this project.
-
-### Project Context
-- **Description**: ${answers['project_description'] || 'App Build'}
-- **Stack**: ${stack}
-
-### Master Build Plan
+### Context
+Build Plan:
 ${buildPlan}
 
-### Task
-Write a comprehensive, step-by-step prompt that I can copy and paste into my AI Agent to complete **${phase}**. 
-The prompt MUST:
-1. Reference specific files from the **File Tree** in the Master Build Plan above.
-2. Include specific terminal commands to run.
-3. detailed code requirements for this phase.
-4. Verification steps (how to check it works).
+### Goal
+Write a prompt that I can copy-paste into Cursor/Windsurf to execute ${phase}.
+The prompt should:
+1. Reference specific files from the file tree.
+2. List the exact steps to take.
+3. Include any specific tech stack constraints.
 
-Output ONLY the prompt text I should paste. Do not add markdown code blocks around the whole thing if possible, or just standard text.`;
+Return ONLY the prompt text.`;
 };
 
 export const generateTroubleshootPrompt = (persona: Persona, answers: Record<string, string>, error: string, tech: string) => {
-    const stack = answers['tech_dev_stack'] || answers['tech_vibe_platform'] || 'Standard Web Stack';
+    return `I am encountering an error while building the project.
 
-    return `Act as a Senior Debugger. I am hitting an error while building this project.
+### Tech Stack
+${tech}
 
-### Project Context
-- **Stack**: ${stack}
-- **Tech Design Summary**: ${tech.substring(0, 1000)}...
-
-### The Error
+### Error Message / Issue
 ${error}
 
-### Task
-Analyze the error and provide a specific solution.
-1. Explain what is wrong briefly.
-2. Provide the corrected code or terminal commands to fix it.
-3. Explain how to prevent it.`;
+### Request
+Analyze the error and provide a specific fix (code block or terminal command). Explain why it happened briefly.`;
+};
+
+export const getRefineSystemInstruction = () => "You are an expert Technical Editor. You improve and refine technical documentation based on specific user instructions. You MUST always output valid Markdown. Maintain the original structure and formatting styles.";
+
+export const generateRefinePrompt = (currentContent: string, instruction: string) => {
+    // Truncate to avoid excessive tokens that exceed output limits anyway
+    const MAX_CONTEXT_CHARS = 25000; // ~6k tokens. Enough context, keeps input manageable.
+    let context = currentContent;
+    if (context.length > MAX_CONTEXT_CHARS) {
+        context = context.substring(0, MAX_CONTEXT_CHARS) + "\n\n... [Content truncated for refinement context] ...";
+    }
+
+    return `Original Content:
+${context}
+
+Instruction:
+${instruction}
+
+Please rewrite the content to address the instruction. Ensure the output is valid Markdown. Maintain the original markdown format (headers, lists, code blocks).`;
+};
+
+export const generateInlineRefinePrompt = (selection: string, instruction: string) => {
+    return `Selection:
+${selection}
+    
+Instruction: ${instruction}
+
+Rewrite the selection based on the instruction. Return ONLY the rewritten text in valid Markdown. Preserve any existing markdown styling (bold, code, links) unless asked to remove it.`;
 };

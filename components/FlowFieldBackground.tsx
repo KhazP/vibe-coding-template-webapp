@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from 'react';
 import p5 from 'p5';
 
@@ -122,6 +123,9 @@ const FlowFieldBackground: React.FC = () => {
       };
 
       p.windowResized = () => {
+        // Prevent background reset on mobile address bar scroll (vertical resize only)
+        if (p.windowWidth === p.width) return;
+
         p.resizeCanvas(p.windowWidth, p.windowHeight);
         p.background(5, 5, 5);
       };

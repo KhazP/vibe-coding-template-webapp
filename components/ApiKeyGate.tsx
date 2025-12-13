@@ -76,13 +76,14 @@ export const ApiKeyGate: React.FC = () => {
   };
 
   // Prevent background scrolling when modal is open
+  // Fix: Use '' instead of 'unset' to correctly remove inline styles and prevent stuck locks
   useEffect(() => {
     if (isApiKeyModalOpen) {
       document.body.style.overflow = 'hidden';
     } else {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
     }
-    return () => { document.body.style.overflow = 'unset'; };
+    return () => { document.body.style.overflow = ''; };
   }, [isApiKeyModalOpen]);
 
   return (

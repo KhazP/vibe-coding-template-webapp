@@ -68,6 +68,20 @@ export interface ToolSettings {
   antigravityAdapterMode: boolean;
 }
 
+export type ArtifactSectionName = 'research' | 'prd' | 'tech' | 'build';
+
+export interface TokenUsage {
+  input: number;
+  output: number;
+  groundingRequests: number;
+  estimatedCost: number;
+}
+
+export interface ArtifactVersion {
+  content: string;
+  timestamp: number;
+}
+
 export interface ProjectState {
   id: string;
   name: string;
@@ -86,6 +100,13 @@ export interface ProjectState {
   isGenerating: boolean;
   settings: GeminiSettings;
   sectionTimestamps: Record<string, number>;
+  
+  // Artifact Versioning
+  artifactVersions: Record<ArtifactSectionName, ArtifactVersion[]>;
+  artifactIndices: Record<ArtifactSectionName, number>;
+  
+  // Cost Tracking
+  tokenUsage: TokenUsage;
 }
 
 export type StepId = 'home' | 'research' | 'prd' | 'tech' | 'agent' | 'export' | 'settings';
