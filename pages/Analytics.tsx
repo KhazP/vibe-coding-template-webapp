@@ -1,13 +1,15 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { PageTransition, GlassCard, Button, Input } from '../components/UI';
 import { 
   BarChart2, Users, PieChart, Activity, RefreshCw, AlertTriangle, ShieldCheck, 
   Database, Lock, Unlock, Zap, Target, TrendingUp, Calendar, ArrowRight,
-  FileText, Cpu, Package, Layers, Sparkles
+  FileText, Cpu, Package, Layers, Sparkles, Key
 } from 'lucide-react';
 import { AnalyticsEvent, Persona } from '../types';
 import { supabase } from '../utils/supabaseClient';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useToast } from '../components/Toast';
 
 // --- Components ---
 
@@ -92,24 +94,55 @@ const Analytics: React.FC = () => {
   const [events, setEvents] = useState<AnalyticsEvent[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const [loading, setLoading] = useState(true);
+  const { addToast } = useToast();
+
+  // Auth State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  
+  const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
+
+  useEffect(() => {
+      // If no password set in env, auto-allow.
+      if (!adminPassword) {
+          setIsAuthenticated(true);
+          return;
+      }
+
+      // Check session storage
+      const sessionAuth = sessionStorage.getItem('VIBE_ADMIN_AUTH');
+      if (sessionAuth === 'true') {
+          setIsAuthenticated(true);
+      }
+  }, [adminPassword]);
+
+  const handleLogin = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (passwordInput === adminPassword) {
+          setIsAuthenticated(true);
+          sessionStorage.setItem('VIBE_ADMIN_AUTH', 'true');
+          addToast('Welcome back, Commander.', 'success');
+      } else {
+          addToast('Access Denied: Invalid Password', 'error');
+          setPasswordInput('');
+      }
+  };
 
   // Load events
   const loadEvents = async () => {
+    if (!isAuthenticated) return;
+
     setLoading(true);
     try {
         let remoteEvents: AnalyticsEvent[] = [];
         let isRemoteConnected = false;
 
         if (supabase) {
-            // Check session first if using Supabase
-            // const { data: { session } } = await supabase.auth.getSession();
-            // If connected, we assume valid credentials/RLS are in place.
-            
             const { data, error } = await supabase
                 .from('events')
                 .select('*')
                 .order('created_at', { ascending: false })
-                .limit(5000); // Increased limit for better charts
+                .limit(5000); 
                 
             if (!error && data) {
                 isRemoteConnected = true;
@@ -145,10 +178,12 @@ const Analytics: React.FC = () => {
   };
 
   useEffect(() => {
-      loadEvents();
-      const interval = setInterval(loadEvents, 15000); // 15s polling
-      return () => clearInterval(interval);
-  }, []);
+      if (isAuthenticated) {
+          loadEvents();
+          const interval = setInterval(loadEvents, 15000); // 15s polling
+          return () => clearInterval(interval);
+      }
+  }, [isAuthenticated]);
 
 
   // --- Deep Metrics Calculation ---
@@ -169,9 +204,6 @@ const Analytics: React.FC = () => {
       const genTech = generations.filter(e => e.data?.type === 'tech').length;
       const genAgent = generations.filter(e => e.data?.type === 'agent').length;
 
-      // Unique Sessions
-      // const sessions = new Set(events.map(e => e.id)); 
-      
       // Active in last 24h
       const activeEvents24h = events.filter(e => (now - e.timestamp) < oneDay);
       
@@ -218,6 +250,42 @@ const Analytics: React.FC = () => {
       };
   }, [events]);
 
+  if (!isAuthenticated) {
+      return (
+          <PageTransition>
+              <div className="flex h-[70vh] items-center justify-center">
+                  <GlassCard className="w-full max-w-md p-8 flex flex-col items-center text-center border-red-500/20 shadow-none">
+                      <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mb-6 border border-red-500/20">
+                          <Lock size={32} className="text-red-400" />
+                      </div>
+                      <h2 className="text-2xl font-bold text-white mb-2">Restricted Access</h2>
+                      <p className="text-slate-400 mb-8 text-sm">
+                          Enter the admin password defined in <code>VITE_ADMIN_PASSWORD</code> to view analytics.
+                      </p>
+                      
+                      <form onSubmit={handleLogin} className="w-full space-y-4">
+                          <Input 
+                              label=""
+                              type="password"
+                              placeholder="Enter Password"
+                              value={passwordInput}
+                              onChange={(e) => setPasswordInput(e.target.value)}
+                              className="text-center font-mono tracking-widest"
+                              autoFocus
+                          />
+                          <Button 
+                              type="submit" 
+                              className="w-full justify-center bg-red-600 hover:bg-red-500 text-white"
+                          >
+                              <Unlock size={16} className="mr-2" /> Access Dashboard
+                          </Button>
+                      </form>
+                  </GlassCard>
+              </div>
+          </PageTransition>
+      );
+  }
+
   // --- Main Dashboard ---
   return (
     <PageTransition>
@@ -237,9 +305,20 @@ const Analytics: React.FC = () => {
                     <span>{events.length} Total Events Logged</span>
                 </div>
             </div>
-            <Button onClick={loadEvents} variant="secondary" className="border-white/10 text-slate-300">
-                <RefreshCw size={16} className={`mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh Data
-            </Button>
+            <div className="flex gap-2">
+                {adminPassword && (
+                    <Button 
+                        variant="secondary" 
+                        onClick={() => { sessionStorage.removeItem('VIBE_ADMIN_AUTH'); setIsAuthenticated(false); }}
+                        className="border-white/10 text-slate-300"
+                    >
+                        <Lock size={16} className="mr-2" /> Lock
+                    </Button>
+                )}
+                <Button onClick={loadEvents} variant="secondary" className="border-white/10 text-slate-300">
+                    <RefreshCw size={16} className={`mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh Data
+                </Button>
+            </div>
         </div>
 
         {/* Key Metrics Row */}

@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI } from "@google/genai";
 import { GroundingChunk, GeminiSettings } from "../types";
 import { MODELS } from "./constants";
@@ -137,12 +138,16 @@ export const streamDeepResearch = async (
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const researchPrompt = `You are an expert product researcher and technical architect. 
+    let researchPrompt = `You are an expert product researcher and technical architect. 
 Please conduct a deep research analysis based on the following request. 
 Use Google Search to find real-time information, competitors, and technical tools.
 
 REQUEST:
 ${prompt}`;
+
+    if (settings.customInstructions) {
+        researchPrompt += `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${settings.customInstructions}`;
+    }
 
     const tools: any[] = [];
     if (settings.useGrounding) {
@@ -229,7 +234,8 @@ export const runDeepResearchInteraction = async (
   prompt: string,
   apiKey: string,
   onStatusUpdate?: (status: string) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  customInstructions?: string
 ): Promise<{ text: string; sources: GroundingChunk[] }> => {
   if (!apiKey) throw new Error("API Key is missing.");
   
@@ -239,10 +245,15 @@ export const runDeepResearchInteraction = async (
   // 1. Create Interaction
   onStatusUpdate?.("Initializing Deep Research Agent...");
   
+  let finalInput = prompt;
+  if (customInstructions) {
+      finalInput += `\n\n(Global Instructions: ${customInstructions})`;
+  }
+
   // Payload matches Deep Research docs: plain input string + background: true
   const payload: InteractionRequest = {
     agent: MODELS.DEEP_RESEARCH,
-    input: prompt,
+    input: finalInput,
     background: true, 
   };
 

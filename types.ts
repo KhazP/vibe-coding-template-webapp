@@ -54,6 +54,7 @@ export interface GeminiSettings {
   topP?: number;
   preset?: PresetMode;
   enableAnalytics?: boolean;
+  customInstructions?: string;
   
   // New QoL Settings
   defaultPersona?: Persona | null;

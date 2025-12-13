@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Clipboard, Check, X, Info, ChevronDown, Sparkles, Send, Loader2, AlertCircle, Download, Printer, Edit2, Save, FileText, FileJson, Clock, ArrowLeft, ArrowRight, Minimize2, Maximize2, Type, AlignLeft, Keyboard, Columns, List, Hash, Scissors, Briefcase, Plus, Search, Replace, ArrowUp, ArrowDown, CaseSensitive, WholeWord, StopCircle, CheckCircle, AlertTriangle } from 'lucide-react';
@@ -188,7 +189,7 @@ export const Tooltip: React.FC<{ content: string; children: React.ReactNode; pos
   );
 };
 
-export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; children: React.ReactNode; title?: string }> = ({ isOpen, onClose, children, title }) => (
+export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; children: React.ReactNode; title?: string; maxWidth?: string }> = ({ isOpen, onClose, children, title, maxWidth = "max-w-2xl" }) => (
   <AnimatePresence>
     {isOpen && (
       <>
@@ -205,7 +206,7 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; children: R
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
-            className="bg-[#09090b] border border-white/10 w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl shadow-2xl pointer-events-auto custom-scrollbar"
+            className={`bg-[#09090b] border border-white/10 w-full ${maxWidth} max-h-[85vh] overflow-y-auto rounded-2xl shadow-2xl pointer-events-auto custom-scrollbar`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between p-6 border-b border-white/5 sticky top-0 bg-[#09090b]/95 backdrop-blur-md z-10">

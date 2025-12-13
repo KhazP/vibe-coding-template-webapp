@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useReducer, useRef, useCallback, useMemo } from 'react';
 import { Persona, ProjectState, GeminiSettings, GroundingChunk, ProjectFieldKey, ToolSettings, AnalyticsEvent, ArtifactSectionName, TokenUsage, ArtifactVersion } from '../types';
 import { runDeepResearch, runDeepResearchInteraction, generateArtifact, streamArtifact, streamDeepResearch } from '../utils/gemini';
@@ -72,6 +71,7 @@ const defaultSettings: GeminiSettings = {
   topP: DEFAULT_SETTINGS.TOP_P,
   preset: 'thorough',
   enableAnalytics: true,
+  customInstructions: '',
   
   // Defaults for new QoL features
   defaultPersona: null,
@@ -942,7 +942,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (mode === 'deep') {
         setGenerationPhase('Starting Deep Research Agent...');
         try {
-            const { text, sources } = await runDeepResearchInteraction(prompt, apiKey, (status) => setGenerationPhase(status), abortControllerRef.current.signal);
+            const { text, sources } = await runDeepResearchInteraction(prompt, apiKey, (status) => setGenerationPhase(status), abortControllerRef.current.signal, proj.settings.customInstructions);
             
             const finalOutputTokens = estimateTokens(text);
             const outputCostDelta = calculateIncrementalCost(proj.settings.modelName, 0, finalOutputTokens, 0);
@@ -977,11 +977,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
                     const fallbackSettings = { ...proj.settings, useGrounding: true, thinkingBudget: 8192 };
                     const { text, sources } = await streamDeepResearch(
                         prompt, fallbackSettings, apiKey, 
-                        (chunk) => { 
+                        (chunk: string) => { 
                             accumulatedText += chunk; 
                             handleStreamUpdate(chunk, 'research', accumulatedText, fallbackSettings.modelName, projectId);
                         },
-                        (status) => setGenerationPhase(status), abortControllerRef.current.signal
+                        (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
                     );
                     updateCurrentProject({ researchSources: sources, isGenerating: false });
                     commitArtifact('research', text);
@@ -1003,11 +1003,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       const { text, sources } = await streamDeepResearch(
         prompt, proj.settings, apiKey, 
-        (chunk) => { 
+        (chunk: string) => { 
             accumulatedText += chunk; 
             handleStreamUpdate(chunk, 'research', accumulatedText, proj.settings.modelName, projectId);
         },
-        (status) => setGenerationPhase(status), abortControllerRef.current.signal
+        (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
       );
       updateCurrentProject({ researchSources: sources, isGenerating: false });
       commitArtifact('research', text);
@@ -1029,7 +1029,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
     abortControllerRef.current = new AbortController();
     
-    const estimatedInputTokens = estimateTokens(getPRDSystemInstruction() + prompt);
+    const systemInstruction = getPRDSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
+    const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
     const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
     const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
@@ -1047,12 +1048,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let accumulatedText = '';
     try {
         const text = await streamArtifact(
-            getPRDSystemInstruction(), prompt, proj.settings, apiKey, 
-            (chunk) => { 
+            systemInstruction, prompt, proj.settings, apiKey, 
+            (chunk: string) => { 
                 accumulatedText += chunk; 
                 handleStreamUpdate(chunk, 'prd', accumulatedText, proj.settings.modelName, projectId);
             },
-            (status) => setGenerationPhase(status), abortControllerRef.current.signal
+            (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
         );
         updateCurrentProject({ isGenerating: false });
         commitArtifact('prd', text);
@@ -1072,7 +1073,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
     abortControllerRef.current = new AbortController();
     
-    const estimatedInputTokens = estimateTokens(getTechDesignSystemInstruction() + prompt);
+    const systemInstruction = getTechDesignSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
+    const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
     const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
     const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
@@ -1090,12 +1092,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let accumulatedText = '';
     try {
         const text = await streamArtifact(
-            getTechDesignSystemInstruction(), prompt, proj.settings, apiKey, 
-            (chunk) => { 
+            systemInstruction, prompt, proj.settings, apiKey, 
+            (chunk: string) => { 
                 accumulatedText += chunk; 
                 handleStreamUpdate(chunk, 'tech', accumulatedText, proj.settings.modelName, projectId);
             },
-            (status) => setGenerationPhase(status), abortControllerRef.current.signal
+            (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
         );
         updateCurrentProject({ isGenerating: false });
         commitArtifact('tech', text);
@@ -1114,7 +1116,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!proj) return "";
       if (!apiKey) { setIsApiKeyModalOpen(true); return ""; }
       
-      const estimatedInputTokens = estimateTokens(getAgentSystemInstruction() + prompt);
+      const systemInstruction = getAgentSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
+      const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
       const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
       const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
@@ -1128,10 +1131,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
       setGenerationPhase('Generating Agent Config...');
       try {
-          const text = await generateArtifact(getAgentSystemInstruction(), prompt, proj.settings, apiKey);
+          const text = (await generateArtifact(systemInstruction, prompt, proj.settings, apiKey)) as string;
           
           const estimatedOutput = estimateTokens(text);
-          const outputCostDelta = calculateIncrementalCost(proj.settings.modelName, 0, estimatedOutput, 0);
+          const outputCostDelta = calculateIncrementalCost(proj.settings.modelName as string, 0, estimatedOutput, 0);
 
           const endUsage = { 
               ...startUsage, 
@@ -1158,7 +1161,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
     abortControllerRef.current = new AbortController();
     
-    const estimatedInputTokens = estimateTokens(getBuildPlanSystemInstruction() + prompt);
+    const systemInstruction = getBuildPlanSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
+    const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
     const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
     const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
@@ -1176,12 +1180,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     let accumulatedText = '';
     try {
         const text = await streamArtifact(
-            getBuildPlanSystemInstruction(), prompt, proj.settings, apiKey, 
-            (chunk) => { 
+            systemInstruction, prompt, proj.settings, apiKey, 
+            (chunk: string) => { 
                 accumulatedText += chunk; 
                 handleStreamUpdate(chunk, 'build', accumulatedText, proj.settings.modelName, projectId);
             },
-            (status) => setGenerationPhase(status), abortControllerRef.current.signal
+            (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
         );
         updateCurrentProject({ isGenerating: false });
         commitArtifact('build', text);
@@ -1201,18 +1205,21 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!currentProj) return; 
     
     let originalContent = '';
-    if (type === 'research') originalContent = currentProj.researchOutput;
-    if (type === 'prd') originalContent = currentProj.prdOutput;
-    if (type === 'tech') originalContent = currentProj.techOutput;
-    if (type === 'build') originalContent = currentProj.buildPlan;
+    if (type === 'research') originalContent = currentProj.researchOutput || '';
+    if (type === 'prd') originalContent = currentProj.prdOutput || '';
+    if (type === 'tech') originalContent = currentProj.techOutput || '';
+    if (type === 'build') originalContent = currentProj.buildPlan || '';
     
     const prompt = generateRefinePrompt(originalContent, instruction);
     
-    const estimatedInputTokens = estimateTokens(getRefineSystemInstruction() + prompt);
+    const customInstr = currentProj.settings.customInstructions || "";
+    const systemInstruction = getRefineSystemInstruction() + (customInstr ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${customInstr}` : "");
+    const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
     const groundingCostCount = currentProj.settings.useGrounding ? 1 : 0;
-    const inputCostDelta = calculateIncrementalCost(currentProj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
+    const modelName: string = currentProj.settings.modelName;
+    const inputCostDelta = calculateIncrementalCost(modelName, estimatedInputTokens, 0, groundingCostCount);
 
-    const startUsage = {
+    const startUsage: TokenUsage = {
         ...currentProj.tokenUsage,
         input: currentProj.tokenUsage.input + estimatedInputTokens,
         groundingRequests: currentProj.tokenUsage.groundingRequests + groundingCostCount,
@@ -1230,12 +1237,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     try {
       const text = await streamArtifact(
-          getRefineSystemInstruction(), prompt, currentProj.settings, apiKey, 
-          (chunk) => {
+          systemInstruction, prompt, currentProj.settings, apiKey, 
+          (chunk: string) => {
               accumulatedText += chunk;
-              handleStreamUpdate(chunk, type, accumulatedText, currentProj.settings.modelName, projectId);
+              handleStreamUpdate(chunk, type, accumulatedText, modelName, projectId);
           },
-          (status) => setGenerationPhase(status), abortControllerRef.current.signal
+          (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
       );
       updateCurrentProject({ isGenerating: false });
       commitArtifact(type, text);
@@ -1266,7 +1273,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
          const proj = state.projects[state.currentId];
          if (!apiKey) { setIsApiKeyModalOpen(true); throw new Error("API Key missing"); }
          
-         const estimatedInput = estimateTokens((systemInstruction || '') + prompt);
+         const effectiveSystemInstruction = (systemInstruction || "You are a helpful AI assistant.") + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
+         const estimatedInput = estimateTokens(effectiveSystemInstruction + prompt);
          const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInput, 0, 0);
 
          const startUsage = {
@@ -1277,7 +1285,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
          
          updateCurrentProject({ tokenUsage: startUsage }, { snapshot: false });
 
-         const text = await generateArtifact(systemInstruction || "You are a helpful AI assistant.", prompt, proj.settings, apiKey);
+         const text = await generateArtifact(effectiveSystemInstruction, prompt, proj.settings, apiKey);
          
          const estimatedOutput = estimateTokens(text);
          const outputCostDelta = calculateIncrementalCost(proj.settings.modelName, 0, estimatedOutput, 0);
