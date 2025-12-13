@@ -8,7 +8,15 @@ export enum Persona {
 
 export type ToastPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
-export type ProjectFieldKey = 
+// Re-export provider types for convenience
+export type { ProviderId, ProviderConfig, ChatMessage, SendChatOptions, SendChatResult } from './utils/providers';
+export type { ProviderKeys, ProviderSettings } from './utils/providerStorage';
+export type { ModelTier, ReasoningEffort, ModelConfig } from './utils/modelUtils';
+
+// Provider status for UI
+export type ProviderKeyStatus = 'saved' | 'invalid' | 'none' | 'testing';
+
+export type ProjectFieldKey =
   | 'project_description'
   // Research - Vibe
   | 'research_vibe_who' | 'research_vibe_problem' | 'research_vibe_existing' | 'research_vibe_unique' | 'research_vibe_features' | 'research_vibe_platform' | 'research_vibe_timeline' | 'research_vibe_budget'
@@ -55,7 +63,7 @@ export interface GeminiSettings {
   preset?: PresetMode;
   enableAnalytics?: boolean;
   customInstructions?: string;
-  
+
   // New QoL Settings
   defaultPersona?: Persona | null;
   reducedMotion?: boolean;
@@ -101,11 +109,11 @@ export interface ProjectState {
   isGenerating: boolean;
   settings: GeminiSettings;
   sectionTimestamps: Record<string, number>;
-  
+
   // Artifact Versioning
   artifactVersions: Record<ArtifactSectionName, ArtifactVersion[]>;
   artifactIndices: Record<ArtifactSectionName, number>;
-  
+
   // Cost Tracking
   tokenUsage: TokenUsage;
 }

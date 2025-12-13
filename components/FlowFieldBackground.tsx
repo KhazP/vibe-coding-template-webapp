@@ -45,27 +45,27 @@ class Particle {
     // R: 16-52, G: 185-211, B: 129-153
     this.p.stroke(200, 255, 230, 40); // Whitish-Emerald with low opacity
     this.p.strokeWeight(1);
-    
+
     // Draw point
     this.p.point(this.pos.x, this.pos.y);
   }
 
   edges() {
     if (this.pos.x > this.p.width) {
-        this.pos.x = 0;
-        this.prevPos = this.pos.copy();
+      this.pos.x = 0;
+      this.prevPos = this.pos.copy();
     }
     if (this.pos.x < 0) {
-        this.pos.x = this.p.width;
-        this.prevPos = this.pos.copy();
+      this.pos.x = this.p.width;
+      this.prevPos = this.pos.copy();
     }
     if (this.pos.y > this.p.height) {
-        this.pos.y = 0;
-        this.prevPos = this.pos.copy();
+      this.pos.y = 0;
+      this.prevPos = this.pos.copy();
     }
     if (this.pos.y < 0) {
-        this.pos.y = this.p.height;
-        this.prevPos = this.pos.copy();
+      this.pos.y = this.p.height;
+      this.prevPos = this.pos.copy();
     }
   }
 }
@@ -79,14 +79,14 @@ const FlowFieldBackground: React.FC = () => {
     const sketch = (p: p5) => {
       const particles: Particle[] = [];
       // Dynamic particle count based on screen size
-      const numParticles = Math.min(2000, Math.floor((window.innerWidth * window.innerHeight) / 500)); 
+      const numParticles = Math.min(2000, Math.floor((window.innerWidth * window.innerHeight) / 500));
       const noiseScale = 0.005; // Looseness of the flow
       let zOff = 0;
 
       p.setup = () => {
         p.createCanvas(p.windowWidth, p.windowHeight);
         p.background(5, 5, 5); // Start with dark background matches #050505
-        
+
         for (let i = 0; i < numParticles; i++) {
           particles.push(new Particle(p));
         }
@@ -100,22 +100,22 @@ const FlowFieldBackground: React.FC = () => {
 
         // Update and draw particles
         for (let i = 0; i < particles.length; i++) {
-            const particle = particles[i];
-            
-            // Calculate noise value for this position
-            const n = p.noise(
-                particle.pos.x * noiseScale, 
-                particle.pos.y * noiseScale, 
-                zOff
-            );
-            
-            // Convert noise to angle (multiply by Two PI or more for rotation)
-            const angle = n * p.TWO_PI * 4;
-            
-            particle.follow(angle);
-            particle.update();
-            particle.show();
-            particle.edges();
+          const particle = particles[i];
+
+          // Calculate noise value for this position
+          const n = p.noise(
+            particle.pos.x * noiseScale,
+            particle.pos.y * noiseScale,
+            zOff
+          );
+
+          // Convert noise to angle (multiply by Two PI or more for rotation)
+          const angle = n * p.TWO_PI * 4;
+
+          particle.follow(angle);
+          particle.update();
+          particle.show();
+          particle.edges();
         }
 
         // Advance time in the noise field slowly
@@ -123,6 +123,9 @@ const FlowFieldBackground: React.FC = () => {
       };
 
       p.windowResized = () => {
+        // Guard against calls before canvas is fully initialized
+        if (!p.width || !p.height) return;
+
         // Prevent background reset on mobile address bar scroll (vertical resize only)
         if (p.windowWidth === p.width) return;
 
@@ -143,10 +146,10 @@ const FlowFieldBackground: React.FC = () => {
   }, []);
 
   return (
-    <div 
-        ref={renderRef} 
-        className="fixed inset-0 z-[-1] pointer-events-none bg-[#050505] blur-[10px]"
-        aria-hidden="true"
+    <div
+      ref={renderRef}
+      className="fixed inset-0 z-[-1] pointer-events-none bg-[#050505] blur-[10px]"
+      aria-hidden="true"
     />
   );
 };

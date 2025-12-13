@@ -35,16 +35,16 @@ const STORAGE_KEY = 'VIBE_TOAST_POSITION';
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [position, setPositionState] = useState<ToastPosition>(() => {
-      try {
-          return (localStorage.getItem(STORAGE_KEY) as ToastPosition) || 'top-right';
-      } catch {
-          return 'top-right';
-      }
+    try {
+      return (localStorage.getItem(STORAGE_KEY) as ToastPosition) || 'top-right';
+    } catch {
+      return 'top-right';
+    }
   });
 
   const setPosition = useCallback((pos: ToastPosition) => {
-      setPositionState(pos);
-      localStorage.setItem(STORAGE_KEY, pos);
+    setPositionState(pos);
+    localStorage.setItem(STORAGE_KEY, pos);
   }, []);
 
   const removeToast = useCallback((id: string) => {
@@ -58,13 +58,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [removeToast]);
 
   const getPositionStyles = () => {
-      switch (position) {
-          case 'top-left': return 'top-4 left-4 flex-col';
-          case 'top-right': return 'top-4 right-4 flex-col';
-          case 'bottom-left': return 'bottom-4 left-4 flex-col-reverse';
-          case 'bottom-right': return 'bottom-4 right-4 flex-col-reverse';
-          default: return 'top-4 right-4 flex-col';
-      }
+    switch (position) {
+      case 'top-left': return 'top-4 left-4 flex-col';
+      case 'top-right': return 'top-4 right-4 flex-col';
+      case 'bottom-left': return 'bottom-4 left-4 flex-col-reverse';
+      case 'bottom-right': return 'bottom-4 right-4 flex-col-reverse';
+      default: return 'top-4 right-4 flex-col';
+    }
   };
 
   return (
@@ -84,7 +84,13 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   );
 };
 
-const ToastItem: React.FC<{ toast: Toast; onDismiss: (id: string) => void; position: ToastPosition }> = ({ toast, onDismiss, position }) => {
+interface ToastItemProps {
+  toast: Toast;
+  onDismiss: (id: string) => void;
+  position: ToastPosition;
+}
+
+const ToastItem = React.forwardRef<HTMLDivElement, ToastItemProps>(({ toast, onDismiss, position }, ref) => {
   const icons = {
     success: <CheckCircle size={18} className="text-emerald-400" />,
     error: <AlertCircle size={18} className="text-red-400" />,
@@ -103,6 +109,7 @@ const ToastItem: React.FC<{ toast: Toast; onDismiss: (id: string) => void; posit
 
   return (
     <motion.div
+      ref={ref}
       layout
       initial={{ opacity: 0, y: isTop ? -20 : 20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -111,7 +118,7 @@ const ToastItem: React.FC<{ toast: Toast; onDismiss: (id: string) => void; posit
     >
       <div className="mt-0.5 shrink-0">{icons[toast.type]}</div>
       <p className="text-sm text-slate-200 font-medium leading-snug flex-1">{toast.message}</p>
-      <button 
+      <button
         onClick={() => onDismiss(toast.id)}
         className="text-slate-500 hover:text-slate-300 transition-colors shrink-0"
       >
@@ -119,4 +126,6 @@ const ToastItem: React.FC<{ toast: Toast; onDismiss: (id: string) => void; posit
       </button>
     </motion.div>
   );
-};
+});
+
+ToastItem.displayName = 'ToastItem';

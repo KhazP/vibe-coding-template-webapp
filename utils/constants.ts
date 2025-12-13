@@ -72,6 +72,21 @@ export const DEFAULT_SETTINGS = {
   TOP_P: 0.95,
 } as const;
 
+// Multi-provider constants
+export const PROVIDER_IDS = {
+  GEMINI: 'gemini',
+  OPENAI: 'openai',
+  ANTHROPIC: 'anthropic',
+  OPENROUTER: 'openrouter',
+} as const;
+
+export const DEFAULT_PROVIDER_MODELS = {
+  gemini: MODELS.GEMINI_PRO,
+  openai: 'gpt-5.2-2025-12-11',
+  anthropic: 'claude-sonnet-4-5-20250929',
+  openrouter: 'openai/gpt-4o',
+} as const;
+
 export const PRESETS = {
   FAST: {
     id: 'fast',
@@ -79,10 +94,10 @@ export const PRESETS = {
     badge: 'Flash',
     description: 'Optimized for speed. Uses Gemini 2.5 Flash with moderate thinking.',
     config: {
-        modelName: MODELS.GEMINI_FLASH,
-        thinkingBudget: 8192,
-        temperature: 0.7,
-        useGrounding: true
+      modelName: MODELS.GEMINI_FLASH,
+      thinkingBudget: 8192,
+      temperature: 0.7,
+      useGrounding: true
     }
   },
   BALANCED: {
@@ -91,10 +106,10 @@ export const PRESETS = {
     badge: 'Pro',
     description: 'High intelligence, standard latency. Uses Gemini 3 Pro without thinking.',
     config: {
-        modelName: MODELS.GEMINI_PRO,
-        thinkingBudget: 0,
-        temperature: 0.7,
-        useGrounding: true
+      modelName: MODELS.GEMINI_PRO,
+      thinkingBudget: 0,
+      temperature: 0.7,
+      useGrounding: true
     }
   },
   THOROUGH: {
@@ -103,10 +118,10 @@ export const PRESETS = {
     badge: 'Pro + Thinking',
     description: 'Max reasoning power. Uses Gemini 3 Pro with max thinking budget.',
     config: {
-        modelName: MODELS.GEMINI_PRO,
-        thinkingBudget: 32768,
-        temperature: 0.7,
-        useGrounding: true
+      modelName: MODELS.GEMINI_PRO,
+      thinkingBudget: 32768,
+      temperature: 0.7,
+      useGrounding: true
     }
   }
 } as const;
@@ -150,63 +165,63 @@ export const TOOLS: ToolDefinition[] = [
   {
     id: TOOL_IDS.CURSOR,
     name: 'Cursor',
-    file: FILE_NAMES.CURSOR_RULES, 
+    file: FILE_NAMES.CURSOR_RULES,
     category: 'Native Support',
     description: 'Reads AGENTS.md automatically. We generate a one-line .cursorrules to enforce strict inheritance.',
     supportLevel: 'native',
     techTooltip: 'Generates .cursorrules. Note: Requires .cursor/mcp.json for MCP server features.'
   },
-  { 
-    id: TOOL_IDS.CLINE, 
-    name: 'Cline', 
-    file: FILE_NAMES.CLINE_RULES, 
+  {
+    id: TOOL_IDS.CLINE,
+    name: 'Cline',
+    file: FILE_NAMES.CLINE_RULES,
     category: 'Native Support',
     description: 'VS Code extension. Supports AGENTS.md natively or via .clinerules.',
     supportLevel: 'native',
     techTooltip: 'Uses .clinerules to natively enforce AGENTS.md rules.'
   },
-  { 
-    id: TOOL_IDS.AIDER, 
-    name: 'Aider', 
-    file: FILE_NAMES.AIDER_CONF, 
+  {
+    id: TOOL_IDS.AIDER,
+    name: 'Aider',
+    file: FILE_NAMES.AIDER_CONF,
     category: 'Native Support',
     description: 'CLI pair programmer. Reads AGENTS.md by default.',
     supportLevel: 'native',
     techTooltip: 'Configures .aider.conf.yml to auto-read AGENTS.md context.'
   },
-  { 
-    id: TOOL_IDS.WINDSURF, 
-    name: 'Windsurf', 
-    file: FILE_NAMES.WINDSURF_RULES, 
+  {
+    id: TOOL_IDS.WINDSURF,
+    name: 'Windsurf',
+    file: FILE_NAMES.WINDSURF_RULES,
     category: 'Native Support',
     description: 'IDE by Codeium. Automatically detects rule files.',
     supportLevel: 'native',
     techTooltip: 'Generates .windsurfrules which is auto-detected by the IDE.'
   },
-  { 
-    id: TOOL_IDS.COPILOT, 
-    name: 'GitHub Copilot', 
-    file: FILE_NAMES.COPILOT_INSTR, 
+  {
+    id: TOOL_IDS.COPILOT,
+    name: 'GitHub Copilot',
+    file: FILE_NAMES.COPILOT_INSTR,
     category: 'Native Support',
     description: 'Reads AGENTS.md via context. We link it explicitly.',
     supportLevel: 'native',
     techTooltip: 'Creates .github/copilot-instructions.md for native context integration.'
   },
-  
+
   // Adapter Required
-  { 
-    id: TOOL_IDS.GEMINI_CLI, 
-    name: 'Gemini CLI', 
-    file: FILE_NAMES.GEMINI_MD, 
+  {
+    id: TOOL_IDS.GEMINI_CLI,
+    name: 'Gemini CLI',
+    file: FILE_NAMES.GEMINI_MD,
     category: 'Adapter Required',
     description: 'Uses GEMINI.md as project memory.',
     supportLevel: 'adapter',
     techTooltip: 'Adapts AGENTS.md into a GEMINI.md system prompt.'
   },
-  { 
-    id: TOOL_IDS.CLAUDE, 
-    name: 'Claude Code', 
-    file: FILE_NAMES.CLAUDE_MD, 
+  {
+    id: TOOL_IDS.CLAUDE,
+    name: 'Claude Code',
+    file: FILE_NAMES.CLAUDE_MD,
     category: 'Adapter Required',
     description: 'Requires an import statement (@AGENTS.md) in CLAUDE.md.',
     supportLevel: 'adapter',
@@ -215,27 +230,27 @@ export const TOOLS: ToolDefinition[] = [
   {
     id: TOOL_IDS.ANTIGRAVITY,
     name: 'Google Antigravity',
-    file: FILE_NAMES.GEMINI_MD, 
+    file: FILE_NAMES.GEMINI_MD,
     category: 'Adapter Required',
     description: 'Requires GEMINI.md for context.',
     supportLevel: 'adapter',
     techTooltip: 'Antigravity reads GEMINI.md for project context.'
   },
-  
+
   // Generators
-  { 
-    id: TOOL_IDS.LOVABLE, 
-    name: 'Lovable', 
-    file: FILE_NAMES.LOVABLE_PROMPT, 
+  {
+    id: TOOL_IDS.LOVABLE,
+    name: 'Lovable',
+    file: FILE_NAMES.LOVABLE_PROMPT,
     category: 'Generator',
     description: 'Full-stack builder. We generate a prompt that summarizes AGENTS.md.',
     supportLevel: 'manual',
     techTooltip: 'Generates a prompt summary optimized for the Lovable builder.'
   },
-  { 
-    id: TOOL_IDS.V0, 
-    name: 'v0', 
-    file: FILE_NAMES.V0_PROMPT, 
+  {
+    id: TOOL_IDS.V0,
+    name: 'v0',
+    file: FILE_NAMES.V0_PROMPT,
     category: 'Generator',
     description: 'Generative UI. We generate a prompt that summarizes AGENTS.md.',
     supportLevel: 'manual',

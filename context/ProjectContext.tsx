@@ -5,6 +5,7 @@ import { getPRDSystemInstruction, getTechDesignSystemInstruction, getAgentSystem
 import { useToast } from '../components/Toast';
 import { STORAGE_KEYS, DEFAULT_SETTINGS, PRICING, MODELS } from '../utils/constants';
 import { supabase } from '../utils/supabaseClient';
+import { getProviderKey, setProviderKey as setStorageProviderKey } from '../utils/providerStorage';
 
 interface ProjectContextType {
   state: ProjectState;
@@ -42,7 +43,7 @@ interface ProjectContextType {
   canRedo: boolean;
   saveProject: () => void;
   saveStatus: 'saved' | 'saving' | 'unsaved' | 'error';
-  
+
   // Artifact Versioning
   commitArtifact: (section: ArtifactSectionName, content: string) => void;
   cycleArtifactVersion: (section: ArtifactSectionName, direction: -1 | 1) => void;
@@ -64,7 +65,7 @@ interface ProjectContextType {
 
 const defaultSettings: GeminiSettings = {
   modelName: DEFAULT_SETTINGS.MODEL,
-  thinkingBudget: DEFAULT_SETTINGS.THINKING_BUDGET, 
+  thinkingBudget: DEFAULT_SETTINGS.THINKING_BUDGET,
   useGrounding: true,
   temperature: DEFAULT_SETTINGS.TEMPERATURE,
   topK: DEFAULT_SETTINGS.TOP_K,
@@ -72,7 +73,7 @@ const defaultSettings: GeminiSettings = {
   preset: 'thorough',
   enableAnalytics: true,
   customInstructions: '',
-  
+
   // Defaults for new QoL features
   defaultPersona: null,
   reducedMotion: false,
@@ -81,13 +82,13 @@ const defaultSettings: GeminiSettings = {
 };
 
 const getGlobalSettings = (): GeminiSettings => {
-    try {
-        const stored = localStorage.getItem(STORAGE_KEYS.GLOBAL_SETTINGS);
-        if (stored) return { ...defaultSettings, ...JSON.parse(stored) };
-    } catch (e) {
-        console.warn("Failed to load global settings", e);
-    }
-    return defaultSettings;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEYS.GLOBAL_SETTINGS);
+    if (stored) return { ...defaultSettings, ...JSON.parse(stored) };
+  } catch (e) {
+    console.warn("Failed to load global settings", e);
+  }
+  return defaultSettings;
 };
 
 const createNewProjectState = (): ProjectState => ({
@@ -162,10 +163,10 @@ const createExampleProject = (): ProjectState => {
     },
     tools: ['cursor', 'lovable'],
     sectionTimestamps: {
-        research: now,
-        prd: now,
-        tech: now,
-        agent: now
+      research: now,
+      prd: now,
+      tech: now,
+      agent: now
     },
     lastModified: now,
     artifactVersions: {
@@ -186,13 +187,13 @@ const createExampleProject = (): ProjectState => {
 
 // Helper to migrate string[] history to ArtifactVersion[] history
 const migrateArtifactVersions = (versions: any, lastMod: number): ArtifactVersion[] => {
-    if (!Array.isArray(versions)) return [];
-    if (versions.length === 0) return [];
-    if (typeof versions[0] === 'string') {
-        // Migration: Convert string to object
-        return (versions as string[]).map(v => ({ content: v, timestamp: lastMod }));
-    }
-    return versions as ArtifactVersion[];
+  if (!Array.isArray(versions)) return [];
+  if (versions.length === 0) return [];
+  if (typeof versions[0] === 'string') {
+    // Migration: Convert string to object
+    return (versions as string[]).map(v => ({ content: v, timestamp: lastMod }));
+  }
+  return versions as ArtifactVersion[];
 };
 
 interface StorageData {
@@ -261,22 +262,22 @@ const projectReducer = (state: StorageData, action: Action): StorageData => {
       };
     }
     case 'UPDATE_GLOBAL_SETTINGS': {
-        const newProjects = { ...state.projects };
-        const newSettingsPayload = action.payload;
-        
-        // Iterate through all projects and update their settings
-        Object.keys(newProjects).forEach(key => {
-            const proj = newProjects[key];
-            newProjects[key] = {
-                ...proj,
-                settings: { ...proj.settings, ...newSettingsPayload }
-            };
-        });
-        
-        return {
-            ...state,
-            projects: newProjects
+      const newProjects = { ...state.projects };
+      const newSettingsPayload = action.payload;
+
+      // Iterate through all projects and update their settings
+      Object.keys(newProjects).forEach(key => {
+        const proj = newProjects[key];
+        newProjects[key] = {
+          ...proj,
+          settings: { ...proj.settings, ...newSettingsPayload }
         };
+      });
+
+      return {
+        ...state,
+        projects: newProjects
+      };
     }
     case 'RESTORE_PROJECT':
       return {
@@ -287,64 +288,64 @@ const projectReducer = (state: StorageData, action: Action): StorageData => {
       const newProjects = { ...state.projects };
       action.payload.forEach(p => {
         if (p.id && p.name && p.answers) {
-            // Ensure imported projects have versioning structure and token usage
-            if (!p.artifactVersions) {
-                p.artifactVersions = {
-                    research: p.researchOutput ? [{ content: p.researchOutput, timestamp: p.lastModified }] : [],
-                    prd: p.prdOutput ? [{ content: p.prdOutput, timestamp: p.lastModified }] : [],
-                    tech: p.techOutput ? [{ content: p.techOutput, timestamp: p.lastModified }] : [],
-                    build: p.buildPlan ? [{ content: p.buildPlan, timestamp: p.lastModified }] : []
-                };
-                p.artifactIndices = {
-                    research: p.researchOutput ? 0 : -1,
-                    prd: p.prdOutput ? 0 : -1,
-                    tech: p.techOutput ? 0 : -1,
-                    build: p.buildPlan ? 0 : -1
-                };
-            } else {
-                // Migrate potentially old imports
-                const sections: ArtifactSectionName[] = ['research', 'prd', 'tech', 'build'];
-                sections.forEach(sec => {
-                    if (p.artifactVersions[sec]) {
-                        p.artifactVersions[sec] = migrateArtifactVersions(p.artifactVersions[sec], p.lastModified);
-                    }
-                });
-            }
-
-            // Validate Artifact Indices against Versions
+          // Ensure imported projects have versioning structure and token usage
+          if (!p.artifactVersions) {
+            p.artifactVersions = {
+              research: p.researchOutput ? [{ content: p.researchOutput, timestamp: p.lastModified }] : [],
+              prd: p.prdOutput ? [{ content: p.prdOutput, timestamp: p.lastModified }] : [],
+              tech: p.techOutput ? [{ content: p.techOutput, timestamp: p.lastModified }] : [],
+              build: p.buildPlan ? [{ content: p.buildPlan, timestamp: p.lastModified }] : []
+            };
+            p.artifactIndices = {
+              research: p.researchOutput ? 0 : -1,
+              prd: p.prdOutput ? 0 : -1,
+              tech: p.techOutput ? 0 : -1,
+              build: p.buildPlan ? 0 : -1
+            };
+          } else {
+            // Migrate potentially old imports
             const sections: ArtifactSectionName[] = ['research', 'prd', 'tech', 'build'];
-            if (!p.artifactIndices) {
-                p.artifactIndices = { research: -1, prd: -1, tech: -1, build: -1 };
-            }
-
             sections.forEach(sec => {
-                const versions = p.artifactVersions?.[sec] || [];
-                let idx = p.artifactIndices?.[sec];
-                if (typeof idx !== 'number') idx = -1;
-                
-                if (versions.length === 0) idx = -1;
-                else if (idx >= versions.length) idx = versions.length - 1;
-                else if (idx < 0) idx = versions.length - 1;
-                
-                if (p.artifactIndices) p.artifactIndices[sec] = idx;
+              if (p.artifactVersions[sec]) {
+                p.artifactVersions[sec] = migrateArtifactVersions(p.artifactVersions[sec], p.lastModified);
+              }
             });
+          }
 
-            if (!p.tokenUsage) {
-                p.tokenUsage = { input: 0, output: 0, groundingRequests: 0, estimatedCost: 0 };
-            }
-            if (!p.toolSettings) {
-                p.toolSettings = { claudeAdapterMode: false, geminiAdapterMode: false, antigravityAdapterMode: false };
-            } else {
-                if (typeof p.toolSettings.claudeAdapterMode === 'undefined') p.toolSettings.claudeAdapterMode = false;
-                if (typeof p.toolSettings.geminiAdapterMode === 'undefined') p.toolSettings.geminiAdapterMode = false;
-                if (typeof p.toolSettings.antigravityAdapterMode === 'undefined') p.toolSettings.antigravityAdapterMode = false;
-            }
+          // Validate Artifact Indices against Versions
+          const sections: ArtifactSectionName[] = ['research', 'prd', 'tech', 'build'];
+          if (!p.artifactIndices) {
+            p.artifactIndices = { research: -1, prd: -1, tech: -1, build: -1 };
+          }
 
-           if (!p.settings) {
-               p.settings = getGlobalSettings();
-           }
+          sections.forEach(sec => {
+            const versions = p.artifactVersions?.[sec] || [];
+            let idx = p.artifactIndices?.[sec];
+            if (typeof idx !== 'number') idx = -1;
 
-           newProjects[p.id] = { ...p, lastModified: Date.now() };
+            if (versions.length === 0) idx = -1;
+            else if (idx >= versions.length) idx = versions.length - 1;
+            else if (idx < 0) idx = versions.length - 1;
+
+            if (p.artifactIndices) p.artifactIndices[sec] = idx;
+          });
+
+          if (!p.tokenUsage) {
+            p.tokenUsage = { input: 0, output: 0, groundingRequests: 0, estimatedCost: 0 };
+          }
+          if (!p.toolSettings) {
+            p.toolSettings = { claudeAdapterMode: false, geminiAdapterMode: false, antigravityAdapterMode: false };
+          } else {
+            if (typeof p.toolSettings.claudeAdapterMode === 'undefined') p.toolSettings.claudeAdapterMode = false;
+            if (typeof p.toolSettings.geminiAdapterMode === 'undefined') p.toolSettings.geminiAdapterMode = false;
+            if (typeof p.toolSettings.antigravityAdapterMode === 'undefined') p.toolSettings.antigravityAdapterMode = false;
+          }
+
+          if (!p.settings) {
+            p.settings = getGlobalSettings();
+          }
+
+          newProjects[p.id] = { ...p, lastModified: Date.now() };
         }
       });
       return { ...state, projects: newProjects };
@@ -403,14 +404,14 @@ const API_KEY_STORAGE = 'VIBE_GEMINI_API_KEY';
 const ANALYTICS_STORAGE = 'VIBE_ANALYTICS_EVENTS';
 
 const calculateIncrementalCost = (modelName: string, inputTokens: number, outputTokens: number, groundingRequests: number = 0): number => {
-    const modelKey = Object.keys(PRICING).find(k => modelName.includes(k)) || MODELS.GEMINI_PRO;
-    const pricing = PRICING[modelKey as keyof typeof PRICING] || PRICING[MODELS.GEMINI_PRO];
-    
-    const inputCost = (inputTokens / 1_000_000) * pricing.input;
-    const outputCost = (outputTokens / 1_000_000) * pricing.output;
-    const groundingCost = groundingRequests * (pricing.grounding || 0);
-    
-    return inputCost + outputCost + groundingCost;
+  const modelKey = Object.keys(PRICING).find(k => modelName.includes(k)) || MODELS.GEMINI_PRO;
+  const pricing = PRICING[modelKey as keyof typeof PRICING] || PRICING[MODELS.GEMINI_PRO];
+
+  const inputCost = (inputTokens / 1_000_000) * pricing.input;
+  const outputCost = (outputTokens / 1_000_000) * pricing.output;
+  const groundingCost = groundingRequests * (pricing.grounding || 0);
+
+  return inputCost + outputCost + groundingCost;
 };
 
 const estimateTokens = (text: string) => Math.ceil((text || '').length / 4);
@@ -421,14 +422,14 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved' | 'error'>('saved');
   const [generationPhase, setGenerationPhase] = useState<string>('');
   const abortControllerRef = useRef<AbortController | null>(null);
-  const [apiKey, setApiKeyState] = useState<string | null>(() => localStorage.getItem(API_KEY_STORAGE));
+  const [apiKey, setApiKeyState] = useState<string | null>(() => getProviderKey('gemini'));
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
   const sessionIdRef = useRef<string>(sessionStorage.getItem('VIBE_SESSION_ID') || crypto.randomUUID());
 
   // Refs for Throttled Dispatch
   const activeUsageRef = useRef<TokenUsage | null>(null);
   const streamBufferTimeoutRef = useRef<number | null>(null);
-  const streamTextBufferRef = useRef<{field: ArtifactSectionName, text: string} | null>(null);
+  const streamTextBufferRef = useRef<{ field: ArtifactSectionName, text: string } | null>(null);
 
   useEffect(() => {
     sessionStorage.setItem('VIBE_SESSION_ID', sessionIdRef.current);
@@ -448,125 +449,125 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const [state, dispatch] = useReducer(projectReducer, { projects: {}, currentId: '' } as StorageData, (initial): StorageData => {
     try {
-        const savedV2 = localStorage.getItem(STORAGE_KEYS.V2);
-        if (savedV2) {
-          const parsed = JSON.parse(savedV2);
-          if (parsed.projects && parsed.currentId) {
-            const globalSettings = getGlobalSettings();
-            Object.values(parsed.projects).forEach((p: any) => {
-              if (!p.sectionTimestamps) p.sectionTimestamps = {};
-              if (!p.validationErrors) p.validationErrors = {};
-              if (!p.settings) p.settings = { ...globalSettings };
-              else p.settings = { ...globalSettings, ...p.settings };
-              
-              if (!p.settings.preset) p.settings.preset = 'thorough';
-              if (!p.toolSettings) p.toolSettings = { claudeAdapterMode: false, geminiAdapterMode: false, antigravityAdapterMode: false };
-              else {
-                  if (typeof p.toolSettings.claudeAdapterMode === 'undefined') p.toolSettings.claudeAdapterMode = false;
-                  if (typeof p.toolSettings.geminiAdapterMode === 'undefined') p.toolSettings.geminiAdapterMode = false;
-                  if (typeof p.toolSettings.antigravityAdapterMode === 'undefined') p.toolSettings.antigravityAdapterMode = false;
-              }
-              
-              if (!p.artifactVersions) {
-                p.artifactVersions = {
-                    research: p.researchOutput ? [{ content: p.researchOutput, timestamp: p.lastModified }] : [],
-                    prd: p.prdOutput ? [{ content: p.prdOutput, timestamp: p.lastModified }] : [],
-                    tech: p.techOutput ? [{ content: p.techOutput, timestamp: p.lastModified }] : [],
-                    build: p.buildPlan ? [{ content: p.buildPlan, timestamp: p.lastModified }] : []
-                };
-                p.artifactIndices = {
-                    research: p.researchOutput ? 0 : -1,
-                    prd: p.prdOutput ? 0 : -1,
-                    tech: p.techOutput ? 0 : -1,
-                    build: p.buildPlan ? 0 : -1
-                };
-              } else {
-                  const sections: ArtifactSectionName[] = ['research', 'prd', 'tech', 'build'];
-                  sections.forEach(sec => {
-                      if (p.artifactVersions[sec]) {
-                          p.artifactVersions[sec] = migrateArtifactVersions(p.artifactVersions[sec], p.lastModified);
-                      }
-                  });
-              }
-              
-              if (!p.tokenUsage) {
-                  p.tokenUsage = { input: 0, output: 0, groundingRequests: 0, estimatedCost: 0 };
-              }
-            });
-            return { projects: parsed.projects, currentId: parsed.currentId } as StorageData;
-          }
-        }
-  
-        const savedV1 = localStorage.getItem(STORAGE_KEYS.V1);
-        if (savedV1) {
-          const parsedV1 = JSON.parse(savedV1);
-          const newProject = {
-            ...createNewProjectState(),
-            ...(parsedV1 as Partial<ProjectState>),
-            isGenerating: false,
-            settings: { ...defaultSettings, ...(parsedV1.settings || {}) },
-            sectionTimestamps: {}
-          };
-          const now = Date.now();
-          newProject.artifactVersions = {
-            research: newProject.researchOutput ? [{ content: newProject.researchOutput, timestamp: now }] : [],
-            prd: newProject.prdOutput ? [{ content: newProject.prdOutput, timestamp: now }] : [],
-            tech: newProject.techOutput ? [{ content: newProject.techOutput, timestamp: now }] : [],
-            build: newProject.buildPlan ? [{ content: newProject.buildPlan, timestamp: now }] : []
-          };
-          newProject.artifactIndices = {
-            research: newProject.researchOutput ? 0 : -1,
-            prd: newProject.prdOutput ? 0 : -1,
-            tech: newProject.techOutput ? 0 : -1,
-            build: newProject.buildPlan ? 0 : -1
-          };
-          newProject.tokenUsage = { input: 0, output: 0, groundingRequests: 0, estimatedCost: 0 };
+      const savedV2 = localStorage.getItem(STORAGE_KEYS.V2);
+      if (savedV2) {
+        const parsed = JSON.parse(savedV2);
+        if (parsed.projects && parsed.currentId) {
+          const globalSettings = getGlobalSettings();
+          Object.values(parsed.projects).forEach((p: any) => {
+            if (!p.sectionTimestamps) p.sectionTimestamps = {};
+            if (!p.validationErrors) p.validationErrors = {};
+            if (!p.settings) p.settings = { ...globalSettings };
+            else p.settings = { ...globalSettings, ...p.settings };
 
-          const derivedName = parsedV1.answers?.['project_description'] || parsedV1.answers?.['prd_vibe_name'] || 'Legacy Project';
-          newProject.name = derivedName.length > 30 ? derivedName.substring(0, 30) + '...' : derivedName;
-  
-          return { projects: { [newProject.id]: newProject }, currentId: newProject.id };
+            if (!p.settings.preset) p.settings.preset = 'thorough';
+            if (!p.toolSettings) p.toolSettings = { claudeAdapterMode: false, geminiAdapterMode: false, antigravityAdapterMode: false };
+            else {
+              if (typeof p.toolSettings.claudeAdapterMode === 'undefined') p.toolSettings.claudeAdapterMode = false;
+              if (typeof p.toolSettings.geminiAdapterMode === 'undefined') p.toolSettings.geminiAdapterMode = false;
+              if (typeof p.toolSettings.antigravityAdapterMode === 'undefined') p.toolSettings.antigravityAdapterMode = false;
+            }
+
+            if (!p.artifactVersions) {
+              p.artifactVersions = {
+                research: p.researchOutput ? [{ content: p.researchOutput, timestamp: p.lastModified }] : [],
+                prd: p.prdOutput ? [{ content: p.prdOutput, timestamp: p.lastModified }] : [],
+                tech: p.techOutput ? [{ content: p.techOutput, timestamp: p.lastModified }] : [],
+                build: p.buildPlan ? [{ content: p.buildPlan, timestamp: p.lastModified }] : []
+              };
+              p.artifactIndices = {
+                research: p.researchOutput ? 0 : -1,
+                prd: p.prdOutput ? 0 : -1,
+                tech: p.techOutput ? 0 : -1,
+                build: p.buildPlan ? 0 : -1
+              };
+            } else {
+              const sections: ArtifactSectionName[] = ['research', 'prd', 'tech', 'build'];
+              sections.forEach(sec => {
+                if (p.artifactVersions[sec]) {
+                  p.artifactVersions[sec] = migrateArtifactVersions(p.artifactVersions[sec], p.lastModified);
+                }
+              });
+            }
+
+            if (!p.tokenUsage) {
+              p.tokenUsage = { input: 0, output: 0, groundingRequests: 0, estimatedCost: 0 };
+            }
+          });
+          return { projects: parsed.projects, currentId: parsed.currentId } as StorageData;
         }
-      } catch (e) {
-        console.warn("Failed to load state", e);
       }
-      
-      const example = createExampleProject();
-      const fresh = createNewProjectState();
-      
-      return { 
-          projects: { 
-              [example.id]: example,
-              [fresh.id]: fresh 
-          }, 
-          currentId: fresh.id
-      };
+
+      const savedV1 = localStorage.getItem(STORAGE_KEYS.V1);
+      if (savedV1) {
+        const parsedV1 = JSON.parse(savedV1);
+        const newProject = {
+          ...createNewProjectState(),
+          ...(parsedV1 as Partial<ProjectState>),
+          isGenerating: false,
+          settings: { ...defaultSettings, ...(parsedV1.settings || {}) },
+          sectionTimestamps: {}
+        };
+        const now = Date.now();
+        newProject.artifactVersions = {
+          research: newProject.researchOutput ? [{ content: newProject.researchOutput, timestamp: now }] : [],
+          prd: newProject.prdOutput ? [{ content: newProject.prdOutput, timestamp: now }] : [],
+          tech: newProject.techOutput ? [{ content: newProject.techOutput, timestamp: now }] : [],
+          build: newProject.buildPlan ? [{ content: newProject.buildPlan, timestamp: now }] : []
+        };
+        newProject.artifactIndices = {
+          research: newProject.researchOutput ? 0 : -1,
+          prd: newProject.prdOutput ? 0 : -1,
+          tech: newProject.techOutput ? 0 : -1,
+          build: newProject.buildPlan ? 0 : -1
+        };
+        newProject.tokenUsage = { input: 0, output: 0, groundingRequests: 0, estimatedCost: 0 };
+
+        const derivedName = parsedV1.answers?.['project_description'] || parsedV1.answers?.['prd_vibe_name'] || 'Legacy Project';
+        newProject.name = derivedName.length > 30 ? derivedName.substring(0, 30) + '...' : derivedName;
+
+        return { projects: { [newProject.id]: newProject }, currentId: newProject.id };
+      }
+    } catch (e) {
+      console.warn("Failed to load state", e);
+    }
+
+    const example = createExampleProject();
+    const fresh = createNewProjectState();
+
+    return {
+      projects: {
+        [example.id]: example,
+        [fresh.id]: fresh
+      },
+      currentId: fresh.id
+    };
   });
 
   const logEvent = useCallback(async (eventName: AnalyticsEvent['eventName'], data?: any) => {
     try {
-        const timestamp = Date.now();
-        const event: AnalyticsEvent = { id: crypto.randomUUID(), eventName, timestamp, data };
-        const existingEvents = JSON.parse(localStorage.getItem(ANALYTICS_STORAGE) || '[]');
-        existingEvents.push(event);
-        localStorage.setItem(ANALYTICS_STORAGE, JSON.stringify(existingEvents.slice(-1000)));
+      const timestamp = Date.now();
+      const event: AnalyticsEvent = { id: crypto.randomUUID(), eventName, timestamp, data };
+      const existingEvents = JSON.parse(localStorage.getItem(ANALYTICS_STORAGE) || '[]');
+      existingEvents.push(event);
+      localStorage.setItem(ANALYTICS_STORAGE, JSON.stringify(existingEvents.slice(-1000)));
     } catch (e) {
-        console.warn('Local Analytics Error:', e);
+      console.warn('Local Analytics Error:', e);
     }
     const currentProj = state.projects[state.currentId];
     const analyticsEnabled = currentProj?.settings?.enableAnalytics ?? true;
     if (!analyticsEnabled) return;
     if (supabase) {
-        try {
-            await supabase.from('events').insert({
-              event_name: eventName,
-              event_type: 'app_event',
-              user_session_id: sessionIdRef.current,
-              metadata: data
-            });
-        } catch (e) {
-            console.warn('Supabase Connection Error:', e);
-        }
+      try {
+        await supabase.from('events').insert({
+          event_name: eventName,
+          event_type: 'app_event',
+          user_session_id: sessionIdRef.current,
+          metadata: data
+        });
+      } catch (e) {
+        console.warn('Supabase Connection Error:', e);
+      }
     }
   }, [state.projects, state.currentId]);
 
@@ -575,14 +576,18 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [apiKey]);
 
   const setApiKey = useCallback((key: string) => {
-    localStorage.setItem(API_KEY_STORAGE, key);
-    setApiKeyState(key);
-    setIsApiKeyModalOpen(false);
-    addToast('API Key saved successfully', 'success');
+    // Use provider storage for consistency
+    setStorageProviderKey('gemini', key);
+    setApiKeyState(key || null);
+    // Note: Don't auto-close modal here - ApiKeyGate handles that
+    if (key) {
+      addToast('API Key saved successfully', 'success');
+    }
   }, [addToast]);
 
   const clearApiKey = useCallback(() => {
     localStorage.removeItem(API_KEY_STORAGE);
+    setStorageProviderKey('gemini', '');
     setApiKeyState(null);
     setIsApiKeyModalOpen(true);
   }, []);
@@ -636,13 +641,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-        const target = e.target as HTMLElement;
-        const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-        if (isInput) return;
-        if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
-            if (e.shiftKey) { e.preventDefault(); redo(); } else { e.preventDefault(); undo(); }
-        }
-        if ((e.metaKey || e.ctrlKey) && e.key === 'y') { e.preventDefault(); redo(); }
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
+      if (isInput) return;
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+        if (e.shiftKey) { e.preventDefault(); redo(); } else { e.preventDefault(); undo(); }
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'y') { e.preventDefault(); redo(); }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -653,14 +658,14 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!currentProject) return;
 
     if (options.snapshot) {
-        if (options.debounce) {
-             if (!typingTimeoutRef.current) pushToHistory(currentProject);
-             if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-             typingTimeoutRef.current = setTimeout(() => { typingTimeoutRef.current = null; }, 1000);
-        } else {
-             const keys = Object.keys(updates);
-             if (!(keys.length === 1 && keys[0] === 'isGenerating')) pushToHistory(currentProject);
-        }
+      if (options.debounce) {
+        if (!typingTimeoutRef.current) pushToHistory(currentProject);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => { typingTimeoutRef.current = null; }, 1000);
+      } else {
+        const keys = Object.keys(updates);
+        if (!(keys.length === 1 && keys[0] === 'isGenerating')) pushToHistory(currentProject);
+      }
     }
     dispatch({ type: 'UPDATE_PROJECT', payload: updates });
     setSaveStatus('unsaved');
@@ -674,56 +679,56 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const now = Date.now();
     const versions = current.artifactVersions[section] || [];
     const currentIndex = current.artifactIndices[section] || -1;
-    
+
     let newVersions = versions.slice(0, currentIndex + 1);
     newVersions.push({ content, timestamp: now });
-    
+
     // LIMIT HISTORY: Keep only last 10 versions to prevent localStorage quota issues
     const MAX_VERSIONS = 10;
     if (newVersions.length > MAX_VERSIONS) {
-        newVersions = newVersions.slice(newVersions.length - MAX_VERSIONS);
+      newVersions = newVersions.slice(newVersions.length - MAX_VERSIONS);
     }
-    
+
     const newVersionsMap = { ...current.artifactVersions, [section]: newVersions };
     const newIndicesMap = { ...current.artifactIndices, [section]: newVersions.length - 1 };
-    
+
     const timestamps = { ...current.sectionTimestamps, [section]: now };
     const payload: Partial<ProjectState> = {
-        artifactVersions: newVersionsMap,
-        artifactIndices: newIndicesMap,
-        sectionTimestamps: timestamps
+      artifactVersions: newVersionsMap,
+      artifactIndices: newIndicesMap,
+      sectionTimestamps: timestamps
     };
 
     if (section === 'research') payload.researchOutput = content;
     if (section === 'prd') payload.prdOutput = content;
     if (section === 'tech') payload.techOutput = content;
     if (section === 'build') payload.buildPlan = content;
-    
+
     updateCurrentProject(payload, { snapshot: true });
   }, [state.projects, state.currentId, updateCurrentProject]);
 
   const cycleArtifactVersion = useCallback((section: ArtifactSectionName, direction: -1 | 1) => {
-      const current = state.projects[state.currentId];
-      if (!current) return;
-      
-      const versions = current.artifactVersions[section];
-      const currentIndex = current.artifactIndices[section];
-      if (!versions || versions.length === 0) return;
+    const current = state.projects[state.currentId];
+    if (!current) return;
 
-      const newIndex = currentIndex + direction;
-      if (newIndex < 0 || newIndex >= versions.length) return;
+    const versions = current.artifactVersions[section];
+    const currentIndex = current.artifactIndices[section];
+    if (!versions || versions.length === 0) return;
 
-      const content = versions[newIndex].content;
-      const payload: Partial<ProjectState> = {
-          artifactIndices: { ...current.artifactIndices, [section]: newIndex }
-      };
-      
-      if (section === 'research') payload.researchOutput = content;
-      if (section === 'prd') payload.prdOutput = content;
-      if (section === 'tech') payload.techOutput = content;
-      if (section === 'build') payload.buildPlan = content;
-      
-      updateCurrentProject(payload, { snapshot: false });
+    const newIndex = currentIndex + direction;
+    if (newIndex < 0 || newIndex >= versions.length) return;
+
+    const content = versions[newIndex].content;
+    const payload: Partial<ProjectState> = {
+      artifactIndices: { ...current.artifactIndices, [section]: newIndex }
+    };
+
+    if (section === 'research') payload.researchOutput = content;
+    if (section === 'prd') payload.prdOutput = content;
+    if (section === 'tech') payload.techOutput = content;
+    if (section === 'build') payload.buildPlan = content;
+
+    updateCurrentProject(payload, { snapshot: false });
   }, [state.projects, state.currentId, updateCurrentProject]);
 
   const currentProject = state.projects[state.currentId];
@@ -743,21 +748,21 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } catch (e: any) {
         console.warn("Failed to save state", e);
         if (e.name === 'QuotaExceededError' || e.message?.toLowerCase().includes('quota')) {
-             setSaveStatus('error');
+          setSaveStatus('error');
         } else {
-             setSaveStatus('unsaved');
+          setSaveStatus('unsaved');
         }
       }
-    }, autoSaveInterval); 
+    }, autoSaveInterval);
     return () => clearTimeout(handler);
   }, [state, saveStatus, autoSaveInterval]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-        if (saveStatus === 'unsaved' || saveStatus === 'saving') {
-            e.preventDefault();
-            e.returnValue = '';
-        }
+      if (saveStatus === 'unsaved' || saveStatus === 'saving') {
+        e.preventDefault();
+        e.returnValue = '';
+      }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
@@ -766,21 +771,21 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const saveProject = useCallback(() => {
     setSaveStatus('saving');
     try {
-        const projectsToSave = Object.entries(state.projects).reduce((acc, [id, proj]) => {
-          acc[id] = { ...(proj as any), isGenerating: false };
-          return acc;
-        }, {} as Record<string, ProjectState>);
-        localStorage.setItem(STORAGE_KEYS.V2, JSON.stringify({ projects: projectsToSave, currentId: state.currentId }));
-        setTimeout(() => setSaveStatus('saved'), 500);
-        addToast('Project saved successfully', 'success');
+      const projectsToSave = Object.entries(state.projects).reduce((acc, [id, proj]) => {
+        acc[id] = { ...(proj as any), isGenerating: false };
+        return acc;
+      }, {} as Record<string, ProjectState>);
+      localStorage.setItem(STORAGE_KEYS.V2, JSON.stringify({ projects: projectsToSave, currentId: state.currentId }));
+      setTimeout(() => setSaveStatus('saved'), 500);
+      addToast('Project saved successfully', 'success');
     } catch (e: any) {
-        if (e.name === 'QuotaExceededError' || e.message?.toLowerCase().includes('quota')) {
-            setSaveStatus('error');
-            addToast('Storage Limit Reached. Please delete old projects or export data.', 'error');
-        } else {
-            setSaveStatus('unsaved');
-            addToast('Failed to save project', 'error');
-        }
+      if (e.name === 'QuotaExceededError' || e.message?.toLowerCase().includes('quota')) {
+        setSaveStatus('error');
+        addToast('Storage Limit Reached. Please delete old projects or export data.', 'error');
+      } else {
+        setSaveStatus('unsaved');
+        addToast('Failed to save project', 'error');
+      }
     }
   }, [state, addToast]);
 
@@ -790,26 +795,26 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const theme = THEMES[activePersona];
       if (theme) {
         const root = document.documentElement;
-        Object.entries(theme.primary).forEach(([k, v]) => root.style.setProperty(`--color-primary-${k}`, v));
-        Object.entries(theme.secondary).forEach(([k, v]) => root.style.setProperty(`--color-secondary-${k}`, v));
+        Object.entries(theme.primary).forEach(([k, v]) => root.style.setProperty(`--color-primary-${k}`, v as string));
+        Object.entries(theme.secondary).forEach(([k, v]) => root.style.setProperty(`--color-secondary-${k}`, v as string));
       }
     } else {
-        const root = document.documentElement;
-        root.style.setProperty('--color-primary-400', '52 211 153');
-        root.style.setProperty('--color-primary-500', '16 185 129');
-        root.style.setProperty('--color-primary-600', '5 150 105');
-        root.style.setProperty('--color-primary-900', '6 78 59');
+      const root = document.documentElement;
+      root.style.setProperty('--color-primary-400', '52 211 153');
+      root.style.setProperty('--color-primary-500', '16 185 129');
+      root.style.setProperty('--color-primary-600', '5 150 105');
+      root.style.setProperty('--color-primary-900', '6 78 59');
     }
   }, [activePersona]);
 
   const cancelGeneration = useCallback(() => {
     if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
     if (streamBufferTimeoutRef.current) {
-        clearTimeout(streamBufferTimeoutRef.current);
-        streamBufferTimeoutRef.current = null;
+      clearTimeout(streamBufferTimeoutRef.current);
+      streamBufferTimeoutRef.current = null;
     }
     updateCurrentProject({ isGenerating: false });
     setGenerationPhase('');
@@ -821,27 +826,27 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     dispatch({ type: 'CREATE_PROJECT', payload: { name } });
     logEvent('project_created', { name });
     addToast('New project created', 'success');
-    return null; 
+    return null;
   }, [addToast, logEvent, cancelGeneration]);
 
-  const loadProject = useCallback((id: string) => { 
-      cancelGeneration();
-      dispatch({ type: 'SWITCH_PROJECT', payload: id }); 
+  const loadProject = useCallback((id: string) => {
+    cancelGeneration();
+    dispatch({ type: 'SWITCH_PROJECT', payload: id });
   }, [cancelGeneration]);
 
   const deleteProject = useCallback((id: string) => { dispatch({ type: 'DELETE_PROJECT', payload: id }); addToast('Project deleted', 'info'); }, [addToast]);
   const setPersona = useCallback((persona: Persona) => { updateCurrentProject({ persona }); logEvent('persona_selected', { persona }); }, [updateCurrentProject, logEvent]);
   const importProjects = useCallback((projects: ProjectState[]) => { dispatch({ type: 'IMPORT_PROJECTS', payload: projects }); addToast(`Imported ${projects.length} project(s)`, 'success'); }, [addToast]);
   const setValidationErrors = useCallback((validationErrors: Partial<Record<ProjectFieldKey, string>>) => { updateCurrentProject({ validationErrors }, { snapshot: false }); }, [updateCurrentProject]);
-  
+
   const clearValidationError = useCallback((key: ProjectFieldKey) => {
-      const current = state.projects[state.currentId];
-      const validationErrors = current?.validationErrors;
-      if (validationErrors?.[key]) {
-          const newErrors = { ...validationErrors };
-          delete newErrors[key];
-          updateCurrentProject({ validationErrors: newErrors }, { snapshot: false });
-      }
+    const current = state.projects[state.currentId];
+    const validationErrors = current?.validationErrors;
+    if (validationErrors?.[key]) {
+      const newErrors = { ...validationErrors };
+      delete newErrors[key];
+      updateCurrentProject({ validationErrors: newErrors }, { snapshot: false });
+    }
   }, [state.projects, state.currentId, updateCurrentProject]);
 
   const setAnswer = useCallback((key: ProjectFieldKey, value: string) => {
@@ -854,10 +859,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const setPrdOutput = useCallback((prdOutput: string) => { commitArtifact('prd', prdOutput); }, [commitArtifact]);
   const setTechOutput = useCallback((techOutput: string) => { commitArtifact('tech', techOutput); }, [commitArtifact]);
   const setBuildPlan = useCallback((buildPlan: string) => { commitArtifact('build', buildPlan); }, [commitArtifact]);
-  const setAgentOutputs = useCallback((agentOutputs: Record<string, string>) => { 
-      const current = state.projects[state.currentId];
-      const timestamps = { ...(current?.sectionTimestamps || {}), agent: Date.now() };
-      updateCurrentProject({ agentOutputs, sectionTimestamps: timestamps });
+  const setAgentOutputs = useCallback((agentOutputs: Record<string, string>) => {
+    const current = state.projects[state.currentId];
+    const timestamps = { ...(current?.sectionTimestamps || {}), agent: Date.now() };
+    updateCurrentProject({ agentOutputs, sectionTimestamps: timestamps });
   }, [updateCurrentProject, state.projects, state.currentId]);
 
   const updateSettingsWrapper = useCallback((newSettings: Partial<GeminiSettings>) => {
@@ -866,7 +871,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     localStorage.setItem(STORAGE_KEYS.GLOBAL_SETTINGS, JSON.stringify(updatedGlobal));
     dispatch({ type: 'UPDATE_GLOBAL_SETTINGS', payload: newSettings });
   }, []);
-  
+
   const updateToolSettings = useCallback((settings: Partial<ToolSettings>) => {
     const current = state.projects[state.currentId];
     if (!current) return;
@@ -880,43 +885,48 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateCurrentProject({ tools });
   }, [state.projects, state.currentId, updateCurrentProject]);
 
-  const generateAgentOutputs = useCallback(() => {}, []);
-  
+  // NOTE: generateAgentOutputs is kept as a stub for interface compatibility.
+  // Actual agent config generation is handled by performGeminiAgent.
+  const generateAgentOutputs = useCallback(() => { }, []);
+
   // Unified stream handler with Throttling
   const handleStreamUpdate = useCallback((chunk: string, field: ArtifactSectionName, accumulatedText: string, modelName: string, projectId: string) => {
-      const outputDiff = estimateTokens(chunk);
-      const costDelta = calculateIncrementalCost(modelName, 0, outputDiff, 0);
+    const outputDiff = estimateTokens(chunk);
+    const costDelta = calculateIncrementalCost(modelName, 0, outputDiff, 0);
 
-      if (activeUsageRef.current) {
-          activeUsageRef.current = {
-              ...activeUsageRef.current,
-              output: activeUsageRef.current.output + outputDiff,
-              estimatedCost: activeUsageRef.current.estimatedCost + costDelta
-          };
-      }
+    if (activeUsageRef.current) {
+      activeUsageRef.current = {
+        ...activeUsageRef.current,
+        output: activeUsageRef.current.output + outputDiff,
+        estimatedCost: activeUsageRef.current.estimatedCost + costDelta
+      };
+    }
 
-      streamTextBufferRef.current = { field, text: accumulatedText };
+    streamTextBufferRef.current = { field, text: accumulatedText };
 
-      if (streamBufferTimeoutRef.current === null) {
-          streamBufferTimeoutRef.current = window.setTimeout(() => {
-              const updatePayload: Partial<ProjectState> = {};
-              
-              if (streamTextBufferRef.current) {
-                  const { field: f, text: t } = streamTextBufferRef.current;
-                  if (f === 'research') updatePayload.researchOutput = t;
-                  else if (f === 'prd') updatePayload.prdOutput = t;
-                  else if (f === 'tech') updatePayload.techOutput = t;
-                  else if (f === 'build') updatePayload.buildPlan = t;
-              }
+    if (streamBufferTimeoutRef.current === null) {
+      streamBufferTimeoutRef.current = window.setTimeout(() => {
+        const updatePayload: Partial<ProjectState> = {};
 
-              if (activeUsageRef.current) {
-                  updatePayload.tokenUsage = activeUsageRef.current;
-              }
+        if (streamTextBufferRef.current) {
+          const { field: f, text: t } = streamTextBufferRef.current;
+          if (f === 'research') updatePayload.researchOutput = t;
+          else if (f === 'prd') updatePayload.prdOutput = t;
+          else if (f === 'tech') updatePayload.techOutput = t;
+          else if (f === 'build') updatePayload.buildPlan = t;
+        }
 
-              dispatch({ type: 'UPDATE_PROJECT', payload: updatePayload, projectId });
-              streamBufferTimeoutRef.current = null;
-          }, 100);
-      }
+        if (activeUsageRef.current) {
+          updatePayload.tokenUsage = activeUsageRef.current;
+        }
+
+        // Safety check: Only dispatch if we have payload to update
+        if (Object.keys(updatePayload).length > 0) {
+          dispatch({ type: 'UPDATE_PROJECT', payload: updatePayload, projectId });
+        }
+        streamBufferTimeoutRef.current = null;
+      }, 100);
+    }
   }, []);
 
   const performGeminiResearch = useCallback(async (prompt: string, mode: 'standard' | 'deep' = 'standard') => {
@@ -924,88 +934,88 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const proj = state.projects[projectId];
     if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
     abortControllerRef.current = new AbortController();
-    
+
     const estimatedInputTokens = estimateTokens(prompt);
     const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
     const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
     const startUsage = {
-        ...proj.tokenUsage,
-        input: proj.tokenUsage.input + estimatedInputTokens,
-        groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
-        estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
+      ...proj.tokenUsage,
+      input: proj.tokenUsage.input + estimatedInputTokens,
+      groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
+      estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
     };
-    
+
     updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
-    activeUsageRef.current = startUsage; 
-    
+    activeUsageRef.current = startUsage;
+
     if (mode === 'deep') {
-        setGenerationPhase('Starting Deep Research Agent...');
-        try {
-            const { text, sources } = await runDeepResearchInteraction(prompt, apiKey, (status) => setGenerationPhase(status), abortControllerRef.current.signal, proj.settings.customInstructions);
-            
-            const finalOutputTokens = estimateTokens(text);
-            const outputCostDelta = calculateIncrementalCost(proj.settings.modelName, 0, finalOutputTokens, 0);
+      setGenerationPhase('Starting Deep Research Agent...');
+      try {
+        const { text, sources } = await runDeepResearchInteraction(prompt, apiKey, (status) => setGenerationPhase(status), abortControllerRef.current.signal, proj.settings.customInstructions);
 
-            const endUsage = { 
-                ...startUsage, 
-                output: startUsage.output + finalOutputTokens,
-                estimatedCost: startUsage.estimatedCost + outputCostDelta
-            };
+        const finalOutputTokens = estimateTokens(text);
+        const outputCostDelta = calculateIncrementalCost(proj.settings.modelName, 0, finalOutputTokens, 0);
 
-            updateCurrentProject({ researchSources: sources, isGenerating: false, tokenUsage: endUsage });
+        const endUsage = {
+          ...startUsage,
+          output: startUsage.output + finalOutputTokens,
+          estimatedCost: startUsage.estimatedCost + outputCostDelta
+        };
+
+        updateCurrentProject({ researchSources: sources, isGenerating: false, tokenUsage: endUsage });
+        commitArtifact('research', text);
+        logEvent('generation_complete', { type: 'research_deep', project: proj.name });
+        setGenerationPhase('');
+        addToast('Deep Research Report ready', 'success');
+      } catch (error: any) {
+        const isFallbackCandidate =
+          error?.message?.includes('not found') ||
+          error?.message?.includes('404') ||
+          error?.status === 404 ||
+          error?.status === 400 ||
+          error?.status === 403 ||
+          error?.message?.includes('400') ||
+          error?.message?.includes('403');
+
+        if (isFallbackCandidate) {
+          console.warn("Deep Research fallback triggered:", error.message);
+          addToast('Deep Research Agent unavailable. Falling back.', 'warning');
+          setGenerationPhase('Falling back to Standard Research...');
+          try {
+            let accumulatedText = '';
+            const fallbackSettings = { ...proj.settings, useGrounding: true, thinkingBudget: 8192 };
+            const { text, sources } = await streamDeepResearch(
+              prompt, fallbackSettings, apiKey,
+              (chunk: string) => {
+                accumulatedText += chunk;
+                handleStreamUpdate(chunk, 'research', accumulatedText, fallbackSettings.modelName, projectId);
+              },
+              (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+            );
+            updateCurrentProject({ researchSources: sources, isGenerating: false });
             commitArtifact('research', text);
-            logEvent('generation_complete', { type: 'research_deep', project: proj.name });
+            logEvent('generation_complete', { type: 'research_fallback', project: proj.name });
             setGenerationPhase('');
-            addToast('Deep Research Report ready', 'success');
-        } catch (error: any) {
-             const isFallbackCandidate = 
-                error?.message?.includes('not found') || 
-                error?.message?.includes('404') || 
-                error?.status === 404 ||
-                error?.status === 400 ||
-                error?.status === 403 ||
-                error?.message?.includes('400') ||
-                error?.message?.includes('403');
-
-             if (isFallbackCandidate) {
-                 console.warn("Deep Research fallback triggered:", error.message);
-                 addToast('Deep Research Agent unavailable. Falling back.', 'warning');
-                 setGenerationPhase('Falling back to Standard Research...');
-                 try {
-                    let accumulatedText = '';
-                    const fallbackSettings = { ...proj.settings, useGrounding: true, thinkingBudget: 8192 };
-                    const { text, sources } = await streamDeepResearch(
-                        prompt, fallbackSettings, apiKey, 
-                        (chunk: string) => { 
-                            accumulatedText += chunk; 
-                            handleStreamUpdate(chunk, 'research', accumulatedText, fallbackSettings.modelName, projectId);
-                        },
-                        (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
-                    );
-                    updateCurrentProject({ researchSources: sources, isGenerating: false });
-                    commitArtifact('research', text);
-                    logEvent('generation_complete', { type: 'research_fallback', project: proj.name });
-                    setGenerationPhase('');
-                    addToast('Research completed', 'success');
-                 } catch (fallbackError: any) { handleApiError(fallbackError); updateCurrentProject({ isGenerating: false }); setGenerationPhase(''); }
-                 return;
-             }
-             handleApiError(error);
-             updateCurrentProject({ isGenerating: false });
-             setGenerationPhase('');
+            addToast('Research completed', 'success');
+          } catch (fallbackError: any) { handleApiError(fallbackError); updateCurrentProject({ isGenerating: false }); setGenerationPhase(''); }
+          return;
         }
-        return;
+        handleApiError(error);
+        updateCurrentProject({ isGenerating: false });
+        setGenerationPhase('');
+      }
+      return;
     }
 
     setGenerationPhase('Initializing AI...');
     let accumulatedText = '';
     try {
       const { text, sources } = await streamDeepResearch(
-        prompt, proj.settings, apiKey, 
-        (chunk: string) => { 
-            accumulatedText += chunk; 
-            handleStreamUpdate(chunk, 'research', accumulatedText, proj.settings.modelName, projectId);
+        prompt, proj.settings, apiKey,
+        (chunk: string) => {
+          accumulatedText += chunk;
+          handleStreamUpdate(chunk, 'research', accumulatedText, proj.settings.modelName, projectId);
         },
         (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
       );
@@ -1017,7 +1027,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (error: any) {
       handleApiError(error);
       if (!error?.message?.includes("Aborted")) {
-          updateCurrentProject({ isGenerating: false });
+        updateCurrentProject({ isGenerating: false });
       }
       setGenerationPhase('');
     }
@@ -1028,17 +1038,17 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const proj = state.projects[projectId];
     if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
     abortControllerRef.current = new AbortController();
-    
+
     const systemInstruction = getPRDSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
     const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
     const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
     const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
     const startUsage = {
-        ...proj.tokenUsage,
-        input: proj.tokenUsage.input + estimatedInputTokens,
-        groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
-        estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
+      ...proj.tokenUsage,
+      input: proj.tokenUsage.input + estimatedInputTokens,
+      groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
+      estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
     };
 
     updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
@@ -1047,23 +1057,23 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setGenerationPhase('Initializing AI...');
     let accumulatedText = '';
     try {
-        const text = await streamArtifact(
-            systemInstruction, prompt, proj.settings, apiKey, 
-            (chunk: string) => { 
-                accumulatedText += chunk; 
-                handleStreamUpdate(chunk, 'prd', accumulatedText, proj.settings.modelName, projectId);
-            },
-            (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
-        );
-        updateCurrentProject({ isGenerating: false });
-        commitArtifact('prd', text);
-        logEvent('generation_complete', { type: 'prd', project: proj.name });
-        setGenerationPhase('');
-        addToast('PRD generated', 'success');
+      const text = await streamArtifact(
+        systemInstruction, prompt, proj.settings, apiKey,
+        (chunk: string) => {
+          accumulatedText += chunk;
+          handleStreamUpdate(chunk, 'prd', accumulatedText, proj.settings.modelName, projectId);
+        },
+        (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+      );
+      updateCurrentProject({ isGenerating: false });
+      commitArtifact('prd', text);
+      logEvent('generation_complete', { type: 'prd', project: proj.name });
+      setGenerationPhase('');
+      addToast('PRD generated', 'success');
     } catch (error: any) {
-        handleApiError(error);
-        if (!error?.message?.includes('Aborted')) updateCurrentProject({ isGenerating: false });
-        setGenerationPhase('');
+      handleApiError(error);
+      if (!error?.message?.includes('Aborted')) updateCurrentProject({ isGenerating: false });
+      setGenerationPhase('');
     }
   }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent, commitArtifact, handleStreamUpdate]);
 
@@ -1072,17 +1082,17 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const proj = state.projects[projectId];
     if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
     abortControllerRef.current = new AbortController();
-    
+
     const systemInstruction = getTechDesignSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
     const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
     const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
     const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
     const startUsage = {
-        ...proj.tokenUsage,
-        input: proj.tokenUsage.input + estimatedInputTokens,
-        groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
-        estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
+      ...proj.tokenUsage,
+      input: proj.tokenUsage.input + estimatedInputTokens,
+      groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
+      estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
     };
 
     updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
@@ -1091,68 +1101,68 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setGenerationPhase('Initializing AI...');
     let accumulatedText = '';
     try {
-        const text = await streamArtifact(
-            systemInstruction, prompt, proj.settings, apiKey, 
-            (chunk: string) => { 
-                accumulatedText += chunk; 
-                handleStreamUpdate(chunk, 'tech', accumulatedText, proj.settings.modelName, projectId);
-            },
-            (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
-        );
-        updateCurrentProject({ isGenerating: false });
-        commitArtifact('tech', text);
-        logEvent('generation_complete', { type: 'tech', project: proj.name });
-        setGenerationPhase('');
-        addToast('Tech Design generated', 'success');
+      const text = await streamArtifact(
+        systemInstruction, prompt, proj.settings, apiKey,
+        (chunk: string) => {
+          accumulatedText += chunk;
+          handleStreamUpdate(chunk, 'tech', accumulatedText, proj.settings.modelName, projectId);
+        },
+        (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+      );
+      updateCurrentProject({ isGenerating: false });
+      commitArtifact('tech', text);
+      logEvent('generation_complete', { type: 'tech', project: proj.name });
+      setGenerationPhase('');
+      addToast('Tech Design generated', 'success');
     } catch (error: any) {
-        handleApiError(error);
-        if (!error?.message?.includes('Aborted')) updateCurrentProject({ isGenerating: false });
-        setGenerationPhase('');
+      handleApiError(error);
+      if (!error?.message?.includes('Aborted')) updateCurrentProject({ isGenerating: false });
+      setGenerationPhase('');
     }
   }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent, commitArtifact, handleStreamUpdate]);
 
   const performGeminiAgent = useCallback(async (prompt: string) => {
-      const proj = state.projects[state.currentId];
-      if (!proj) return "";
-      if (!apiKey) { setIsApiKeyModalOpen(true); return ""; }
-      
-      const systemInstruction = getAgentSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
-      const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
-      const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
-      const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
+    const proj = state.projects[state.currentId];
+    if (!proj) return "";
+    if (!apiKey) { setIsApiKeyModalOpen(true); return ""; }
 
-      const startUsage = {
-          ...proj.tokenUsage,
-          input: proj.tokenUsage.input + estimatedInputTokens,
-          groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
-          estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
+    const systemInstruction = getAgentSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
+    const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
+    const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
+    const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
+
+    const startUsage = {
+      ...proj.tokenUsage,
+      input: proj.tokenUsage.input + estimatedInputTokens,
+      groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
+      estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
+    };
+
+    updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
+    setGenerationPhase('Generating Agent Config...');
+    try {
+      const text = (await generateArtifact(systemInstruction, prompt, proj.settings, apiKey)) as string;
+
+      const estimatedOutput = estimateTokens(text);
+      const outputCostDelta = calculateIncrementalCost(proj.settings.modelName as string, 0, estimatedOutput, 0);
+
+      const endUsage = {
+        ...startUsage,
+        output: startUsage.output + estimatedOutput,
+        estimatedCost: startUsage.estimatedCost + outputCostDelta
       };
 
-      updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
-      setGenerationPhase('Generating Agent Config...');
-      try {
-          const text = (await generateArtifact(systemInstruction, prompt, proj.settings, apiKey)) as string;
-          
-          const estimatedOutput = estimateTokens(text);
-          const outputCostDelta = calculateIncrementalCost(proj.settings.modelName as string, 0, estimatedOutput, 0);
-
-          const endUsage = { 
-              ...startUsage, 
-              output: startUsage.output + estimatedOutput,
-              estimatedCost: startUsage.estimatedCost + outputCostDelta
-          };
-
-          updateCurrentProject({ isGenerating: false, tokenUsage: endUsage });
-          logEvent('generation_complete', { type: 'agent', project: proj.name });
-          setGenerationPhase('');
-          addToast('Agent config generated', 'success');
-          return text;
-      } catch (error: any) {
-          handleApiError(error);
-          updateCurrentProject({ isGenerating: false });
-          setGenerationPhase('');
-          return "";
-      }
+      updateCurrentProject({ isGenerating: false, tokenUsage: endUsage });
+      logEvent('generation_complete', { type: 'agent', project: proj.name });
+      setGenerationPhase('');
+      addToast('Agent config generated', 'success');
+      return text;
+    } catch (error: any) {
+      handleApiError(error);
+      updateCurrentProject({ isGenerating: false });
+      setGenerationPhase('');
+      return "";
+    }
   }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent]);
 
   const performGeminiBuildPlan = useCallback(async (prompt: string) => {
@@ -1160,17 +1170,17 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const proj = state.projects[projectId];
     if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
     abortControllerRef.current = new AbortController();
-    
+
     const systemInstruction = getBuildPlanSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
     const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
     const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
     const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
     const startUsage = {
-        ...proj.tokenUsage,
-        input: proj.tokenUsage.input + estimatedInputTokens,
-        groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
-        estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
+      ...proj.tokenUsage,
+      input: proj.tokenUsage.input + estimatedInputTokens,
+      groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
+      estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
     };
 
     updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
@@ -1179,39 +1189,39 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setGenerationPhase('Initializing AI...');
     let accumulatedText = '';
     try {
-        const text = await streamArtifact(
-            systemInstruction, prompt, proj.settings, apiKey, 
-            (chunk: string) => { 
-                accumulatedText += chunk; 
-                handleStreamUpdate(chunk, 'build', accumulatedText, proj.settings.modelName, projectId);
-            },
-            (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
-        );
-        updateCurrentProject({ isGenerating: false });
-        commitArtifact('build', text);
-        logEvent('generation_complete', { type: 'build_plan', project: proj.name });
-        setGenerationPhase('');
-        addToast('Build Plan generated', 'success');
+      const text = await streamArtifact(
+        systemInstruction, prompt, proj.settings, apiKey,
+        (chunk: string) => {
+          accumulatedText += chunk;
+          handleStreamUpdate(chunk, 'build', accumulatedText, proj.settings.modelName, projectId);
+        },
+        (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+      );
+      updateCurrentProject({ isGenerating: false });
+      commitArtifact('build', text);
+      logEvent('generation_complete', { type: 'build_plan', project: proj.name });
+      setGenerationPhase('');
+      addToast('Build Plan generated', 'success');
     } catch (error: any) {
-        handleApiError(error);
-        if (!error?.message?.includes('Aborted')) updateCurrentProject({ isGenerating: false });
-        setGenerationPhase('');
+      handleApiError(error);
+      if (!error?.message?.includes('Aborted')) updateCurrentProject({ isGenerating: false });
+      setGenerationPhase('');
     }
   }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent, commitArtifact, handleStreamUpdate]);
 
   const performRefinement = useCallback(async (type: 'research' | 'prd' | 'tech' | 'build', instruction: string) => {
     const projectId = state.currentId;
     const currentProj = state.projects[projectId];
-    if (!currentProj) return; 
-    
+    if (!currentProj) return;
+
     let originalContent = '';
     if (type === 'research') originalContent = currentProj.researchOutput || '';
     if (type === 'prd') originalContent = currentProj.prdOutput || '';
     if (type === 'tech') originalContent = currentProj.techOutput || '';
     if (type === 'build') originalContent = currentProj.buildPlan || '';
-    
+
     const prompt = generateRefinePrompt(originalContent, instruction);
-    
+
     const customInstr = currentProj.settings.customInstructions || "";
     const systemInstruction = getRefineSystemInstruction() + (customInstr ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${customInstr}` : "");
     const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
@@ -1220,15 +1230,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const inputCostDelta = calculateIncrementalCost(modelName, estimatedInputTokens, 0, groundingCostCount);
 
     const startUsage: TokenUsage = {
-        ...currentProj.tokenUsage,
-        input: currentProj.tokenUsage.input + estimatedInputTokens,
-        groundingRequests: currentProj.tokenUsage.groundingRequests + groundingCostCount,
-        estimatedCost: currentProj.tokenUsage.estimatedCost + inputCostDelta
+      ...currentProj.tokenUsage,
+      input: currentProj.tokenUsage.input + estimatedInputTokens,
+      groundingRequests: currentProj.tokenUsage.groundingRequests + groundingCostCount,
+      estimatedCost: currentProj.tokenUsage.estimatedCost + inputCostDelta
     };
 
     updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
     activeUsageRef.current = startUsage;
-    
+
     if (!apiKey) { setIsApiKeyModalOpen(true); updateCurrentProject({ isGenerating: false }); return; }
     abortControllerRef.current = new AbortController();
     setGenerationPhase('Refining Content...');
@@ -1237,12 +1247,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     try {
       const text = await streamArtifact(
-          systemInstruction, prompt, currentProj.settings, apiKey, 
-          (chunk: string) => {
-              accumulatedText += chunk;
-              handleStreamUpdate(chunk, type, accumulatedText, modelName, projectId);
-          },
-          (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+        systemInstruction, prompt, currentProj.settings, apiKey,
+        (chunk: string) => {
+          accumulatedText += chunk;
+          handleStreamUpdate(chunk, type, accumulatedText, modelName, projectId);
+        },
+        (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
       );
       updateCurrentProject({ isGenerating: false });
       commitArtifact(type, text);
@@ -1250,65 +1260,65 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addToast('Content refined', 'success');
     } catch (error: any) {
       handleApiError(error);
-      
+
       const restorePayload: Partial<ProjectState> = { isGenerating: false };
       if (type === 'research') restorePayload.researchOutput = originalContent;
       if (type === 'prd') restorePayload.prdOutput = originalContent;
       if (type === 'tech') restorePayload.techOutput = originalContent;
       if (type === 'build') restorePayload.buildPlan = originalContent;
-      
+
       updateCurrentProject(restorePayload, { snapshot: false });
       setGenerationPhase('');
-      
+
       if (!error?.message?.includes('Aborted')) {
-          addToast('Refinement failed. Original content restored.', 'info');
+        addToast('Refinement failed. Original content restored.', 'info');
       } else {
-          addToast('Refinement cancelled. Content reverted.', 'info');
+        addToast('Refinement cancelled. Content reverted.', 'info');
       }
     }
   }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, commitArtifact, handleStreamUpdate]);
 
   const queryGemini = useCallback(async (prompt: string, systemInstruction?: string) => {
-     try {
-         const proj = state.projects[state.currentId];
-         if (!apiKey) { setIsApiKeyModalOpen(true); throw new Error("API Key missing"); }
-         
-         const effectiveSystemInstruction = (systemInstruction || "You are a helpful AI assistant.") + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
-         const estimatedInput = estimateTokens(effectiveSystemInstruction + prompt);
-         const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInput, 0, 0);
+    try {
+      const proj = state.projects[state.currentId];
+      if (!apiKey) { setIsApiKeyModalOpen(true); throw new Error("API Key missing"); }
 
-         const startUsage = {
-             ...proj.tokenUsage,
-             input: proj.tokenUsage.input + estimatedInput,
-             estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
-         };
-         
-         updateCurrentProject({ tokenUsage: startUsage }, { snapshot: false });
+      const effectiveSystemInstruction = (systemInstruction || "You are a helpful AI assistant.") + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
+      const estimatedInput = estimateTokens(effectiveSystemInstruction + prompt);
+      const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInput, 0, 0);
 
-         const text = await generateArtifact(effectiveSystemInstruction, prompt, proj.settings, apiKey);
-         
-         const estimatedOutput = estimateTokens(text);
-         const outputCostDelta = calculateIncrementalCost(proj.settings.modelName, 0, estimatedOutput, 0);
+      const startUsage = {
+        ...proj.tokenUsage,
+        input: proj.tokenUsage.input + estimatedInput,
+        estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
+      };
 
-         const endUsage = {
-             ...startUsage,
-             output: startUsage.output + estimatedOutput,
-             estimatedCost: startUsage.estimatedCost + outputCostDelta
-         };
-         
-         updateCurrentProject({ tokenUsage: endUsage }, { snapshot: false });
+      updateCurrentProject({ tokenUsage: startUsage }, { snapshot: false });
 
-         return text;
-     } catch (error: any) {
-         handleApiError(error);
-         throw error;
-     }
+      const text = await generateArtifact(effectiveSystemInstruction, prompt, proj.settings, apiKey);
+
+      const estimatedOutput = estimateTokens(text);
+      const outputCostDelta = calculateIncrementalCost(proj.settings.modelName, 0, estimatedOutput, 0);
+
+      const endUsage = {
+        ...startUsage,
+        output: startUsage.output + estimatedOutput,
+        estimatedCost: startUsage.estimatedCost + outputCostDelta
+      };
+
+      updateCurrentProject({ tokenUsage: endUsage }, { snapshot: false });
+
+      return text;
+    } catch (error: any) {
+      handleApiError(error);
+      throw error;
+    }
   }, [state.projects, state.currentId, handleApiError, apiKey, updateCurrentProject]);
 
   const activeProjectState = state.projects[state.currentId] || createNewProjectState();
   const sortedProjects = useMemo(() => Object.values(state.projects).sort((a: ProjectState, b: ProjectState) => b.lastModified - a.lastModified), [state.projects]);
 
-  const contextValue = useMemo(() => ({ 
+  const contextValue = useMemo(() => ({
     state: activeProjectState,
     projects: sortedProjects,
     currentProjectId: state.currentId,
@@ -1316,7 +1326,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     loadProject,
     deleteProject,
     importProjects,
-    setPersona, 
+    setPersona,
     setAnswer,
     setValidationErrors,
     clearValidationError,
