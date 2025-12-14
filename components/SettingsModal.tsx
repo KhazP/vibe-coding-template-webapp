@@ -15,6 +15,8 @@ import { getProviderSettings, setProviderSettings, setDefaultModel, getExpertSet
 import { PROVIDERS, type ProviderId } from '../utils/providers';
 import { PROVIDER_MODELS, getModelsForProvider, getModelById, supportsReasoningEffort, type ModelConfig, type ReasoningEffort } from '../utils/modelUtils';
 import { ReasoningEffortSelector } from './ReasoningEffortSelector';
+import { useOpenRouterModels } from '../hooks/useOpenRouterModels';
+import { OpenRouterModelSelector } from './OpenRouterModelSelector';
 import { PricingIndicator } from './PricingIndicator';
 import { ContextBar } from './ContextBar';
 
@@ -54,8 +56,23 @@ const SettingsModal: React.FC = () => {
         }
     }, [activeProvider]);
 
+    const { providers: openRouterProviders } = useOpenRouterModels();
+
     // Get provider capabilities
     const providerCapabilities = PROVIDERS[activeProvider].capabilities;
+
+    // Capabilities Check for OpenRouter
+    const openRouterModel = activeProvider === 'openrouter'
+        ? openRouterProviders.flatMap(p => p.models).find(m => m.id === selectedModelId)
+        : null;
+
+    const supportsTemperature = activeProvider === 'openrouter'
+        ? (openRouterModel?.supported_parameters?.includes('temperature') ?? true)
+        : true;
+
+    const supportsTopP = activeProvider === 'openrouter'
+        ? (openRouterModel?.supported_parameters?.includes('top_p') ?? true)
+        : true;
 
     // Sync selected model when provider changes
     useEffect(() => {
@@ -72,8 +89,26 @@ const SettingsModal: React.FC = () => {
 
     // Get current model config
     const currentModelConfig = useMemo(() => {
+        if (activeProvider === 'openrouter') {
+            const m = openRouterProviders.flatMap(p => p.models).find(m => m.id === selectedModelId);
+            if (m) {
+                return {
+                    id: m.id,
+                    displayName: m.displayName,
+                    provider: 'openrouter',
+                    tier: 'complex', // Default/Placeholder
+                    inputCostPerMillion: Number(m.pricing.prompt) * 1000000,
+                    outputCostPerMillion: Number(m.pricing.completion) * 1000000,
+                    inputContextLimit: m.contextLength,
+                    outputContextLimit: m.top_provider?.max_completion_tokens || 4096,
+                    description: m.description,
+                    supportsVision: m.architecture?.modality?.includes('image') || false,
+                } as unknown as ModelConfig; // Cast to avoid strict type mismatch if ModelConfig has other fields
+            }
+            return MODEL_CONFIGS['openai/gpt-4o']; // Fallback
+        }
         return getModelById(selectedModelId);
-    }, [selectedModelId]);
+    }, [selectedModelId, activeProvider, openRouterProviders]);
 
     // Get models for active provider
     const providerModels = useMemo(() => {
@@ -288,92 +323,113 @@ const SettingsModal: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-bold text-slate-200 mb-4">Model Tier</label>
-                                <div className="grid grid-cols-3 gap-3">
-                                    {(['fast', 'mid', 'complex'] as const).map((tier) => {
-                                        const tierModels = providerModels.filter(m => m.tier === tier);
-                                        const model = tierModels[0];
-                                        if (!model) return null;
-
-                                        const isActive = selectedModelId === model.id;
-                                        const tierLabels = {
-                                            fast: { label: 'Fast', icon: '⚡', color: 'emerald' },
-                                            mid: { label: 'Balanced', icon: '⚖️', color: 'blue' },
-                                            complex: { label: 'Complex', icon: '🧠', color: 'purple' },
-                                        };
-                                        const tierInfo = tierLabels[tier];
-
-                                        return (
-                                            <button
-                                                key={tier}
-                                                onClick={() => {
-                                                    setSelectedModelId(model.id);
-                                                    setDefaultModel(activeProvider, model.id);
-                                                    // Update global settings.modelName for ALL providers
-                                                    if (activeProvider === 'gemini') {
-                                                        const maxBudget = MODEL_CONFIGS[model.id as keyof typeof MODEL_CONFIGS]?.maxThinkingBudget || 0;
-                                                        updateSettings({ modelName: model.id, thinkingBudget: maxBudget, preset: 'custom' });
-                                                    } else {
-                                                        // For non-Gemini providers, just update the modelName
-                                                        updateSettings({ modelName: model.id, preset: 'custom' });
-                                                    }
-                                                }}
-                                                className={`relative text-left p-4 rounded-xl border transition-all duration-300 group ${isActive
-                                                    ? 'bg-primary-500/10 border-primary-500 ring-1 ring-primary-500/50 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
-                                                    : 'bg-slate-900/50 border-white/10 hover:border-white/20 hover:bg-slate-800'
-                                                    }`}
-                                            >
-                                                {/* Tier Header */}
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-lg">{tierInfo.icon}</span>
-                                                        <span className={`text-sm font-bold ${isActive ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>
-                                                            {tierInfo.label}
-                                                        </span>
-                                                    </div>
-                                                    {isActive && <Check size={16} className="text-primary-400" />}
-                                                </div>
-
-                                                {/* Model Name */}
-                                                <p className="text-xs text-slate-400 mb-2 truncate" title={model.displayName}>
-                                                    {model.displayName}
-                                                </p>
-
-                                                {/* Cost Indicator */}
-                                                <div className="flex items-center gap-1.5 mt-auto">
-                                                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                                                        ${model.inputCostPerMillion.toFixed(2)}/1M
-                                                    </span>
-                                                    <span className="text-[10px] text-slate-600">in</span>
-                                                </div>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Selected Model Details */}
-                                {currentModelConfig && (
-                                    <div className="mt-4 p-3 bg-slate-950/50 rounded-lg border border-slate-800/50 flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className="text-xs text-slate-400 truncate max-w-[300px]">
-                                                {currentModelConfig.description}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-3 shrink-0">
-                                            <span className="text-[10px] text-slate-600">
-                                                {(currentModelConfig.inputContextLimit / 1000).toFixed(0)}k ctx
-                                            </span>
-                                            <PricingIndicator
-                                                modelConfig={currentModelConfig}
-                                                inputTokens={5000}
-                                                estimatedOutputTokens={1000}
-                                                showBreakdown={true}
-                                            />
+                            {activeProvider === 'openrouter' ? (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className="text-sm font-bold text-slate-200">Select Model</label>
+                                        <div className="text-xs text-slate-500">
+                                            Access 100+ models via OpenRouter
                                         </div>
                                     </div>
-                                )}
-                            </div>
+                                    <div className="p-4 bg-slate-900/50 rounded-xl border border-white/10">
+                                        <OpenRouterModelSelector
+                                            selectedModel={selectedModelId}
+                                            onModelSelect={(newModelId) => {
+                                                setSelectedModelId(newModelId);
+                                                setDefaultModel(activeProvider, newModelId);
+                                                updateSettings({ modelName: newModelId, preset: 'custom' });
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-200 mb-4">Model Tier</label>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {(['fast', 'mid', 'complex'] as const).map((tier) => {
+                                            const tierModels = providerModels.filter(m => m.tier === tier);
+                                            const model = tierModels[0];
+                                            if (!model) return null;
+
+                                            const isActive = selectedModelId === model.id;
+                                            const tierLabels = {
+                                                fast: { label: 'Fast', icon: '⚡', color: 'emerald' },
+                                                mid: { label: 'Balanced', icon: '⚖️', color: 'blue' },
+                                                complex: { label: 'Complex', icon: '🧠', color: 'purple' },
+                                            };
+                                            const tierInfo = tierLabels[tier];
+
+                                            return (
+                                                <button
+                                                    key={tier}
+                                                    onClick={() => {
+                                                        setSelectedModelId(model.id);
+                                                        setDefaultModel(activeProvider, model.id);
+                                                        // Update global settings.modelName for ALL providers
+                                                        if (activeProvider === 'gemini') {
+                                                            const maxBudget = MODEL_CONFIGS[model.id as keyof typeof MODEL_CONFIGS]?.maxThinkingBudget || 0;
+                                                            updateSettings({ modelName: model.id, thinkingBudget: maxBudget, preset: 'custom' });
+                                                        } else {
+                                                            // For non-Gemini providers, just update the modelName
+                                                            updateSettings({ modelName: model.id, preset: 'custom' });
+                                                        }
+                                                    }}
+                                                    className={`relative text-left p-4 rounded-xl border transition-all duration-300 group ${isActive
+                                                        ? 'bg-primary-500/10 border-primary-500 ring-1 ring-primary-500/50 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                                                        : 'bg-slate-900/50 border-white/10 hover:border-white/20 hover:bg-slate-800'
+                                                        }`}
+                                                >
+                                                    {/* Tier Header */}
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-lg">{tierInfo.icon}</span>
+                                                            <span className={`text-sm font-bold ${isActive ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>
+                                                                {tierInfo.label}
+                                                            </span>
+                                                        </div>
+                                                        {isActive && <Check size={16} className="text-primary-400" />}
+                                                    </div>
+
+                                                    {/* Model Name */}
+                                                    <p className="text-xs text-slate-400 mb-2 truncate" title={model.displayName}>
+                                                        {model.displayName}
+                                                    </p>
+
+                                                    {/* Cost Indicator */}
+                                                    <div className="flex items-center gap-1.5 mt-auto">
+                                                        <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                                            ${model.inputCostPerMillion.toFixed(2)}/1M
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-600">in</span>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Selected Model Details */}
+                                    {currentModelConfig && (
+                                        <div className="mt-4 p-3 bg-slate-950/50 rounded-lg border border-slate-800/50 flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="text-xs text-slate-400 truncate max-w-[300px]">
+                                                    {currentModelConfig.description}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3 shrink-0">
+                                                <span className="text-[10px] text-slate-600">
+                                                    {(currentModelConfig.inputContextLimit / 1000).toFixed(0)}k ctx
+                                                </span>
+                                                <PricingIndicator
+                                                    modelConfig={currentModelConfig}
+                                                    inputTokens={5000}
+                                                    estimatedOutputTokens={1000}
+                                                    showBreakdown={true}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {/* Custom Instructions Section */}
                             <div className="border-t border-slate-800 pt-4">
@@ -413,54 +469,57 @@ const SettingsModal: React.FC = () => {
                                         </div>
 
                                         {/* Specific Model Selection */}
-                                        <div className="p-4 bg-slate-950/50 rounded-xl border border-slate-800/50 space-y-4">
-                                            <Select
-                                                label={`Specific ${PROVIDERS[activeProvider].displayName} Model`}
-                                                value={selectedModelId}
-                                                onChange={handleModelChange}
-                                                tooltip="Override the tier selection with a specific model variant."
-                                            >
-                                                {providerModels.map((model) => (
-                                                    <option key={model.id} value={model.id}>
-                                                        {model.displayName} • {model.tier.toUpperCase()} • ${model.inputCostPerMillion}/1M
-                                                    </option>
-                                                ))}
-                                            </Select>
+                                        {/* Specific Model Selection - Hidden for OpenRouter */}
+                                        {activeProvider !== 'openrouter' && (
+                                            <div className="p-4 bg-slate-950/50 rounded-xl border border-slate-800/50 space-y-4">
+                                                <Select
+                                                    label={`Specific ${PROVIDERS[activeProvider].displayName} Model`}
+                                                    value={selectedModelId}
+                                                    onChange={handleModelChange}
+                                                    tooltip="Override the tier selection with a specific model variant."
+                                                >
+                                                    {providerModels.map((model) => (
+                                                        <option key={model.id} value={model.id}>
+                                                            {model.displayName} • {model.tier.toUpperCase()} • ${model.inputCostPerMillion}/1M
+                                                        </option>
+                                                    ))}
+                                                </Select>
 
-                                            {/* Model ID & Context Info */}
-                                            {currentModelConfig && (
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div>
-                                                        <label className="text-[10px] text-slate-600 uppercase tracking-wider mb-1 block">Model ID</label>
-                                                        <code className="text-[11px] text-slate-400 font-mono bg-slate-900 px-2 py-1 rounded block truncate" title={currentModelConfig.id}>
-                                                            {currentModelConfig.id}
-                                                        </code>
-                                                    </div>
-                                                    <div>
-                                                        <label className="text-[10px] text-slate-600 uppercase tracking-wider mb-1 block">Pricing</label>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[11px] font-mono text-emerald-400">${currentModelConfig.inputCostPerMillion}</span>
-                                                            <span className="text-[10px] text-slate-600">in /</span>
-                                                            <span className="text-[11px] font-mono text-amber-400">${currentModelConfig.outputCostPerMillion}</span>
-                                                            <span className="text-[10px] text-slate-600">out per 1M</span>
+                                                {/* Model ID & Context Info */}
+                                                {currentModelConfig && (
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div>
+                                                            <label className="text-[10px] text-slate-600 uppercase tracking-wider mb-1 block">Model ID</label>
+                                                            <code className="text-[11px] text-slate-400 font-mono bg-slate-900 px-2 py-1 rounded block truncate" title={currentModelConfig.id}>
+                                                                {currentModelConfig.id}
+                                                            </code>
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] text-slate-600 uppercase tracking-wider mb-1 block">Pricing</label>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-[11px] font-mono text-emerald-400">${currentModelConfig.inputCostPerMillion}</span>
+                                                                <span className="text-[10px] text-slate-600">in /</span>
+                                                                <span className="text-[11px] font-mono text-amber-400">${currentModelConfig.outputCostPerMillion}</span>
+                                                                <span className="text-[10px] text-slate-600">out per 1M</span>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            )}
+                                                )}
 
-                                            {/* Context Window Visualization */}
-                                            {currentModelConfig && (
-                                                <div>
-                                                    <label className="text-[10px] text-slate-600 uppercase tracking-wider mb-2 block">Context Window</label>
-                                                    <ContextBar
-                                                        modelConfig={currentModelConfig}
-                                                        inputTokensUsed={0}
-                                                        outputTokensUsed={0}
-                                                        showOutput={true}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
+                                                {/* Context Window Visualization */}
+                                                {currentModelConfig && (
+                                                    <div>
+                                                        <label className="text-[10px] text-slate-600 uppercase tracking-wider mb-2 block">Context Window</label>
+                                                        <ContextBar
+                                                            modelConfig={currentModelConfig}
+                                                            inputTokensUsed={0}
+                                                            outputTokensUsed={0}
+                                                            showOutput={true}
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
 
                                         {/* Reasoning Effort (OpenAI GPT-5.2 only) */}
                                         {showReasoningEffort && currentModelConfig && (
@@ -523,31 +582,41 @@ const SettingsModal: React.FC = () => {
                                         <div className="space-y-4">
                                             <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Generation Parameters</span>
                                             <div className="grid grid-cols-2 gap-4">
-                                                <div className="p-3 bg-slate-950/50 rounded-lg border border-slate-800/50">
+                                                <div className={`p-3 bg-slate-950/50 rounded-lg border border-slate-800/50 ${!supportsTemperature ? 'opacity-50 grayscale' : ''}`}>
                                                     <div className="flex items-center justify-between mb-2">
                                                         <label className="text-xs text-slate-400">Temperature</label>
-                                                        <span className="text-xs font-mono text-primary-400">{settings.temperature ?? 0.7}</span>
+                                                        <span className="text-xs font-mono text-primary-400">
+                                                            {!supportsTemperature ? 'N/A' : (settings.temperature ?? 0.7)}
+                                                        </span>
                                                     </div>
                                                     <input
                                                         type="range" min="0" max="2" step="0.1"
                                                         value={settings.temperature ?? 0.7}
                                                         onChange={(e) => updateSettings({ temperature: parseFloat(e.target.value), preset: 'custom' })}
-                                                        className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary-500"
+                                                        disabled={!supportsTemperature}
+                                                        className={`w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer ${supportsTemperature ? 'accent-primary-500' : 'cursor-not-allowed'}`}
                                                     />
-                                                    <p className="text-[9px] text-slate-600 mt-1">Lower = focused, Higher = creative</p>
+                                                    <p className="text-[9px] text-slate-600 mt-1">
+                                                        {!supportsTemperature ? 'Not supported by this model' : 'Lower = focused, Higher = creative'}
+                                                    </p>
                                                 </div>
-                                                <div className="p-3 bg-slate-950/50 rounded-lg border border-slate-800/50">
+                                                <div className={`p-3 bg-slate-950/50 rounded-lg border border-slate-800/50 ${!supportsTopP ? 'opacity-50 grayscale' : ''}`}>
                                                     <div className="flex items-center justify-between mb-2">
                                                         <label className="text-xs text-slate-400">Top P</label>
-                                                        <span className="text-xs font-mono text-primary-400">{settings.topP ?? 0.95}</span>
+                                                        <span className="text-xs font-mono text-primary-400">
+                                                            {!supportsTopP ? 'N/A' : (settings.topP ?? 0.95)}
+                                                        </span>
                                                     </div>
                                                     <input
                                                         type="range" min="0" max="1" step="0.05"
                                                         value={settings.topP ?? 0.95}
                                                         onChange={(e) => updateSettings({ topP: parseFloat(e.target.value), preset: 'custom' })}
-                                                        className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary-500"
+                                                        disabled={!supportsTopP}
+                                                        className={`w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer ${supportsTopP ? 'accent-primary-500' : 'cursor-not-allowed'}`}
                                                     />
-                                                    <p className="text-[9px] text-slate-600 mt-1">Nucleus sampling threshold</p>
+                                                    <p className="text-[9px] text-slate-600 mt-1">
+                                                        {!supportsTopP ? 'Not supported by this model' : 'Nucleus sampling threshold'}
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>

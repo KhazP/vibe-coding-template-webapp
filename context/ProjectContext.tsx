@@ -408,14 +408,41 @@ const API_KEY_STORAGE = 'VIBE_GEMINI_API_KEY';
 const ANALYTICS_STORAGE = 'VIBE_ANALYTICS_EVENTS';
 
 const calculateIncrementalCost = (modelName: string, inputTokens: number, outputTokens: number, groundingRequests: number = 0): number => {
-  const modelKey = Object.keys(PRICING).find(k => modelName.includes(k)) || MODELS.GEMINI_PRO;
-  const pricing = PRICING[modelKey as keyof typeof PRICING] || PRICING[MODELS.GEMINI_PRO];
+  // 1. Try Standard Pricing (Gemini/OpenAI Native)
+  const modelKey = Object.keys(PRICING).find(k => modelName.includes(k));
+  if (modelKey) {
+    const pricing = PRICING[modelKey as keyof typeof PRICING];
+    const inputCost = (inputTokens / 1_000_000) * pricing.input;
+    const outputCost = (outputTokens / 1_000_000) * pricing.output;
+    const groundingCost = groundingRequests * (pricing.grounding || 0);
+    return inputCost + outputCost + groundingCost;
+  }
 
-  const inputCost = (inputTokens / 1_000_000) * pricing.input;
-  const outputCost = (outputTokens / 1_000_000) * pricing.output;
-  const groundingCost = groundingRequests * (pricing.grounding || 0);
+  // 2. Try OpenRouter Cache (Dynamic)
+  try {
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('openrouter_models_cache_v2');
+      if (cached) {
+        const { data } = JSON.parse(cached);
+        // Data is ProviderGroup[], need to flatten or search
+        // structure: [{ models: [...] }, ...]
+        for (const group of data) {
+          const model = group.models.find((m: any) => m.id === modelName);
+          if (model) {
+            // OpenRouter pricing is raw per-token (e.g. 0.000001)
+            // We simply multiply
+            return (inputTokens * model.pricing.prompt) + (outputTokens * model.pricing.completion);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to calculate dynamic cost:', e);
+  }
 
-  return inputCost + outputCost + groundingCost;
+  // 3. Fallback (Gemini Pro/Standard)
+  const fallback = PRICING[MODELS.GEMINI_PRO];
+  return ((inputTokens + outputTokens) / 1_000_000) * fallback.input;
 };
 
 const estimateTokens = (text: string) => Math.ceil((text || '').length / 4);

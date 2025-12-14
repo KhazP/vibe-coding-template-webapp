@@ -83,7 +83,7 @@ export const ModelStatus: React.FC = () => {
 
     const activePreset = Object.values(PRESETS).find(p => p.id === settings.preset);
     const isCustom = !activePreset;
-    const costString = (tokenUsage?.estimatedCost || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 4 });
+    const costString = (tokenUsage?.estimatedCost || 0).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 
     // Context Health Logic - use model's context limit
     const modelContextLimit = providerInfo.modelConfig?.inputContextLimit || TOKEN_LIMITS.INPUT_GLOBAL;
@@ -170,7 +170,7 @@ export const ModelStatus: React.FC = () => {
 
             {/* Stats */}
             <div className="flex items-center gap-4 px-2 overflow-x-auto whitespace-nowrap border-l border-white/5 pl-4">
-                {settings.thinkingBudget > 0 && (
+                {settings.thinkingBudget > 0 && providerInfo.providerId === 'gemini' && (
                     <div className="flex items-center gap-1.5 text-slate-300">
                         <BrainCircuit size={14} className="text-purple-400" />
                         <span className="hidden md:inline">{settings.thinkingBudget.toLocaleString()} think</span>
