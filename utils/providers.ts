@@ -5,6 +5,8 @@
  * requirements, endpoints, and configuration.
  */
 
+import type { ProviderCapabilities, GeminiSafetyPreset } from '../types';
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -26,6 +28,7 @@ export interface ProviderConfig {
     logoPath: string;            // Path to logo in public/providers
     enabled: boolean;
     defaultModels: string[];
+    capabilities: ProviderCapabilities;  // Expert settings capability flags
 }
 
 export interface ChatMessage {
@@ -41,6 +44,10 @@ export interface SendChatOptions {
     maxTokens?: number;
     stream?: boolean;
     signal?: AbortSignal;
+    // Expert settings (v1)
+    stopSequences?: string[];
+    seed?: number;
+    safetyPreset?: GeminiSafetyPreset;  // Gemini only
 }
 
 export interface SendChatResult {
@@ -75,6 +82,12 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
         logoPath: '/providers/gemini.svg',
         enabled: true,
         defaultModels: ['gemini-3-pro', 'gemini-2.5-pro', 'gemini-2.5-flash'],
+        capabilities: {
+            supportsMaxTokens: true,
+            supportsStop: true,
+            supportsSeed: false,  // Gemini doesn't support seed
+            supportsSafety: true,
+        },
     },
 
     openai: {
@@ -95,6 +108,11 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
         logoPath: '/providers/openai.svg',
         enabled: true,
         defaultModels: ['gpt-5.2-2025-12-11', 'gpt-5.2-pro-2025-12-11', 'gpt-5.2-chat-latest', 'gpt-5-mini'],
+        capabilities: {
+            supportsMaxTokens: true,
+            supportsStop: true,
+            supportsSeed: true,
+        },
     },
 
     anthropic: {
@@ -116,6 +134,11 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
         logoPath: '/providers/claude.svg',
         enabled: true,
         defaultModels: ['claude-sonnet-4-5-20250929', 'claude-opus-4-5-20251101', 'claude-haiku-4-5-20251001'],
+        capabilities: {
+            supportsMaxTokens: true,
+            supportsStop: true,
+            supportsSeed: false,  // Claude doesn't support seed
+        },
     },
 
     openrouter: {
@@ -138,9 +161,64 @@ export const PROVIDERS: Record<ProviderId, ProviderConfig> = {
         logoPath: '/providers/openrouter.svg',
         enabled: true,
         defaultModels: ['openai/gpt-4o', 'anthropic/claude-sonnet-4', 'google/gemini-2.5-pro-preview'],
+        capabilities: {
+            supportsMaxTokens: true,
+            supportsStop: true,
+            supportsSeed: true,  // OpenRouter passes through to underlying model
+        },
     },
 };
 
+// ============================================================================
+// GEMINI SAFETY PRESET MAPPING
+// ============================================================================
+
+type GeminiHarmCategory =
+    | 'HARM_CATEGORY_HARASSMENT'
+    | 'HARM_CATEGORY_HATE_SPEECH'
+    | 'HARM_CATEGORY_SEXUALLY_EXPLICIT'
+    | 'HARM_CATEGORY_DANGEROUS_CONTENT';
+
+type GeminiBlockThreshold =
+    | 'BLOCK_NONE'
+    | 'BLOCK_ONLY_HIGH'
+    | 'BLOCK_MEDIUM_AND_ABOVE'
+    | 'BLOCK_LOW_AND_ABOVE';
+
+interface GeminiSafetySettingItem {
+    category: GeminiHarmCategory;
+    threshold: GeminiBlockThreshold;
+}
+
+/**
+ * Map safety preset to Gemini API safety_settings format
+ */
+const mapGeminiSafetyPreset = (preset: GeminiSafetyPreset): GeminiSafetySettingItem[] => {
+    const categories: GeminiHarmCategory[] = [
+        'HARM_CATEGORY_HARASSMENT',
+        'HARM_CATEGORY_HATE_SPEECH',
+        'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+        'HARM_CATEGORY_DANGEROUS_CONTENT',
+    ];
+
+    let threshold: GeminiBlockThreshold;
+    switch (preset) {
+        case 'relaxed':
+            threshold = 'BLOCK_NONE';
+            break;
+        case 'balanced':
+            threshold = 'BLOCK_MEDIUM_AND_ABOVE';
+            break;
+        case 'strict':
+            threshold = 'BLOCK_LOW_AND_ABOVE';
+            break;
+        default:
+            // 'default' should not call this function, but handle gracefully
+            threshold = 'BLOCK_MEDIUM_AND_ABOVE';
+    }
+
+    return categories.map(category => ({ category, threshold }));
+};
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -273,7 +351,19 @@ export const testProviderConnection = async (
  * Send a chat completion request to any supported provider
  */
 export const sendChat = async (options: SendChatOptions): Promise<SendChatResult> => {
-    const { providerId, messages, model, temperature = 0.7, maxTokens, stream = false, signal } = options;
+    const {
+        providerId,
+        messages,
+        model,
+        temperature = 0.7,
+        maxTokens,
+        stream = false,
+        signal,
+        // Expert settings (v1)
+        stopSequences,
+        seed,
+        safetyPreset,
+    } = options;
 
     const provider = PROVIDERS[providerId];
     if (!provider) {
@@ -306,7 +396,12 @@ export const sendChat = async (options: SendChatOptions): Promise<SendChatResult
                         generationConfig: {
                             temperature,
                             maxOutputTokens: maxTokens,
+                            ...(stopSequences?.length && { stopSequences }),
                         },
+                        // Safety settings mapped from preset
+                        ...(safetyPreset && safetyPreset !== 'default' && {
+                            safetySettings: mapGeminiSafetyPreset(safetyPreset),
+                        }),
                     }),
                     signal,
                 }
@@ -343,6 +438,9 @@ export const sendChat = async (options: SendChatOptions): Promise<SendChatResult
                     temperature,
                     max_tokens: maxTokens,
                     stream,
+                    // Expert settings
+                    ...(stopSequences?.length && { stop: stopSequences }),
+                    ...(seed !== undefined && { seed }),
                 }),
                 signal,
             });
@@ -380,6 +478,8 @@ export const sendChat = async (options: SendChatOptions): Promise<SendChatResult
                     system: systemMessage?.content,
                     messages: nonSystemMessages.map(m => ({ role: m.role, content: m.content })),
                     temperature,
+                    // Expert settings (Claude uses stop_sequences)
+                    ...(stopSequences?.length && { stop_sequences: stopSequences }),
                 }),
                 signal,
             });

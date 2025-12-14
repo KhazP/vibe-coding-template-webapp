@@ -5,30 +5,54 @@ import { ProjectInput, ProjectTextArea, ProjectSelect } from '../components/Form
 import { ArtifactSection } from '../components/ArtifactSection';
 import { generateResearchPrompt } from '../utils/templates';
 import { Persona } from '../types';
-import { Sparkles, Globe, Loader2, Zap, ExternalLink, ArrowDown, CheckCircle2, ArrowRight, Info, BrainCircuit } from 'lucide-react';
+import { Sparkles, Globe, Loader2, Zap, ExternalLink, ArrowDown, CheckCircle2, ArrowRight, Info, BrainCircuit, ChevronDown } from 'lucide-react';
 import { ModelStatus } from '../components/ModelStatus';
 import { useToast } from '../components/Toast';
+
+// OpenAI Deep Research Models with pricing
+const OPENAI_DEEP_RESEARCH_MODELS = [
+  {
+    id: 'o3-deep-research',
+    name: 'o3 Deep Research',
+    description: 'Most capable - comprehensive analysis',
+    inputCost: 10.00, // per 1M tokens
+    outputCost: 40.00,
+  },
+  {
+    id: 'o4-mini-deep-research',
+    name: 'o4-mini Deep Research',
+    description: 'Faster - good for quick research',
+    inputCost: 1.10,
+    outputCost: 4.40,
+  },
+] as const;
+
+type ResearchProvider = 'gemini' | 'openai';
+type OpenAIDeepModel = typeof OPENAI_DEEP_RESEARCH_MODELS[number]['id'];
 
 const Part1Research: React.FC = React.memo(() => {
   const { state, performGeminiResearch, setValidationErrors, setResearchOutput, generationPhase } = useProject();
   const { persona, answers, researchOutput, researchSources, isGenerating } = state;
   const { addToast } = useToast();
-  
+
   const [researchMethod, setResearchMethod] = useState<'in-app' | 'external'>('in-app');
   const [researchMode, setResearchMode] = useState<'standard' | 'deep'>('standard');
+  const [researchProvider, setResearchProvider] = useState<ResearchProvider>('gemini');
+  const [openaiDeepModel, setOpenaiDeepModel] = useState<OpenAIDeepModel>('o3-deep-research');
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [externalPrompt, setExternalPrompt] = useState<string>('');
   const [externalPasteBuffer, setExternalPasteBuffer] = useState<string>('');
 
   // Sync buffer if researchOutput changes externally (e.g. undo/redo)
   useEffect(() => {
-      if (researchOutput && !externalPasteBuffer) {
-          setExternalPasteBuffer(researchOutput);
-      }
+    if (researchOutput && !externalPasteBuffer) {
+      setExternalPasteBuffer(researchOutput);
+    }
   }, [researchOutput]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
-    
+
     // Common validation
     if (!answers['project_description'] || answers['project_description'].length < 10) {
       newErrors['project_description'] = 'Project description must be at least 10 characters.';
@@ -39,9 +63,9 @@ const Part1Research: React.FC = React.memo(() => {
       if (!answers['research_vibe_who']) newErrors['research_vibe_who'] = 'Target audience is required.';
       if (!answers['research_vibe_platform']) newErrors['research_vibe_platform'] = 'Platform selection is required.';
     } else if (persona === Persona.Developer) {
-       // Devs might skip some, but description is key
+      // Devs might skip some, but description is key
     } else if (persona === Persona.InBetween) {
-       if (!answers['research_mid_problem']) newErrors['research_mid_problem'] = 'Problem definition is required.';
+      if (!answers['research_mid_problem']) newErrors['research_mid_problem'] = 'Problem definition is required.';
     }
 
     setValidationErrors(newErrors);
@@ -59,19 +83,19 @@ const Part1Research: React.FC = React.memo(() => {
 
   const handleGeneratePrompt = () => {
     if (validate() && persona) {
-        const prompt = generateResearchPrompt(persona, answers);
-        setExternalPrompt(prompt);
-        addToast('Research prompt generated!', 'success');
+      const prompt = generateResearchPrompt(persona, answers);
+      setExternalPrompt(prompt);
+      addToast('Research prompt generated!', 'success');
     } else {
-        addToast('Please fix validation errors before generating prompt.', 'error');
+      addToast('Please fix validation errors before generating prompt.', 'error');
     }
   };
 
   const handleSaveExternalResearch = () => {
-      if (externalPasteBuffer.trim()) {
-          setResearchOutput(externalPasteBuffer);
-          addToast('Research results saved!', 'success');
-      }
+    if (externalPasteBuffer.trim()) {
+      setResearchOutput(externalPasteBuffer);
+      addToast('Research results saved!', 'success');
+    }
   };
 
   if (!persona) return <PersonaError />;
@@ -87,32 +111,30 @@ const Part1Research: React.FC = React.memo(() => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-6">
-          
+
           {/* Research Method Toggle */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 w-full md:w-fit">
-                  <button 
-                  onClick={() => setResearchMethod('in-app')} 
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all duration-300 ${
-                      researchMethod === 'in-app' ? 'bg-primary-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
-                  }`}
-                  >
-                      <Zap size={14} /> In-App (Gemini)
-                  </button>
-                  <button 
-                  onClick={() => setResearchMethod('external')} 
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all duration-300 ${
-                      researchMethod === 'external' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
-                  }`}
-                  >
-                      <ExternalLink size={14} /> External AI
-                  </button>
+                <button
+                  onClick={() => setResearchMethod('in-app')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all duration-300 ${researchMethod === 'in-app' ? 'bg-primary-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                    }`}
+                >
+                  <Zap size={14} /> In-App (Gemini)
+                </button>
+                <button
+                  onClick={() => setResearchMethod('external')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all duration-300 ${researchMethod === 'external' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
+                    }`}
+                >
+                  <ExternalLink size={14} /> External AI
+                </button>
               </div>
               <Tooltip content="In-App uses Gemini to research immediately. External AI generates a prompt you can paste into ChatGPT, Claude, or Perplexity." position="right">
-                  <div className="p-2 text-slate-500 hover:text-slate-300 transition-colors cursor-help">
-                      <Info size={16} />
-                  </div>
+                <div className="p-2 text-slate-500 hover:text-slate-300 transition-colors cursor-help">
+                  <Info size={16} />
+                </div>
               </Tooltip>
             </div>
 
@@ -120,43 +142,128 @@ const Part1Research: React.FC = React.memo(() => {
             {researchMethod === 'in-app' && (
               <GlassCard className="p-3 bg-surface/30 border-primary-500/10">
                 <div className="flex flex-col gap-2">
-                   <div className="flex items-center justify-between">
-                     <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                       <BrainCircuit size={12} className="text-primary-400" /> Research Agent
-                     </span>
-                   </div>
-                   <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => setResearchMode('standard')}
-                        className={`text-left px-3 py-2 rounded-lg border text-xs transition-all ${
-                          researchMode === 'standard' 
-                            ? 'bg-primary-500/20 border-primary-500/50 text-white' 
-                            : 'bg-black/20 border-transparent text-slate-500 hover:bg-black/40'
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                      <BrainCircuit size={12} className="text-primary-400" /> Research Agent
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setResearchMode('standard')}
+                      className={`text-left px-3 py-2 rounded-lg border text-xs transition-all ${researchMode === 'standard'
+                        ? 'bg-primary-500/20 border-primary-500/50 text-white'
+                        : 'bg-black/20 border-transparent text-slate-500 hover:bg-black/40'
                         }`}
-                      >
-                         <div className="font-bold mb-0.5">Standard</div>
-                         <div className="opacity-70 text-[10px]">Gemini 3 Pro + Search</div>
-                      </button>
-                      <button
-                        onClick={() => setResearchMode('deep')}
-                        className={`text-left px-3 py-2 rounded-lg border text-xs transition-all ${
-                          researchMode === 'deep' 
-                            ? 'bg-purple-500/20 border-purple-500/50 text-white' 
-                            : 'bg-black/20 border-transparent text-slate-500 hover:bg-black/40'
+                    >
+                      <div className="font-bold mb-0.5">Standard</div>
+                      <div className="opacity-70 text-[10px]">Gemini 3 Pro + Search</div>
+                    </button>
+                    <button
+                      onClick={() => setResearchMode('deep')}
+                      className={`text-left px-3 py-2 rounded-lg border text-xs transition-all ${researchMode === 'deep'
+                        ? 'bg-purple-500/20 border-purple-500/50 text-white'
+                        : 'bg-black/20 border-transparent text-slate-500 hover:bg-black/40'
                         }`}
-                      >
-                         <div className="font-bold mb-0.5 flex items-center gap-1">Deep Research <span className="bg-purple-500 text-white text-[8px] px-1 rounded">NEW</span></div>
-                         <div className="opacity-70 text-[10px]">Agentic Deep Dive (Slow)</div>
-                      </button>
-                   </div>
-                   {researchMode === 'deep' && (
-                      <div className="mt-1 p-2.5 rounded-lg bg-purple-900/20 border border-purple-500/20 text-xs text-purple-200/80 flex items-start gap-2">
-                          <Info size={14} className="shrink-0 mt-0.5 text-purple-400" />
-                          <span>
-                              <strong>Preview Feature:</strong> Deep Research (via Interactions API) is rolling out gradually. If unavailable for your key, we will automatically fall back to Standard mode.
-                          </span>
+                    >
+                      <div className="font-bold mb-0.5 flex items-center gap-1">Deep Research <span className="bg-purple-500 text-white text-[8px] px-1 rounded">NEW</span></div>
+                      <div className="opacity-70 text-[10px]">Agentic Deep Dive (Slow)</div>
+                    </button>
+                  </div>
+
+                  {/* Deep Research Provider Selection - Only show for deep mode */}
+                  {researchMode === 'deep' && (
+                    <div className="mt-2 space-y-2">
+                      {/* Provider Toggle */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-500 uppercase tracking-wider">Provider:</span>
+                        <div className="flex bg-black/40 p-0.5 rounded-md border border-white/5">
+                          <Tooltip content="Preview Feature: Deep Research (via Interactions API) is rolling out gradually. If unavailable for your key, we will automatically fall back to Standard mode." position="top">
+                            <button
+                              onClick={() => setResearchProvider('gemini')}
+                              className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-medium transition-all ${researchProvider === 'gemini'
+                                ? 'bg-purple-600 text-white'
+                                : 'text-slate-400 hover:text-white'
+                                }`}
+                            >
+                              <img src="/providers/gemini.svg" alt="Gemini" className="w-3 h-3" />
+                              Gemini
+                            </button>
+                          </Tooltip>
+                          <Tooltip content="Uses OpenAI Responses API with web search. Takes 2-10 minutes for comprehensive analysis." position="top">
+                            <button
+                              onClick={() => setResearchProvider('openai')}
+                              className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-medium transition-all ${researchProvider === 'openai'
+                                ? 'bg-green-600 text-white'
+                                : 'text-slate-400 hover:text-white'
+                                }`}
+                            >
+                              <img src="/providers/openai.svg" alt="OpenAI" className="w-3 h-3" />
+                              OpenAI
+                            </button>
+                          </Tooltip>
+                        </div>
                       </div>
-                   )}
+
+                      {/* OpenAI Model Dropdown - Only show for OpenAI provider */}
+                      {researchProvider === 'openai' && (
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowModelDropdown(!showModelDropdown)}
+                            className="w-full flex items-center justify-between px-3 py-2 bg-slate-900/80 border border-green-500/20 rounded-lg text-xs hover:border-green-500/40 transition-all"
+                          >
+                            <div className="flex items-center gap-2">
+                              <img src="/providers/openai.svg" alt="OpenAI" className="w-4 h-4" />
+                              <div className="text-left">
+                                <div className="font-medium text-white">
+                                  {OPENAI_DEEP_RESEARCH_MODELS.find(m => m.id === openaiDeepModel)?.name}
+                                </div>
+                                <div className="text-[10px] text-slate-500">
+                                  {OPENAI_DEEP_RESEARCH_MODELS.find(m => m.id === openaiDeepModel)?.description}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-mono text-emerald-400">
+                                ${OPENAI_DEEP_RESEARCH_MODELS.find(m => m.id === openaiDeepModel)?.inputCost}/1M
+                              </span>
+                              <ChevronDown size={14} className={`text-slate-400 transition-transform ${showModelDropdown ? 'rotate-180' : ''}`} />
+                            </div>
+                          </button>
+
+                          {/* Dropdown Menu - Opens upward to avoid being cut off */}
+                          {showModelDropdown && (
+                            <div className="absolute bottom-full left-0 right-0 mb-1 bg-slate-900 border border-green-500/20 rounded-lg overflow-hidden z-50 shadow-xl animate-in fade-in slide-in-from-bottom-1 duration-200">
+                              {OPENAI_DEEP_RESEARCH_MODELS.map((model) => (
+                                <button
+                                  key={model.id}
+                                  onClick={() => {
+                                    setOpenaiDeepModel(model.id);
+                                    setShowModelDropdown(false);
+                                  }}
+                                  className={`w-full flex items-center justify-between px-3 py-2.5 text-xs hover:bg-green-500/10 transition-all ${openaiDeepModel === model.id ? 'bg-green-500/5' : ''
+                                    }`}
+                                >
+                                  <div className="text-left">
+                                    <div className="font-medium text-white flex items-center gap-2">
+                                      {model.name}
+                                      {openaiDeepModel === model.id && (
+                                        <CheckCircle2 size={12} className="text-green-400" />
+                                      )}
+                                    </div>
+                                    <div className="text-[10px] text-slate-500">{model.description}</div>
+                                  </div>
+                                  <div className="text-right">
+                                    <div className="text-[10px] font-mono text-emerald-400">${model.inputCost}/1M in</div>
+                                    <div className="text-[10px] font-mono text-amber-400">${model.outputCost}/1M out</div>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </GlassCard>
             )}
@@ -164,51 +271,51 @@ const Part1Research: React.FC = React.memo(() => {
 
           {persona === Persona.VibeCoder && (
             <>
-              <ProjectTextArea 
+              <ProjectTextArea
                 field="project_description"
                 label="1. What is your App Idea?"
-                placeholder="Describe it in simple terms, as if explaining to a friend – what problem will it solve?" 
+                placeholder="Describe it in simple terms, as if explaining to a friend – what problem will it solve?"
                 tooltip="The core concept you want to validate. Be concise."
                 maxLength={2000}
                 required
               />
-              <ProjectTextArea 
+              <ProjectTextArea
                 field="research_vibe_who"
-                label="2. Who would use this app?" 
-                placeholder="Describe your ideal user (e.g., “busy parents,” “small business owners”) and what they need most." 
+                label="2. Who would use this app?"
+                placeholder="Describe your ideal user (e.g., “busy parents,” “small business owners”) and what they need most."
                 tooltip="Target audience analysis helps Gemini understand market fit."
                 maxLength={1000}
                 required
               />
-              <ProjectTextArea 
+              <ProjectTextArea
                 field="research_vibe_problem"
-                label="3. What problems do they face?" 
-                placeholder="Outline their biggest pain points or frustrations when trying to do that task today." 
+                label="3. What problems do they face?"
+                placeholder="Outline their biggest pain points or frustrations when trying to do that task today."
                 tooltip="Focus on the specific pain points your app solves."
                 maxLength={1000}
               />
-              <ProjectInput 
+              <ProjectInput
                 field="research_vibe_existing"
-                label="4. How are people solving this now?" 
-                placeholder="Name any similar apps or workarounds your target users currently use." 
+                label="4. How are people solving this now?"
+                placeholder="Name any similar apps or workarounds your target users currently use."
                 tooltip="List competitors or manual workarounds."
                 maxLength={200}
               />
-              <ProjectTextArea 
+              <ProjectTextArea
                 field="research_vibe_unique"
-                label="5. What makes your solution special?" 
-                placeholder="Describe the unique value or “secret sauce” that makes users choose you." 
+                label="5. What makes your solution special?"
+                placeholder="Describe the unique value or “secret sauce” that makes users choose you."
                 tooltip="Your Unique Selling Proposition (USP)."
                 maxLength={1000}
               />
-              <ProjectTextArea 
+              <ProjectTextArea
                 field="research_vibe_features"
-                label="6. Must-Have Features (Top 3)" 
-                placeholder="Focus on the essentials you can’t launch without." 
+                label="6. Must-Have Features (Top 3)"
+                placeholder="Focus on the essentials you can’t launch without."
                 tooltip="Key MVP features."
                 maxLength={1000}
               />
-               <ProjectSelect
+              <ProjectSelect
                 field="research_vibe_platform"
                 label="7. On which platform will people use your app?"
                 tooltip="Target device ecosystem."
@@ -223,7 +330,7 @@ const Part1Research: React.FC = React.memo(() => {
                   { value: "TV App", label: "TV App" },
                   { value: "Not sure", label: "Not sure" }
                 ]}
-               />
+              />
 
               <ProjectSelect
                 field="research_vibe_timeline"
@@ -253,18 +360,18 @@ const Part1Research: React.FC = React.memo(() => {
 
           {persona === Persona.Developer && (
             <>
-              <ProjectTextArea 
+              <ProjectTextArea
                 field="project_description"
                 label="1. Project Focus & Context"
-                placeholder="Brief overview including technical domain or problem space." 
+                placeholder="Brief overview including technical domain or problem space."
                 tooltip="Technical domain overview."
                 maxLength={3000}
                 required
               />
-              <ProjectTextArea 
+              <ProjectTextArea
                 field="research_dev_questions"
-                label="2. Specific Questions" 
-                placeholder="e.g. 'Is tRPC better than GraphQL for this?', 'Limitations of Gemini Flash context?', 'Best vector DB for this scale?'" 
+                label="2. Specific Questions"
+                placeholder="e.g. 'Is tRPC better than GraphQL for this?', 'Limitations of Gemini Flash context?', 'Best vector DB for this scale?'"
                 tooltip="Key technical uncertainties to resolve."
                 maxLength={2000}
               />
@@ -275,22 +382,22 @@ const Part1Research: React.FC = React.memo(() => {
                 tooltip="Constraints or preferences for the stack."
                 maxLength={1000}
               />
-              <ProjectInput 
+              <ProjectInput
                 field="research_dev_decisions"
-                label="4. Decisions to Inform" 
-                placeholder="What technical/arch decisions will this research inform?" 
+                label="4. Decisions to Inform"
+                placeholder="What technical/arch decisions will this research inform?"
                 tooltip="Why are you running this research?"
               />
-              <ProjectInput 
+              <ProjectInput
                 field="research_dev_timing"
-                label="5. Why Now?" 
-                placeholder="Any market trend or emerging tech that makes this timely?" 
+                label="5. Why Now?"
+                placeholder="Any market trend or emerging tech that makes this timely?"
                 tooltip="Market timing context."
               />
-              <ProjectTextArea 
+              <ProjectTextArea
                 field="research_dev_scope"
-                label="6. Scope Boundaries" 
-                placeholder="What is explicitly IN and OUT of scope?" 
+                label="6. Scope Boundaries"
+                placeholder="What is explicitly IN and OUT of scope?"
                 tooltip="Define the MVP boundaries."
               />
               <ProjectSelect
@@ -303,22 +410,22 @@ const Part1Research: React.FC = React.memo(() => {
                   { value: "Comprehensive", label: "Comprehensive" }
                 ]}
               />
-              <ProjectInput 
+              <ProjectInput
                 field="research_dev_sources"
-                label="8. Source Priority" 
-                placeholder="Rank: Academic, GitHub, Docs, Blogs, Competitors..." 
+                label="8. Source Priority"
+                placeholder="Rank: Academic, GitHub, Docs, Blogs, Competitors..."
                 tooltip="Preferred information sources."
               />
-              <ProjectTextArea 
+              <ProjectTextArea
                 field="research_dev_constraints"
-                label="9. Technical Constraints" 
-                placeholder="Must use/avoid specific languages, frameworks, standards?" 
+                label="9. Technical Constraints"
+                placeholder="Must use/avoid specific languages, frameworks, standards?"
                 tooltip="Hard technical requirements."
               />
-              <ProjectInput 
+              <ProjectInput
                 field="research_dev_context"
-                label="10. Broader Context" 
-                placeholder="Startup, Enterprise, Side Project? Domain details?" 
+                label="10. Broader Context"
+                placeholder="Startup, Enterprise, Side Project? Domain details?"
                 tooltip="Business context."
               />
             </>
@@ -326,37 +433,37 @@ const Part1Research: React.FC = React.memo(() => {
 
           {persona === Persona.InBetween && (
             <>
-              <ProjectTextArea 
+              <ProjectTextArea
                 field="project_description"
-                label="1. Idea & Coding Experience" 
-                placeholder="Briefly describe your project idea and your coding experience. What can you build already?" 
+                label="1. Idea & Coding Experience"
+                placeholder="Briefly describe your project idea and your coding experience. What can you build already?"
                 tooltip="Your idea + your skill level."
                 maxLength={2000}
                 required
               />
-              <ProjectTextArea 
+              <ProjectTextArea
                 field="research_mid_problem"
-                label="2. Problem & User" 
-                placeholder="What problem are you solving, and who experiences this problem most?" 
+                label="2. Problem & User"
+                placeholder="What problem are you solving, and who experiences this problem most?"
                 tooltip="The 'Why' and 'Who'."
                 required
               />
-              <ProjectTextArea 
+              <ProjectTextArea
                 field="research_mid_learn"
-                label="3. Research & Learning Needs" 
-                placeholder="List technical topics (frameworks) and business topics (market) to investigate." 
+                label="3. Research & Learning Needs"
+                placeholder="List technical topics (frameworks) and business topics (market) to investigate."
                 tooltip="What do you need to learn to build this?"
               />
-              <ProjectInput 
+              <ProjectInput
                 field="research_mid_existing"
-                label="4. Similar Solutions" 
-                placeholder="Competing apps or DIY solutions? What do you like/dislike?" 
+                label="4. Similar Solutions"
+                placeholder="Competing apps or DIY solutions? What do you like/dislike?"
                 tooltip="Existing market landscape."
               />
-              <ProjectTextArea 
+              <ProjectTextArea
                 field="research_mid_validation"
-                label="5. Validation Strategy" 
-                placeholder="How will you validate people need this? (Surveys, prototype?)" 
+                label="5. Validation Strategy"
+                placeholder="How will you validate people need this? (Surveys, prototype?)"
                 tooltip="How will you prove it works?"
               />
               <ProjectSelect
@@ -372,16 +479,16 @@ const Part1Research: React.FC = React.memo(() => {
                   { value: "Not sure", label: "Not sure – need guidance" }
                 ]}
               />
-              <ProjectInput 
+              <ProjectInput
                 field="research_mid_comfort"
-                label="7. Technical Comfort Zone" 
-                placeholder="What languages/tools do you know? Open to new ones?" 
+                label="7. Technical Comfort Zone"
+                placeholder="What languages/tools do you know? Open to new ones?"
                 tooltip="Your current tech stack."
               />
-              <ProjectInput 
+              <ProjectInput
                 field="research_mid_timeline"
-                label="8. Timeline & Success" 
-                placeholder="Target launch date? How will you measure success?" 
+                label="8. Timeline & Success"
+                placeholder="Target launch date? How will you measure success?"
                 tooltip="Goals and deadlines."
               />
               <ProjectSelect
@@ -400,138 +507,137 @@ const Part1Research: React.FC = React.memo(() => {
 
           {/* Action Area */}
           <div className="pt-4 border-t border-white/5">
-             {researchMethod === 'in-app' ? (
-                <Button 
-                    onClick={handleRunResearch} 
-                    disabled={isGenerating}
-                    className={`w-full border-0 ${
-                       researchMode === 'deep' 
-                         ? 'bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 shadow-purple-500/20' 
-                         : 'bg-gradient-to-r from-blue-600 to-primary-600 hover:from-blue-500 hover:to-primary-500'
-                    }`}
-                    tooltip={researchMode === 'deep' ? "Uses 'deep-research-pro' agent. Takes 2-5 minutes." : "Standard Gemini 3 Pro research."}
+            {researchMethod === 'in-app' ? (
+              <Button
+                onClick={handleRunResearch}
+                disabled={isGenerating}
+                className={`w-full border-0 ${researchMode === 'deep'
+                  ? 'bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 shadow-purple-500/20'
+                  : 'bg-gradient-to-r from-blue-600 to-primary-600 hover:from-blue-500 hover:to-primary-500'
+                  }`}
+                tooltip={researchMode === 'deep' ? "Uses 'deep-research-pro' agent. Takes 2-5 minutes." : "Standard Gemini 3 Pro research."}
+              >
+                {isGenerating ? (
+                  <><Loader2 className="animate-spin" size={18} /> {generationPhase || (researchMode === 'deep' ? 'Agent Working...' : 'Researching...')}</>
+                ) : (
+                  <><Sparkles size={18} /> Run {researchMode === 'deep' ? 'Deep Research' : 'Research'} with Gemini</>
+                )}
+              </Button>
+            ) : (
+              <div className="space-y-4 animate-fade-in">
+                <Button
+                  onClick={handleGeneratePrompt}
+                  variant="secondary"
+                  className="w-full border-blue-500/20 hover:border-blue-500/50"
                 >
-                    {isGenerating ? (
-                    <><Loader2 className="animate-spin" size={18} /> {generationPhase || (researchMode === 'deep' ? 'Agent Working...' : 'Researching...')}</>
-                    ) : (
-                    <><Sparkles size={18} /> Run {researchMode === 'deep' ? 'Deep Research' : 'Research'} with Gemini</>
-                    )}
+                  <Sparkles size={18} className="text-blue-400" /> Generate Prompt for External AI
                 </Button>
-             ) : (
-                <div className="space-y-4 animate-fade-in">
-                    <Button 
-                        onClick={handleGeneratePrompt} 
-                        variant="secondary"
-                        className="w-full border-blue-500/20 hover:border-blue-500/50"
-                    >
-                        <Sparkles size={18} className="text-blue-400" /> Generate Prompt for External AI
-                    </Button>
-                    
-                    {externalPrompt && (
-                        <div className="space-y-4">
-                            <CopyBlock content={externalPrompt} label="Prompt to Copy" fileName="research-prompt" />
-                            
-                            {/* Visual Indicator for Right Panel */}
-                            <div className="hidden md:flex items-center justify-between p-3 rounded-lg border border-dashed border-blue-500/30 bg-blue-500/5 text-blue-300 text-xs font-mono animate-pulse">
-                                <span className="flex items-center gap-2"><ArrowRight size={14} /> COPY PROMPT ABOVE</span>
-                                <span className="flex items-center gap-2">PASTE RESULT IN RIGHT PANEL <ArrowRight size={14} /></span>
-                            </div>
-                            
-                            <div className="md:hidden flex flex-col items-center justify-center py-2 text-slate-500">
-                                <ArrowDown size={16} className="animate-bounce" />
-                                <span className="text-[10px] uppercase tracking-widest mt-1">Paste Result Below</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
-             )}
+
+                {externalPrompt && (
+                  <div className="space-y-4">
+                    <CopyBlock content={externalPrompt} label="Prompt to Copy" fileName="research-prompt" />
+
+                    {/* Visual Indicator for Right Panel */}
+                    <div className="hidden md:flex items-center justify-between p-3 rounded-lg border border-dashed border-blue-500/30 bg-blue-500/5 text-blue-300 text-xs font-mono animate-pulse">
+                      <span className="flex items-center gap-2"><ArrowRight size={14} /> COPY PROMPT ABOVE</span>
+                      <span className="flex items-center gap-2">PASTE RESULT IN RIGHT PANEL <ArrowRight size={14} /></span>
+                    </div>
+
+                    <div className="md:hidden flex flex-col items-center justify-center py-2 text-slate-500">
+                      <ArrowDown size={16} className="animate-bounce" />
+                      <span className="text-[10px] uppercase tracking-widest mt-1">Paste Result Below</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
         <div className="space-y-4">
-           {/* If External Method AND No Output yet, show Paste Card instead of ArtifactSection Placeholder */}
-           {researchMethod === 'external' && !researchOutput ? (
-             <GlassCard className="h-full flex flex-col justify-center min-h-[400px] border-dashed border-blue-500/20 bg-blue-900/5">
-                 <div className="text-center mb-6">
-                    <Sparkles className="mx-auto mb-3 text-blue-400" size={32} />
-                    <h3 className="text-lg font-bold text-slate-200">External Research Results</h3>
-                    <p className="text-sm text-slate-400 max-w-xs mx-auto">Paste the output from ChatGPT, Perplexity, or Gemini Advanced here to populate the workspace.</p>
-                 </div>
-                 <TextArea
-                    label="Paste Results"
-                    placeholder="Paste your research findings here..."
-                    value={externalPasteBuffer}
-                    onChange={(e) => setExternalPasteBuffer(e.target.value)}
-                    className="flex-1 min-h-[200px] mb-4 bg-slate-900/50 border-blue-500/20 focus:border-blue-500/50"
-                 />
-                 <Button
-                    onClick={handleSaveExternalResearch}
-                    disabled={!externalPasteBuffer.trim()}
-                    className="w-full bg-blue-600 hover:bg-blue-500"
-                 >
-                    <CheckCircle2 size={16} /> Save Research
-                 </Button>
-             </GlassCard>
-           ) : (
-               <ArtifactSection
-                 section="research"
-                 loaderLabel={researchMode === 'deep' ? "Agent is browsing, reading, and synthesizing (this may take a minute)..." : "Conducting Deep Research & Market Analysis..."}
-                 mode={researchMethod === 'external' ? 'manual' : 'ai'}
-                 placeholder={
-                   <div className="max-w-xs">
-                     <Sparkles className="mx-auto mb-3 opacity-50" size={32} />
-                     <p>
-                        Fill in the details and click "Run Research" to let Gemini browse the web and analyze your idea.
-                     </p>
-                   </div>
-                 }
-               >
-                  {/* Sources Display Logic */}
-                  {isGenerating && (!researchSources || researchSources.length === 0) && (
-                     <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 mt-4 animate-pulse">
-                        <div className="flex items-center gap-2 mb-3">
-                            <Skeleton className="h-4 w-4 rounded-full" />
-                            <Skeleton className="h-4 w-24" />
-                        </div>
-                        <div className="space-y-2 pl-6">
-                            <Skeleton className="h-3 w-3/4" />
-                            <Skeleton className="h-3 w-1/2" />
-                            <Skeleton className="h-3 w-2/3" />
-                        </div>
-                     </div>
-                   )}
+          {/* If External Method AND No Output yet, show Paste Card instead of ArtifactSection Placeholder */}
+          {researchMethod === 'external' && !researchOutput ? (
+            <GlassCard className="h-full flex flex-col justify-center min-h-[400px] border-dashed border-blue-500/20 bg-blue-900/5">
+              <div className="text-center mb-6">
+                <Sparkles className="mx-auto mb-3 text-blue-400" size={32} />
+                <h3 className="text-lg font-bold text-slate-200">External Research Results</h3>
+                <p className="text-sm text-slate-400 max-w-xs mx-auto">Paste the output from ChatGPT, Perplexity, or Gemini Advanced here to populate the workspace.</p>
+              </div>
+              <TextArea
+                label="Paste Results"
+                placeholder="Paste your research findings here..."
+                value={externalPasteBuffer}
+                onChange={(e) => setExternalPasteBuffer(e.target.value)}
+                className="flex-1 min-h-[200px] mb-4 bg-slate-900/50 border-blue-500/20 focus:border-blue-500/50"
+              />
+              <Button
+                onClick={handleSaveExternalResearch}
+                disabled={!externalPasteBuffer.trim()}
+                className="w-full bg-blue-600 hover:bg-blue-500"
+              >
+                <CheckCircle2 size={16} /> Save Research
+              </Button>
+            </GlassCard>
+          ) : (
+            <ArtifactSection
+              section="research"
+              loaderLabel={researchMode === 'deep' ? "Agent is browsing, reading, and synthesizing (this may take a minute)..." : "Conducting Deep Research & Market Analysis..."}
+              mode={researchMethod === 'external' ? 'manual' : 'ai'}
+              placeholder={
+                <div className="max-w-xs">
+                  <Sparkles className="mx-auto mb-3 opacity-50" size={32} />
+                  <p>
+                    Fill in the details and click "Run Research" to let Gemini browse the web and analyze your idea.
+                  </p>
+                </div>
+              }
+            >
+              {/* Sources Display Logic */}
+              {isGenerating && (!researchSources || researchSources.length === 0) && (
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 mt-4 animate-pulse">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Skeleton className="h-4 w-4 rounded-full" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                  <div className="space-y-2 pl-6">
+                    <Skeleton className="h-3 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
+                </div>
+              )}
 
-                   {researchSources && researchSources.length > 0 && (
-                     <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 mt-4">
-                       <h4 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
-                         <Globe size={14} className="text-blue-400" /> Sources
-                       </h4>
-                       <div className="space-y-2">
-                         {researchSources.map((source, idx) => (
-                           source.web?.uri && (
-                             <a 
-                               key={idx} 
-                               href={source.web.uri} 
-                               target="_blank" 
-                               rel="noopener noreferrer"
-                               className="block text-xs text-blue-400 hover:underline truncate"
-                             >
-                               {idx + 1}. {source.web.title || source.web.uri}
-                             </a>
-                           )
-                         ))}
-                       </div>
-                     </div>
-                   )}
-               </ArtifactSection>
-           )}
+              {researchSources && researchSources.length > 0 && (
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 mt-4">
+                  <h4 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
+                    <Globe size={14} className="text-blue-400" /> Sources
+                  </h4>
+                  <div className="space-y-2">
+                    {researchSources.map((source, idx) => (
+                      source.web?.uri && (
+                        <a
+                          key={idx}
+                          href={source.web.uri}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block text-xs text-blue-400 hover:underline truncate"
+                        >
+                          {idx + 1}. {source.web.title || source.web.uri}
+                        </a>
+                      )
+                    ))}
+                  </div>
+                </div>
+              )}
+            </ArtifactSection>
+          )}
         </div>
       </div>
-      
-      <StepNavigation 
-         prev={{ label: 'Start', path: '/' }}
-         next={{ label: 'Define PRD', path: '/prd', disabled: !researchOutput }}
-         onPrefetchNext={() => import('./Part2PRD')}
+
+      <StepNavigation
+        prev={{ label: 'Start', path: '/' }}
+        next={{ label: 'Define PRD', path: '/prd', disabled: !researchOutput }}
+        onPrefetchNext={() => import('./Part2PRD')}
       />
     </div>
   );

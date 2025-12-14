@@ -4,13 +4,14 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useProject } from '../context/ProjectContext';
 import {
     Zap, BrainCircuit, Search, Check, Activity, Bell, User, Clock,
-    FileArchive, EyeOff, Layout, Download, ChevronDown, RefreshCcw, MessageSquare
+    FileArchive, EyeOff, Layout, Download, ChevronDown, RefreshCcw, MessageSquare,
+    AlertTriangle, Wrench
 } from 'lucide-react';
 import { Modal, Tooltip, Select, TextArea, Button } from './UI';
 import { MODEL_CONFIGS, PRESETS, DEFAULT_SETTINGS } from '../utils/constants';
-import { PresetMode, ToastPosition, Persona } from '../types';
+import { PresetMode, ToastPosition, Persona, GeminiSafetyPreset, ExpertSettings } from '../types';
 import { useToast } from './Toast';
-import { getProviderSettings, setDefaultModel } from '../utils/providerStorage';
+import { getProviderSettings, setDefaultModel, getExpertSettings, setExpertSettings, resetExpertSettings } from '../utils/providerStorage';
 import { PROVIDERS, type ProviderId } from '../utils/providers';
 import { PROVIDER_MODELS, getModelsForProvider, getModelById, supportsReasoningEffort, type ModelConfig, type ReasoningEffort } from '../utils/modelUtils';
 import { ReasoningEffortSelector } from './ReasoningEffortSelector';
@@ -31,6 +32,30 @@ const SettingsModal: React.FC = () => {
     const [activeProvider, setActiveProvider] = useState<ProviderId>(providerSettings.defaultProvider);
     const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>('medium');
     const [selectedModelId, setSelectedModelId] = useState<string>(providerSettings.defaultModels[activeProvider] || '');
+
+    // Expert Settings state (v1) - per provider
+    const [showExpertSettings, setShowExpertSettings] = useState(false);
+    const savedExpertSettings = useMemo(() => getExpertSettings(activeProvider) || {}, [activeProvider, isSettingsOpen]);
+    const [expertMaxTokens, setExpertMaxTokens] = useState<number | undefined>(savedExpertSettings.maxOutputTokens);
+    const [expertStopSequences, setExpertStopSequences] = useState<string>(savedExpertSettings.stopSequences?.join('\n') || '');
+    const [expertSeed, setExpertSeed] = useState<number | undefined>(savedExpertSettings.seed);
+    const [expertSafetyPreset, setExpertSafetyPreset] = useState<GeminiSafetyPreset>(
+        (activeProvider === 'gemini' && (savedExpertSettings as any)?.safetyPreset) || 'default'
+    );
+
+    // Sync expert settings when provider changes
+    useEffect(() => {
+        const settings = getExpertSettings(activeProvider) || {};
+        setExpertMaxTokens(settings.maxOutputTokens);
+        setExpertStopSequences(settings.stopSequences?.join('\n') || '');
+        setExpertSeed(settings.seed);
+        if (activeProvider === 'gemini') {
+            setExpertSafetyPreset((settings as any)?.safetyPreset || 'default');
+        }
+    }, [activeProvider]);
+
+    // Get provider capabilities
+    const providerCapabilities = PROVIDERS[activeProvider].capabilities;
 
     // Sync selected model when provider changes
     useEffect(() => {
@@ -129,6 +154,35 @@ const SettingsModal: React.FC = () => {
             thinkingBudget: maxBudget, // Reset to recommended budget for model
             preset: 'custom'
         });
+    };
+
+    // Expert Settings handlers (v1)
+    const saveExpertSettings = () => {
+        const stopSeqArray = expertStopSequences
+            .split('\n')
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+
+        const expertData: ExpertSettings & { safetyPreset?: GeminiSafetyPreset } = {
+            ...(expertMaxTokens !== undefined && { maxOutputTokens: expertMaxTokens }),
+            ...(stopSeqArray.length > 0 && { stopSequences: stopSeqArray }),
+            ...(expertSeed !== undefined && { seed: expertSeed }),
+        };
+
+        // Add Gemini-specific settings
+        if (activeProvider === 'gemini' && expertSafetyPreset !== 'default') {
+            expertData.safetyPreset = expertSafetyPreset;
+        }
+
+        setExpertSettings(activeProvider, expertData);
+    };
+
+    const handleResetExpertSettings = () => {
+        resetExpertSettings(activeProvider);
+        setExpertMaxTokens(undefined);
+        setExpertStopSequences('');
+        setExpertSeed(undefined);
+        setExpertSafetyPreset('default');
     };
 
     const currentConfig = MODEL_CONFIGS[settings.modelName as keyof typeof MODEL_CONFIGS];
@@ -467,6 +521,152 @@ const SettingsModal: React.FC = () => {
                                                     <p className="text-[9px] text-slate-600 mt-1">Nucleus sampling threshold</p>
                                                 </div>
                                             </div>
+                                        </div>
+
+                                        {/* Expert Settings Section (v1) */}
+                                        <div className="border-t border-slate-800/50 pt-4 mt-4">
+                                            <button
+                                                onClick={() => setShowExpertSettings(!showExpertSettings)}
+                                                className="flex items-center gap-2 text-xs font-medium text-amber-400/80 hover:text-amber-300 transition-colors mb-4 w-full"
+                                            >
+                                                <Wrench size={12} />
+                                                <ChevronDown size={14} className={`transition-transform duration-300 ${showExpertSettings ? 'rotate-180' : ''}`} />
+                                                {showExpertSettings ? 'Hide Expert Settings' : 'Show Expert Settings (API Overrides)'}
+                                            </button>
+
+                                            {showExpertSettings && (
+                                                <div className="space-y-4 animate-fade-in">
+                                                    {/* Warning Banner */}
+                                                    <div className="flex items-start gap-2 p-3 bg-amber-900/20 border border-amber-500/30 rounded-lg">
+                                                        <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />
+                                                        <p className="text-[10px] text-amber-200/80">
+                                                            These settings override API defaults. Only set values you understand—incorrect settings may cause errors or unexpected behavior.
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="space-y-4 p-4 bg-slate-950/50 rounded-xl border border-slate-800/50">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                                {PROVIDERS[activeProvider].displayName} Expert
+                                                            </span>
+                                                            <button
+                                                                onClick={handleResetExpertSettings}
+                                                                className="flex items-center gap-1.5 text-[10px] text-amber-400 hover:text-amber-300 px-2 py-1 rounded bg-amber-900/10 border border-amber-500/20 hover:bg-amber-900/20 transition-colors"
+                                                            >
+                                                                <RefreshCcw size={10} />
+                                                                Reset Expert
+                                                            </button>
+                                                        </div>
+
+                                                        {/* Max Output Tokens */}
+                                                        {providerCapabilities.supportsMaxTokens && (
+                                                            <div>
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <label className="text-xs text-slate-400">Max Output Tokens</label>
+                                                                    <span className="text-xs font-mono text-amber-400">
+                                                                        {expertMaxTokens ?? 'default'}
+                                                                    </span>
+                                                                </div>
+                                                                <input
+                                                                    type="range"
+                                                                    min="0"
+                                                                    max={currentModelConfig?.outputContextLimit || 16384}
+                                                                    step="256"
+                                                                    value={expertMaxTokens ?? 0}
+                                                                    onChange={(e) => {
+                                                                        const val = parseInt(e.target.value);
+                                                                        setExpertMaxTokens(val === 0 ? undefined : val);
+                                                                    }}
+                                                                    onMouseUp={saveExpertSettings}
+                                                                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                                                />
+                                                                <p className="text-[9px] text-slate-600 mt-1">
+                                                                    Maximum tokens in the response. Set to 0 for provider default.
+                                                                </p>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Stop Sequences */}
+                                                        {providerCapabilities.supportsStop && (
+                                                            <div>
+                                                                <label className="text-xs text-slate-400 block mb-2">
+                                                                    Stop Sequences <span className="text-slate-600">(one per line)</span>
+                                                                </label>
+                                                                <textarea
+                                                                    value={expertStopSequences}
+                                                                    onChange={(e) => setExpertStopSequences(e.target.value)}
+                                                                    onBlur={saveExpertSettings}
+                                                                    placeholder="Enter stop sequences...&#10;e.g. ```&#10;###"
+                                                                    className="w-full h-16 px-3 py-2 text-xs font-mono bg-slate-900 border border-slate-800 rounded-lg text-slate-300 placeholder-slate-600 resize-none focus:outline-none focus:border-amber-500/50"
+                                                                />
+                                                                <p className="text-[9px] text-slate-600 mt-1">
+                                                                    AI will stop generating when it encounters these strings.
+                                                                </p>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Seed (OpenAI/OpenRouter only) */}
+                                                        {providerCapabilities.supportsSeed && (
+                                                            <div>
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <label className="text-xs text-slate-400">Seed</label>
+                                                                    <span className="text-xs font-mono text-amber-400">
+                                                                        {expertSeed ?? 'random'}
+                                                                    </span>
+                                                                </div>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max="2147483647"
+                                                                    value={expertSeed ?? ''}
+                                                                    onChange={(e) => {
+                                                                        const val = e.target.value;
+                                                                        setExpertSeed(val === '' ? undefined : parseInt(val));
+                                                                    }}
+                                                                    onBlur={saveExpertSettings}
+                                                                    placeholder="Leave empty for random"
+                                                                    className="w-full px-3 py-2 text-xs font-mono bg-slate-900 border border-slate-800 rounded-lg text-slate-300 placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
+                                                                />
+                                                                <p className="text-[9px] text-slate-600 mt-1">
+                                                                    For deterministic outputs. May not be supported by all models.
+                                                                </p>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Gemini Safety Preset */}
+                                                        {providerCapabilities.supportsSafety && (
+                                                            <div>
+                                                                <label className="text-xs text-slate-400 block mb-2">
+                                                                    Safety Level
+                                                                </label>
+                                                                <select
+                                                                    value={expertSafetyPreset}
+                                                                    onChange={(e) => {
+                                                                        setExpertSafetyPreset(e.target.value as GeminiSafetyPreset);
+                                                                        // Save immediately
+                                                                        const stopSeqArray = expertStopSequences.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+                                                                        setExpertSettings(activeProvider, {
+                                                                            ...(expertMaxTokens !== undefined && { maxOutputTokens: expertMaxTokens }),
+                                                                            ...(stopSeqArray.length > 0 && { stopSequences: stopSeqArray }),
+                                                                            ...(expertSeed !== undefined && { seed: expertSeed }),
+                                                                            safetyPreset: e.target.value as GeminiSafetyPreset,
+                                                                        });
+                                                                    }}
+                                                                    className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-800 rounded-lg text-slate-300 focus:outline-none focus:border-amber-500/50"
+                                                                >
+                                                                    <option value="default">Default (Provider Standard)</option>
+                                                                    <option value="relaxed">Relaxed (Minimal Blocking)</option>
+                                                                    <option value="balanced">Balanced (Medium Blocking)</option>
+                                                                    <option value="strict">Strict (Maximum Blocking)</option>
+                                                                </select>
+                                                                <p className="text-[9px] text-slate-600 mt-1">
+                                                                    Controls content safety thresholds for all harm categories.
+                                                                </p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}

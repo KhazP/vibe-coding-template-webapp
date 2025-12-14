@@ -6,6 +6,7 @@
  */
 
 import { ProviderId, PROVIDERS } from './providers';
+import type { ProviderExpertSettings, ExpertSettings, GeminiSafetyPreset } from '../types';
 
 // ============================================================================
 // TYPES
@@ -21,6 +22,7 @@ export interface ProviderKeys {
 export interface ProviderSettings {
     defaultProvider: ProviderId;
     defaultModels: Partial<Record<ProviderId, string>>;
+    expertSettings?: ProviderExpertSettings;
 }
 
 // ============================================================================
@@ -202,4 +204,51 @@ export const resetProviderSettings = (): void => {
     } catch (e) {
         console.warn('Failed to reset provider settings:', e);
     }
+};
+
+// ============================================================================
+// EXPERT SETTINGS (v1)
+// ============================================================================
+
+/**
+ * Get expert settings for a specific provider
+ */
+export const getExpertSettings = <T extends ProviderId>(id: T): ProviderExpertSettings[T] | undefined => {
+    const settings = getProviderSettings();
+    return settings.expertSettings?.[id];
+};
+
+/**
+ * Set expert settings for a specific provider
+ */
+export const setExpertSettings = <T extends ProviderId>(
+    id: T,
+    expertSettingsForProvider: ProviderExpertSettings[T]
+): void => {
+    const settings = getProviderSettings();
+    setProviderSettings({
+        expertSettings: {
+            ...settings.expertSettings,
+            [id]: expertSettingsForProvider,
+        },
+    });
+};
+
+/**
+ * Reset expert settings for a specific provider to defaults (undefined)
+ */
+export const resetExpertSettings = (id: ProviderId): void => {
+    const settings = getProviderSettings();
+    if (settings.expertSettings) {
+        const updated = { ...settings.expertSettings };
+        delete updated[id];
+        setProviderSettings({ expertSettings: updated });
+    }
+};
+
+/**
+ * Reset all expert settings across all providers
+ */
+export const resetAllExpertSettings = (): void => {
+    setProviderSettings({ expertSettings: {} });
 };

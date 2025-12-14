@@ -13,6 +13,37 @@ export type { ProviderId, ProviderConfig, ChatMessage, SendChatOptions, SendChat
 export type { ProviderKeys, ProviderSettings } from './utils/providerStorage';
 export type { ModelTier, ReasoningEffort, ModelConfig } from './utils/modelUtils';
 
+// ============================================================================
+// EXPERT SETTINGS (v1) - Normalized internal schema
+// ============================================================================
+
+export type GeminiSafetyPreset = 'default' | 'relaxed' | 'balanced' | 'strict';
+
+/** Normalized expert settings - provider adapters map to API field names */
+export interface ExpertSettings {
+  maxOutputTokens?: number;
+  stopSequences?: string[];
+  seed?: number;
+}
+
+/** Per-provider expert settings storage */
+export interface ProviderExpertSettings {
+  openai?: ExpertSettings;
+  anthropic?: ExpertSettings;
+  gemini?: ExpertSettings & {
+    safetyPreset?: GeminiSafetyPreset;
+  };
+  openrouter?: ExpertSettings;
+}
+
+/** Provider capability flags for UI gating */
+export interface ProviderCapabilities {
+  supportsMaxTokens: boolean;
+  supportsStop: boolean;
+  supportsSeed: boolean;
+  supportsSafety?: boolean;
+}
+
 // Provider status for UI
 export type ProviderKeyStatus = 'saved' | 'invalid' | 'none' | 'testing';
 
