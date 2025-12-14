@@ -25,8 +25,8 @@ const OPENAI_DEEP_RESEARCH_MODELS = [
     id: 'o4-mini-deep-research',
     name: 'o4-mini Deep Research',
     description: 'Faster - good for quick research',
-    inputCost: 1.10,
-    outputCost: 4.40,
+    inputCost: 2.00,
+    outputCost: 8.00,
   },
 ] as const;
 
@@ -166,7 +166,7 @@ const Part1Research: React.FC = React.memo(() => {
 
             {/* In-App Research Depth Selection */}
             {researchMethod === 'in-app' && (
-              <GlassCard className="p-5 bg-gradient-to-br from-slate-900/90 to-slate-900/50 border-white/5">
+              <GlassCard className="p-5 bg-gradient-to-br from-slate-900/90 to-slate-900/50 border-white/5 !overflow-visible">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -226,13 +226,13 @@ const Part1Research: React.FC = React.memo(() => {
                   </div>
 
                   {/* Deep Research Configuration */}
-                  <div className={`overflow-hidden transition-all duration-500 ease-in-out ${researchMode === 'deep' ? 'max-h-[200px] opacity-100 pt-2' : 'max-h-0 opacity-0'}`}>
+                  <div className={`transition-all duration-500 ease-in-out ${researchMode === 'deep' ? 'max-h-[500px] opacity-100 pt-2' : 'max-h-0 opacity-0 overflow-hidden'}`}>
                     <div className="p-3 bg-black/20 rounded-xl border border-white/5 space-y-3">
 
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Agent Model</span>
                         <div className="flex bg-slate-950 p-0.5 rounded-lg border border-white/5">
-                          <Tooltip content="Deep Research via Google's Gemini Agent" position="top">
+                          <Tooltip content="Deep Research via Google's Gemini Agent (same pricing as Gemini 3 Pro)" position="top">
                             <button
                               onClick={() => setResearchProvider('gemini')}
                               className={`flex items-center gap-2 px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${researchProvider === 'gemini'
@@ -303,6 +303,11 @@ const Part1Research: React.FC = React.memo(() => {
                                       <div className="font-medium text-slate-200">{model.name}</div>
                                       <div className="text-[10px] text-slate-500">{model.description}</div>
                                     </div>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                      ${model.inputCost}/1M
+                                    </span>
                                   </div>
                                 </button>
                               ))}

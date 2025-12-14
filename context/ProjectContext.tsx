@@ -189,6 +189,178 @@ const createExampleProject = (): ProjectState => {
   };
 };
 
+/**
+ * Creates a second demo project in vibe-coder style for someone who 
+ * doesn't know code but wants to make an app
+ */
+const createVibeCoderExampleProject = (): ProjectState => {
+  const base = createNewProjectState();
+  const researchText = `## VibeWeather Research ☀️🌧️
+
+### what i found out
+
+ok so i asked around and looked at weather apps and heres what i learned:
+
+**who wants this:**
+- people who hate boring weather apps (me lol)
+- gen z and millennials who want aesthetic everything
+- anyone who checks weather before picking an outfit
+
+**the problem:**
+- weather apps are SO ugly and boring 😴
+- they give too much info nobody cares about
+- no one wants to see "partly cloudy 67°" they want vibes!
+
+**apps that exist:**
+- Apple Weather - fine but basic
+- Weather.com - information overload
+- Carrot Weather - sassy but expensive
+
+**my unique thing:**
+- VIBES not numbers!! like "sweater weather" or "beach day energy"
+- cute animations and colors that match the mood
+- outfit suggestions based on weather vibes
+- daily affirmations with the weather lol
+
+### next steps
+build it with ai help because i definitely cannot code 💀`;
+
+  const prdText = `## VibeWeather PRD 🌈
+
+### THE VISION
+an app that tells you the weather... but make it ✨aesthetic✨
+
+### who its for
+people who:
+- care about vibes more than exact temperatures
+- want their apps to be pretty
+- need outfit inspo based on weather
+- are tired of boring weather apps
+
+### user story
+> maya wakes up, checks vibeweather, sees "cozy sweater day ☁️" with soft orange colors and a cute cloud animation. she knows exactly what to wear. she smiles. life is good.
+
+### features (the fun stuff)
+1. **vibe check** - tells you the mood of the day not just numbers
+2. **outfit oracle** - suggests what to wear based on vibes
+3. **aesthetic themes** - changes colors based on weather mood
+4. **daily affirmation** - because why not add positivity
+
+### NOT doing (for now)
+- hourly forecasts (boring)
+- weather alerts (scary)
+- 10 day predictions (who plans that far)
+
+### success = 
+when people screenshot and share the vibes on their stories
+
+### constraints
+- must be buildable with ai coding tools
+- budget: basically free or very cheap
+- timeline: want it done in like 2 weeks max`;
+
+  const techText = `## VibeWeather Tech Stuff 🛠️
+
+### what the ai suggested
+
+**framework thing:**
+using something called React Native with Expo because apparently its the easiest for making apps without knowing code?? the ai said cursor or lovable can handle it
+
+**getting weather data:**
+- theres a free weather api called OpenWeatherMap
+- gives temperature and stuff that we convert to vibes
+- apparently its free for 1000 requests/day which is plenty
+
+**the vibe logic:**
+the ai will write code that turns boring weather into vibes:
+- hot + sunny = "beach day energy 🏖️"  
+- cold + rainy = "cozy inside day 🍵"
+- etc
+
+**making it pretty:**
+- animations with something called lottie?
+- color themes that change with weather
+- cute icons and fonts
+
+**hosting & stuff:**
+- expo handles the app store stuff i think
+- might need vercel for a website version (its free)
+
+**what i need to tell the ai:**
+1. make it look like the mockup i drew
+2. use the free weather api
+3. add cute animations
+4. make the vibes accurate lol
+
+### worried about
+- will it actually work on iphone AND android?
+- how do i get it on the app store?
+- what if the weather api is wrong about vibes?
+
+the ai said dont worry it will figure it out 🤷‍♀️`;
+
+  const now = Date.now();
+
+  return {
+    ...base,
+    id: 'example-vibeweather',
+    name: 'VibeWeather 🌈 (Example)',
+    persona: Persona.VibeCoder,
+    answers: {
+      'project_description': 'a weather app but make it aesthetic!! tells you vibes not boring numbers',
+      'research_vibe_who': 'anyone who wants their apps to be cute and aesthetic, mostly gen z and millennials',
+      'research_vibe_problem': 'weather apps are ugly and boring, too many numbers, no vibes',
+      'research_vibe_existing': 'apple weather (meh), weather.com (too much), carrot weather (costs money)',
+      'research_vibe_unique': 'VIBES instead of numbers, cute animations, outfit suggestions, daily affirmations',
+      'research_vibe_features': 'vibe check, outfit oracle, aesthetic themes, daily affirmation',
+      'research_vibe_platform': 'Mobile (both please)',
+      'research_vibe_timeline': 'like 2 weeks hopefully',
+      'research_vibe_budget': 'free or super cheap',
+      'prd_vibe_name': 'VibeWeather',
+      'prd_vibe_goal': 'make weather checking actually fun, get people to screenshot and share',
+      'prd_vibe_users': 'aesthetic-loving people who care about vibes',
+      'prd_vibe_story': 'maya wakes up, checks app, sees "cozy sweater day", knows what to wear, is happy',
+      'prd_vibe_features': 'vibe check, outfit oracle, aesthetic themes',
+      'prd_vibe_non_features': 'hourly forecasts, weather alerts, 10 day predictions',
+      'prd_vibe_metric': 'people sharing screenshots on their stories',
+      'prd_vibe_vibe': 'aesthetic, cute, cozy, colorful, gen z energy',
+      'prd_vibe_constraints': 'must be buildable with ai, basically free',
+      'tech_vibe_platform': 'Cross-Platform',
+      'tech_vibe_coding': 'AI writes all code',
+      'tech_vibe_budget': 'Free pls',
+      'tech_vibe_timeline': 'About 2 weeks',
+      'tech_vibe_worry': 'getting it on the app store, will it actually work',
+      'tech_vibe_tools': 'just started learning about cursor and chatgpt',
+      'tech_vibe_priority': 'Aesthetic + Easy to build'
+    },
+    researchOutput: researchText,
+    researchSources: [],
+    prdOutput: prdText,
+    techOutput: techText,
+    agentOutputs: {},
+    tools: ['cursor', 'lovable'],
+    sectionTimestamps: {
+      research: now,
+      prd: now,
+      tech: now
+    },
+    lastModified: now,
+    artifactVersions: {
+      research: [{ content: researchText, timestamp: now }],
+      prd: [{ content: prdText, timestamp: now }],
+      tech: [{ content: techText, timestamp: now }],
+      build: []
+    },
+    artifactIndices: {
+      research: 0,
+      prd: 0,
+      tech: 0,
+      build: -1
+    },
+    tokenUsage: { input: 1800, output: 5500, groundingRequests: 1, estimatedCost: 0.08 }
+  };
+};
+
 // Helper to migrate string[] history to ArtifactVersion[] history
 const migrateArtifactVersions = (versions: any, lastMod: number): ArtifactVersion[] => {
   if (!Array.isArray(versions)) return [];
@@ -564,11 +736,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     const example = createExampleProject();
+    const vibeExample = createVibeCoderExampleProject();
     const fresh = createNewProjectState();
 
     return {
       projects: {
         [example.id]: example,
+        [vibeExample.id]: vibeExample,
         [fresh.id]: fresh
       },
       currentId: fresh.id

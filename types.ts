@@ -96,6 +96,7 @@ export interface GeminiSettings {
   reducedMotion?: boolean;
   autoSaveInterval?: number; // milliseconds
   defaultExportFormat?: 'zip' | 'markdown';
+  projectExportFormat?: 'json' | 'markdown';
 
   // Expert Settings Propagation
   maxOutputTokens?: number;

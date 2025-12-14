@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { useProject } from '../context/ProjectContext';
-import { Settings, BrainCircuit, Search, Cpu, Gauge, DollarSign, Database, AlertCircle, RefreshCw } from 'lucide-react';
+import { Settings, BrainCircuit, Search, Cpu, Gauge, DollarSign, Database, AlertCircle, RefreshCw, X } from 'lucide-react';
 import { Tooltip, Button } from './UI';
 import { PRESETS, TOKEN_LIMITS } from '../utils/constants';
 import { getExactTokenCount, estimateTokens } from '../utils/gemini';
@@ -18,6 +18,15 @@ export const ModelStatus: React.FC = () => {
 
     const [tokenCount, setTokenCount] = useState<number>(0);
     const [isCounting, setIsCounting] = useState<boolean>(false);
+    const [isDismissed, setIsDismissed] = useState<boolean>(() =>
+        localStorage.getItem('model-status-dismissed') === 'true'
+    );
+
+    const handleDismiss = () => {
+        setIsDismissed(true);
+        localStorage.setItem('model-status-dismissed', 'true');
+        addToast('Model status bar hidden. Re-enable in Settings > General.', 'info');
+    };
 
     // Construct the "Current Context" string - what would be sent if we generated now?
     // We approximate the largest context scenario (Agent Gen uses everything)
@@ -45,8 +54,25 @@ export const ModelStatus: React.FC = () => {
         };
     }, [isSettingsOpen]);  // Re-read when settings modal opens/closes
 
+    // Listen for storage changes to restore visibility from settings
+    useEffect(() => {
+        const handleStorageChange = () => {
+            setIsDismissed(localStorage.getItem('model-status-dismissed') === 'true');
+        };
+        window.addEventListener('storage', handleStorageChange);
+        // Also listen for custom event for same-tab updates
+        window.addEventListener('model-status-visibility-changed', handleStorageChange);
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('model-status-visibility-changed', handleStorageChange);
+        };
+    }, []);
+
     // Debounced Token Counting (Uses API if available, else local estimate)
     useEffect(() => {
+        // Skip token counting if dismissed
+        if (isDismissed) return;
+
         let isMounted = true;
         const timer = setTimeout(async () => {
             if (!contextString) {
@@ -79,7 +105,7 @@ export const ModelStatus: React.FC = () => {
         }, 2000); // 2s debounce to avoid API spam
 
         return () => { isMounted = false; clearTimeout(timer); };
-    }, [contextString, apiKey, settings.modelName, providerInfo.providerId]);
+    }, [contextString, apiKey, settings.modelName, providerInfo.providerId, isDismissed]);
 
     const activePreset = Object.values(PRESETS).find(p => p.id === settings.preset);
     const isCustom = !activePreset;
@@ -108,8 +134,11 @@ export const ModelStatus: React.FC = () => {
         addToast('Context is large. Consider manually shortening Research or PRD outputs to improve latency.', 'info');
     };
 
+    // Early return if dismissed - MUST be after all hooks!
+    if (isDismissed) return null;
+
     return (
-        <div className="bg-glass-100 backdrop-blur-xl border border-glass-border rounded-2xl p-2 flex flex-wrap items-center gap-4 text-xs font-mono text-slate-400 mb-8 shadow-sm relative overflow-hidden">
+        <div className="bg-glass-100 backdrop-blur-xl border border-glass-border rounded-2xl p-2 flex flex-wrap items-center gap-4 text-xs font-mono text-slate-400 mb-8 shadow-sm relative">
             {/* Subtle gradient sheen */}
             <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent opacity-50 pointer-events-none" />
 
@@ -196,7 +225,7 @@ export const ModelStatus: React.FC = () => {
             </div>
 
             {/* Configure Button */}
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-2">
                 <Tooltip content="Adjust intelligence, speed, and thinking depth.">
                     <button
                         onClick={() => setIsSettingsOpen(true)}
@@ -204,6 +233,14 @@ export const ModelStatus: React.FC = () => {
                     >
                         <Settings size={14} className="group-hover:rotate-45 transition-transform duration-500" />
                         <span>Configure</span>
+                    </button>
+                </Tooltip>
+                <Tooltip content="Hide this bar. Re-enable in Settings > General.">
+                    <button
+                        onClick={handleDismiss}
+                        className="p-2 hover:bg-white/10 transition-colors rounded-lg text-slate-500 hover:text-slate-300 border border-transparent hover:border-white/10"
+                    >
+                        <X size={14} />
                     </button>
                 </Tooltip>
             </div>

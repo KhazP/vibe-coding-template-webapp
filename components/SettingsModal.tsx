@@ -5,7 +5,7 @@ import { useProject } from '../context/ProjectContext';
 import {
     Zap, BrainCircuit, Search, Check, Activity, Bell, User, Clock,
     FileArchive, EyeOff, Layout, Download, ChevronDown, RefreshCcw, MessageSquare,
-    AlertTriangle, Wrench
+    AlertTriangle, Wrench, BarChart2, RotateCcw
 } from 'lucide-react';
 import { Modal, Tooltip, Select, TextArea, Button } from './UI';
 import { MODEL_CONFIGS, PRESETS, DEFAULT_SETTINGS } from '../utils/constants';
@@ -23,7 +23,7 @@ import { getAnthropicModels, type AnthropicModel } from '../utils/anthropic';
 import { PricingIndicator } from './PricingIndicator';
 import { ContextBar } from './ContextBar';
 
-type SettingsTab = 'ai' | 'general' | 'export';
+type SettingsTab = 'ai' | 'general' | 'export' | 'reset';
 
 const SettingsModal: React.FC = () => {
     const { state, updateSettings, isSettingsOpen, setIsSettingsOpen } = useProject();
@@ -53,6 +53,9 @@ const SettingsModal: React.FC = () => {
     const [expertSafetyPreset, setExpertSafetyPreset] = useState<GeminiSafetyPreset>(
         (activeProvider === 'gemini' && (savedExpertSettings as any)?.safetyPreset) || 'default'
     );
+
+    // Reset confirmation state
+    const [showResetConfirmation, setShowResetConfirmation] = useState(false);
 
     // Gemini Dynamic Models
     const [geminiModels, setGeminiModels] = useState<GeminiModel[]>([]);
@@ -438,18 +441,30 @@ const SettingsModal: React.FC = () => {
     const currentConfig = MODEL_CONFIGS[settings.modelName as keyof typeof MODEL_CONFIGS];
     const currentMaxBudget = currentConfig ? currentConfig.maxThinkingBudget : 32768;
 
-    const TabButton: React.FC<{ id: SettingsTab; icon: React.ReactNode; label: string }> = ({ id, icon, label }) => (
-        <button
-            onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all duration-200 w-full text-left border-l-2 ${activeTab === id
-                ? 'bg-primary-500/10 text-primary-400 border-primary-400'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border-transparent'
-                }`}
-        >
-            {icon}
-            <span className="font-medium text-sm">{label}</span>
-        </button>
-    );
+    const TabButton: React.FC<{ id: SettingsTab; icon: React.ReactNode; label: string }> = ({ id, icon, label }) => {
+        const isReset = id === 'reset';
+        return (
+            <button
+                onClick={() => setActiveTab(id)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all duration-200 w-full text-left border-l-2 ${activeTab === id
+                    ? isReset
+                        ? 'bg-red-500/20 text-red-300 border-red-400 shadow-[inset_0_0_12px_rgba(239,68,68,0.15)]'
+                        : 'bg-primary-500/20 text-primary-300 border-primary-400 shadow-[inset_0_0_12px_rgba(16,185,129,0.15)]'
+                    : isReset
+                        ? 'text-red-500/60 hover:text-red-400 hover:bg-red-500/5 border-transparent'
+                        : 'text-slate-500 hover:text-slate-200 hover:bg-white/5 border-transparent'
+                    }`}
+            >
+                {React.cloneElement(icon as React.ReactElement<any>, {
+                    size: 18,
+                    className: activeTab === id
+                        ? isReset ? 'text-red-400' : 'text-primary-400'
+                        : isReset ? 'text-red-500/60' : 'text-slate-500'
+                })}
+                <span className={`font-medium text-sm ${activeTab === id ? (isReset ? 'text-red-300' : 'text-primary-300') : ''}`}>{label}</span>
+            </button>
+        );
+    };
 
     return (
         <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Global Settings" maxWidth="max-w-5xl">
@@ -459,6 +474,8 @@ const SettingsModal: React.FC = () => {
                     <TabButton id="ai" icon={<BrainCircuit size={18} />} label="AI Brain" />
                     <TabButton id="general" icon={<Layout size={18} />} label="General" />
                     <TabButton id="export" icon={<Download size={18} />} label="Export" />
+                    <div className="flex-1" />
+                    <TabButton id="reset" icon={<RotateCcw size={18} />} label="Reset" />
                 </div>
 
                 {/* Content Area */}
@@ -1217,18 +1234,49 @@ const SettingsModal: React.FC = () => {
                                     <Clock size={16} className="text-emerald-400" />
                                 </div>
                                 <div className="flex-1">
-                                    <label className="font-medium text-slate-300 block text-xs">Auto-Save</label>
-                                    <p className="text-[10px] text-slate-400">Interval (ms)</p>
+                                    <label className="font-medium text-slate-300 block text-xs">Auto-Save Interval</label>
+                                    <p className="text-[10px] text-slate-400">How often to save changes</p>
                                 </div>
-                                <div className="w-32 flex items-center gap-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[9px] text-slate-500">0.5s</span>
                                     <input
                                         type="range" min="500" max="5000" step="500"
                                         value={settings.autoSaveInterval || 1000}
                                         onChange={(e) => updateSettings({ autoSaveInterval: parseInt(e.target.value) })}
                                         className="w-20 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                                     />
-                                    <span className="text-[10px] font-mono w-8 text-right">{settings.autoSaveInterval || 1000}</span>
+                                    <span className="text-[9px] text-slate-500">5s</span>
+                                    <span className="text-[10px] font-mono font-bold text-emerald-400 w-10 text-right">{((settings.autoSaveInterval || 1000) / 1000).toFixed(1)}s</span>
                                 </div>
+                            </div>
+
+                            <div className="flex items-center justify-between p-3 bg-slate-950 rounded-xl border border-slate-800 hover:border-slate-700 transition-colors">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                                        <BarChart2 size={16} className="text-blue-400" />
+                                    </div>
+                                    <div>
+                                        <label className="font-medium text-slate-300 block text-xs">Show Model Status Bar</label>
+                                        <p className="text-[10px] text-slate-400">Display AI model info at top of pages</p>
+                                    </div>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={localStorage.getItem('model-status-dismissed') !== 'true'}
+                                        onChange={(e) => {
+                                            if (e.target.checked) {
+                                                localStorage.removeItem('model-status-dismissed');
+                                            } else {
+                                                localStorage.setItem('model-status-dismissed', 'true');
+                                            }
+                                            // Dispatch custom event to notify ModelStatus component
+                                            window.dispatchEvent(new Event('model-status-visibility-changed'));
+                                        }}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                                </label>
                             </div>
 
                             <div className="grid grid-cols-1 gap-3 pt-4">
@@ -1287,8 +1335,8 @@ const SettingsModal: React.FC = () => {
                                     <FileArchive size={16} className="text-orange-400" />
                                 </div>
                                 <div className="flex-1">
-                                    <label className="font-medium text-slate-300 block text-xs">Default Export Format</label>
-                                    <p className="text-[10px] text-slate-400">Kit download type</p>
+                                    <label className="font-medium text-slate-300 block text-xs">Vibe Kit Export Format</label>
+                                    <p className="text-[10px] text-slate-400">Format for Export & Deploy downloads</p>
                                 </div>
                                 <div className="w-32">
                                     <Select
@@ -1303,15 +1351,129 @@ const SettingsModal: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="p-4 rounded-xl bg-slate-900/50 border border-white/5 text-xs text-slate-400 leading-relaxed">
-                                <p>
-                                    <strong>ZIP Archive:</strong> Best for starting a new project. Includes all folders, config files, and documentation ready for <code>git init</code>.
-                                </p>
-                                <div className="h-px bg-white/5 my-2" />
-                                <p>
-                                    <strong>Markdown:</strong> Best for copying into an existing LLM chat. Combines all generated artifacts into a single clipboard-ready text block.
-                                </p>
+                            <div className="flex items-center gap-3 p-3 bg-slate-950 rounded-xl border border-slate-800">
+                                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+                                    <Download size={16} className="text-blue-400" />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="font-medium text-slate-300 block text-xs">Project Export Format</label>
+                                    <p className="text-[10px] text-slate-400">Format for My Projects exports</p>
+                                </div>
+                                <div className="w-32">
+                                    <Select
+                                        label=""
+                                        value={settings.projectExportFormat || 'json'}
+                                        onChange={(e) => updateSettings({ projectExportFormat: e.target.value as 'json' | 'markdown' })}
+                                        className="!mb-0 !py-1.5 !text-xs"
+                                    >
+                                        <option value="json">JSON</option>
+                                        <option value="markdown">Markdown</option>
+                                    </Select>
+                                </div>
                             </div>
+
+                            <div className="p-4 rounded-xl bg-slate-900/50 border border-white/5 text-xs text-slate-400 leading-relaxed space-y-3">
+                                <div>
+                                    <p className="font-bold text-slate-300 mb-1">Vibe Kit Export</p>
+                                    <p><strong>ZIP Archive:</strong> Best for starting a new project. Includes all folders, config files, and documentation ready for <code>git init</code>.</p>
+                                    <p><strong>Markdown:</strong> Best for copying into an existing LLM chat. Combines all generated artifacts into a single clipboard-ready text block.</p>
+                                </div>
+                                <div className="h-px bg-white/5" />
+                                <div>
+                                    <p className="font-bold text-slate-300 mb-1">Project Export</p>
+                                    <p><strong>JSON:</strong> Complete project backup including all state. Can be re-imported to restore a project.</p>
+                                    <p><strong>Markdown:</strong> Human-readable export of all generated artifacts. Cannot be re-imported.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- Reset Tab --- */}
+                    {activeTab === 'reset' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300 flex flex-col items-center justify-center h-full">
+                            <div className="text-center max-w-md">
+                                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-red-500/10 border-2 border-red-500/30 flex items-center justify-center">
+                                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M12 2.5C6.75 2.5 2.5 6.75 2.5 12C2.5 17.25 6.75 21.5 12 21.5C17.25 21.5 21.5 17.25 21.5 12" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" />
+                                        <path d="M17.5 2.5V8.5H21.5" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                        <path d="M21.5 8.5L17 13" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" />
+                                        <path d="M8 8L16 16M16 8L8 16" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" opacity="0.5" />
+                                    </svg>
+                                </div>
+
+                                <h3 className="text-xl font-bold text-red-400 mb-3">Reset Application</h3>
+                                <p className="text-sm text-slate-400 mb-6 leading-relaxed">
+                                    This will permanently delete all your data and return the app to its initial state. This action cannot be undone.
+                                </p>
+
+                                <div className="p-4 rounded-xl bg-red-950/30 border border-red-500/20 mb-6">
+                                    <p className="text-xs text-red-300/80 font-medium mb-2">The following will be deleted:</p>
+                                    <ul className="text-xs text-slate-400 space-y-1">
+                                        <li className="flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-red-500/60"></span>
+                                            All projects and generated content
+                                        </li>
+                                        <li className="flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-red-500/60"></span>
+                                            All API keys (Gemini, OpenAI, Claude, OpenRouter)
+                                        </li>
+                                        <li className="flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-red-500/60"></span>
+                                            All settings and preferences
+                                        </li>
+                                    </ul>
+                                </div>
+
+                                <button
+                                    onClick={() => setShowResetConfirmation(true)}
+                                    className="group relative px-8 py-4 rounded-xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white font-bold text-lg transition-all duration-300 shadow-lg shadow-red-500/20 hover:shadow-red-500/40 hover:scale-105"
+                                >
+                                    <span className="flex items-center gap-3">
+                                        <RotateCcw size={22} className="group-hover:rotate-180 transition-transform duration-500" />
+                                        Reset Everything
+                                    </span>
+                                </button>
+                            </div>
+
+                            {/* Reset Confirmation Modal */}
+                            <Modal
+                                isOpen={showResetConfirmation}
+                                onClose={() => setShowResetConfirmation(false)}
+                                title="⚠️ Confirm Reset"
+                                maxWidth="max-w-md"
+                            >
+                                <div className="space-y-4">
+                                    <div className="p-4 bg-red-950/50 border border-red-500/30 rounded-xl">
+                                        <p className="text-sm text-red-200 font-medium mb-2">
+                                            Are you absolutely sure?
+                                        </p>
+                                        <p className="text-xs text-slate-400">
+                                            This will permanently delete ALL your projects, API keys, and settings. The app will reload with a fresh state.
+                                        </p>
+                                    </div>
+
+                                    <div className="flex gap-3 pt-2">
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => setShowResetConfirmation(false)}
+                                            className="flex-1"
+                                        >
+                                            Cancel
+                                        </Button>
+                                        <Button
+                                            onClick={() => {
+                                                // Clear all localStorage
+                                                localStorage.clear();
+                                                // Reload the app to reinitialize
+                                                window.location.reload();
+                                            }}
+                                            className="flex-1 bg-red-600/80 hover:bg-red-500 border-red-500/50 shadow-none hover:shadow-[0_0_20px_rgba(239,68,68,0.4)] text-white"
+                                        >
+                                            Yes, Reset Everything
+                                        </Button>
+                                    </div>
+                                </div>
+                            </Modal>
                         </div>
                     )}
 

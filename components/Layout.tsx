@@ -392,10 +392,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               <Key size={16} /> <span className="ml-2">API Key</span>
             </Button>
           </div>
-
-          <div className="text-[10px] text-slate-600 mt-2 text-center font-mono opacity-50">
-            Auto-save • v2.2.0
-          </div>
         </div>
       </aside>
 
@@ -413,35 +409,48 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             </div>
 
             <div className="flex items-center gap-4 justify-between md:justify-end">
-              <div className="text-xs font-mono flex items-center gap-2 transition-all duration-300">
-                {saveStatus === 'saving' && (
-                  <span className="text-slate-400 flex items-center gap-2">
-                    <Loader2 size={12} className="animate-spin" /> Saving...
-                  </span>
-                )}
-                {saveStatus === 'saved' && (
-                  <span className="text-emerald-500/80 flex items-center gap-2">
-                    <CheckCircle size={12} /> Saved
-                  </span>
-                )}
-                {saveStatus === 'unsaved' && (
-                  <span className="text-amber-500/80 flex items-center gap-2 animate-pulse">
-                    <AlertCircle size={12} /> Unsaved
-                  </span>
-                )}
-                {saveStatus === 'error' && (
-                  <span className="text-red-500 flex items-center gap-2 font-bold animate-pulse" title="Storage Full! Export or delete projects.">
-                    <AlertCircle size={12} /> Storage Full
-                  </span>
-                )}
-              </div>
               <div className="flex gap-2">
                 <Button
                   variant="secondary"
                   onClick={saveProject}
-                  className="h-8 text-xs px-3 bg-white/5 border-white/10 hover:bg-white/10"
+                  className={`h-8 text-xs px-3 transition-all duration-300 ${saveStatus === 'saving' ? 'bg-slate-700/50 border-slate-600' :
+                      saveStatus === 'saved' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.15)]' :
+                        saveStatus === 'unsaved' ? 'bg-amber-900/20 border-amber-500/40 text-amber-400' :
+                          saveStatus === 'error' ? 'bg-red-900/30 border-red-500/50 text-red-400' :
+                            'bg-white/5 border-white/10 hover:bg-white/10'
+                    }`}
+                  disabled={saveStatus === 'saving'}
                 >
-                  <Save size={14} className="mr-1.5" /> Save
+                  {saveStatus === 'saving' && (
+                    <>
+                      <Loader2 size={14} className="mr-1.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  )}
+                  {saveStatus === 'saved' && (
+                    <>
+                      <CheckCircle size={14} className="mr-1.5" />
+                      <span>Saved</span>
+                    </>
+                  )}
+                  {saveStatus === 'unsaved' && (
+                    <>
+                      <Save size={14} className="mr-1.5" />
+                      <span>Unsaved</span>
+                    </>
+                  )}
+                  {saveStatus === 'error' && (
+                    <>
+                      <AlertCircle size={14} className="mr-1.5" />
+                      <span>Storage Full</span>
+                    </>
+                  )}
+                  {!saveStatus && (
+                    <>
+                      <Save size={14} className="mr-1.5" />
+                      <span>Save</span>
+                    </>
+                  )}
                 </Button>
               </div>
             </div>

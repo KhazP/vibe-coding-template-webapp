@@ -551,7 +551,7 @@ Your AI agent will use this as its primary context.
                             </Button>
 
                             {/* Secondary Option Button */}
-                            <Button onClick={isZipDefault ? handleCopyAllMarkdown : handleDownloadZip} variant="secondary" className="px-3" tooltip={isZipDefault ? "Copy as Markdown instead" : "Download as ZIP instead"}>
+                            <Button onClick={isZipDefault ? handleCopyAllMarkdown : handleDownloadZip} variant="secondary" className="px-3" tooltip={isZipDefault ? "Copy Markdown" : "Download ZIP"}>
                                 {isZipDefault ? <Copy size={18} /> : <Download size={18} />}
                             </Button>
                         </div>

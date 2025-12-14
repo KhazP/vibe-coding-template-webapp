@@ -43,14 +43,45 @@ const Projects: React.FC = () => {
   const handleExport = (e: React.MouseEvent, project: ProjectState) => {
     e.stopPropagation();
     try {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(project, null, 2));
-      const downloadAnchorNode = document.createElement('a');
-      downloadAnchorNode.setAttribute("href", dataStr);
-      downloadAnchorNode.setAttribute("download", `${project.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_vibe.json`);
-      document.body.appendChild(downloadAnchorNode);
-      downloadAnchorNode.click();
-      downloadAnchorNode.remove();
-      addToast('Project exported successfully', 'success');
+      const format = project.settings?.projectExportFormat || 'json';
+      const cleanName = project.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+
+      if (format === 'markdown') {
+        // Export as combined markdown
+        let combined = `# ${project.name.toUpperCase()} - PROJECT EXPORT\n\n`;
+        combined += `**Persona:** ${getPersonaLabel(project.persona)}\n`;
+        combined += `**Last Modified:** ${formatDate(project.lastModified)}\n\n---\n\n`;
+
+        if (project.researchOutput) combined += `## RESEARCH\n${project.researchOutput}\n\n---\n\n`;
+        if (project.prdOutput) combined += `## PRD\n${project.prdOutput}\n\n---\n\n`;
+        if (project.techOutput) combined += `## TECH DESIGN\n${project.techOutput}\n\n---\n\n`;
+        if (Object.keys(project.agentOutputs).length > 0) {
+          Object.entries(project.agentOutputs).forEach(([filename, content]) => {
+            combined += `## ${filename}\n\`\`\`markdown\n${content}\n\`\`\`\n\n---\n\n`;
+          });
+        }
+
+        const blob = new Blob([combined], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${cleanName}_vibe.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        addToast('Project exported as Markdown', 'success');
+      } else {
+        // Export as JSON (default)
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(project, null, 2));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", `${cleanName}_vibe.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+        addToast('Project exported as JSON', 'success');
+      }
     } catch (err) {
       addToast('Failed to export project', 'error');
     }
