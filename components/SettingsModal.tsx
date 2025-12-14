@@ -11,7 +11,7 @@ import { Modal, Tooltip, Select, TextArea, Button } from './UI';
 import { MODEL_CONFIGS, PRESETS, DEFAULT_SETTINGS } from '../utils/constants';
 import { PresetMode, ToastPosition, Persona, GeminiSafetyPreset, ExpertSettings } from '../types';
 import { useToast } from './Toast';
-import { getProviderSettings, setDefaultModel, getExpertSettings, setExpertSettings, resetExpertSettings } from '../utils/providerStorage';
+import { getProviderSettings, setDefaultModel, getExpertSettings, setExpertSettings, resetExpertSettings, getEffectiveDefaultProvider } from '../utils/providerStorage';
 import { PROVIDERS, type ProviderId } from '../utils/providers';
 import { PROVIDER_MODELS, getModelsForProvider, getModelById, supportsReasoningEffort, type ModelConfig, type ReasoningEffort } from '../utils/modelUtils';
 import { ReasoningEffortSelector } from './ReasoningEffortSelector';
@@ -29,7 +29,7 @@ const SettingsModal: React.FC = () => {
 
     // Provider state
     const providerSettings = useMemo(() => getProviderSettings(), [isSettingsOpen]);
-    const [activeProvider, setActiveProvider] = useState<ProviderId>(providerSettings.defaultProvider);
+    const [activeProvider, setActiveProvider] = useState<ProviderId>(getEffectiveDefaultProvider());
     const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>('medium');
     const [selectedModelId, setSelectedModelId] = useState<string>(providerSettings.defaultModels[activeProvider] || '');
 

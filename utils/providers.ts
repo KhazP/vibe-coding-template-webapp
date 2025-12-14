@@ -313,14 +313,14 @@ export const testProviderConnection = async (
             }
 
             case 'anthropic': {
-                // Use models list endpoint (cheap/free)
-                const response = await fetch(`${provider.baseURL}/models`, {
-                    headers: provider.getHeaders(apiKey),
-                });
-                if (!response.ok) {
-                    const data = await response.json().catch(() => ({}));
-                    throw new Error(data?.error?.message || `HTTP ${response.status}`);
+                // Anthropic doesn't support CORS for browser requests
+                // We can only validate the key format, not test the connection
+                // Real validation happens on first actual API call
+                if (!validateKeyFormat('anthropic', apiKey)) {
+                    return { success: false, error: 'Invalid key format. Anthropic keys start with sk-ant-' };
                 }
+                // Return success based on format validation only
+                // Note: Actual key validity will be checked on first generation request
                 return { success: true };
             }
 
