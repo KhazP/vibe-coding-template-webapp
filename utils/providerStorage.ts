@@ -252,3 +252,29 @@ export const resetExpertSettings = (id: ProviderId): void => {
 export const resetAllExpertSettings = (): void => {
     setProviderSettings({ expertSettings: {} });
 };
+
+/**
+ * Get the effective default provider - returns a provider that actually has a key saved.
+ * Priority: 1. Stored default provider (if it has a key)
+ *           2. First provider with a key in order: gemini, openai, anthropic, openrouter
+ *           3. Falls back to 'gemini' if no keys exist
+ */
+export const getEffectiveDefaultProvider = (): ProviderId => {
+    const settings = getProviderSettings();
+
+    // Check if stored default provider has a key
+    if (settings.defaultProvider && getProviderKey(settings.defaultProvider)) {
+        return settings.defaultProvider;
+    }
+
+    // Otherwise, find first provider with a key
+    const providerOrder: ProviderId[] = ['gemini', 'openai', 'anthropic', 'openrouter'];
+    for (const id of providerOrder) {
+        if (getProviderKey(id)) {
+            return id;
+        }
+    }
+
+    // Default fallback (no keys exist)
+    return 'gemini';
+};

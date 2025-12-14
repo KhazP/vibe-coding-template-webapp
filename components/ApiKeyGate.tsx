@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Key, Lock, Eye, EyeOff, ExternalLink, CheckCircle2, ShieldCheck,
-  AlertCircle, Loader2, X, Sparkles, ChevronDown
+  AlertCircle, Loader2, X, Sparkles, ChevronDown, Trash2
 } from 'lucide-react';
 import { Button } from './UI';
 import { useProject } from '../context/ProjectContext';
@@ -21,6 +21,7 @@ import {
   clearProviderKey,
   getProviderSettings,
   setProviderSettings,
+  getEffectiveDefaultProvider,
 } from '../utils/providerStorage';
 
 // ============================================================================
@@ -36,8 +37,8 @@ type ProviderKeyStatus = 'none' | 'saved' | 'invalid' | 'testing';
 export const ApiKeyGate: React.FC = () => {
   const { apiKey, setApiKey, isApiKeyModalOpen, setIsApiKeyModalOpen } = useProject();
 
-  // Current selected provider (default: gemini)
-  const [selectedProvider, setSelectedProvider] = useState<ProviderId>('gemini');
+  // Current selected provider - defaults to provider with saved key, or from settings
+  const [selectedProvider, setSelectedProvider] = useState<ProviderId>(() => getEffectiveDefaultProvider());
   const [showProviderDropdown, setShowProviderDropdown] = useState(false);
 
   // Key input state
@@ -323,6 +324,25 @@ export const ApiKeyGate: React.FC = () => {
 
                 {/* Action Buttons */}
                 <div className="flex gap-3">
+                  {/* Delete Key Button - Only show if current provider has a saved key */}
+                  {status === 'saved' && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        clearProviderKey(selectedProvider);
+                        setKeyInput('');
+                        setStatus('none');
+                        // Clear legacy Gemini key if needed
+                        if (selectedProvider === 'gemini') {
+                          setApiKey('');
+                        }
+                      }}
+                      className="px-3 bg-red-900/20 hover:bg-red-900/40 border-red-500/20 text-red-400"
+                      disabled={isValidating}
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  )}
                   {geminiSaved && (
                     <Button
                       variant="secondary"
