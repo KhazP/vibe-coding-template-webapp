@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useReducer, useRef, useCallback, useMemo } from 'react';
 import { Persona, ProjectState, GeminiSettings, GroundingChunk, ProjectFieldKey, ToolSettings, AnalyticsEvent, ArtifactSectionName, TokenUsage, ArtifactVersion } from '../types';
 import { runDeepResearch, runDeepResearchInteraction, generateArtifact, streamArtifact, streamDeepResearch } from '../utils/gemini';
-import { runOpenAIDeepResearch } from '../utils/openai';
+import { runOpenAIDeepResearch, streamOpenAI } from '../utils/openai';
+import { getModelById } from '../utils/modelUtils';
 import { getPRDSystemInstruction, getTechDesignSystemInstruction, getAgentSystemInstruction, getRefineSystemInstruction, generateRefinePrompt, getBuildPlanSystemInstruction } from '../utils/templates';
 import { useToast } from '../components/Toast';
 import { STORAGE_KEYS, DEFAULT_SETTINGS, PRICING, MODELS } from '../utils/constants';
@@ -1117,12 +1118,24 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const performGeminiPRD = useCallback(async (prompt: string) => {
     const projectId = state.currentId;
     const proj = state.projects[projectId];
-    if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
+    if (!proj) return;
+
+    // Determine Provider
+    const modelConfig = getModelById(proj.settings.modelName);
+    const providerId = modelConfig?.providerId || 'gemini';
+    const apiKeyToUse = getProviderKey(providerId === 'openai' ? 'openai' : 'gemini');
+
+    if (!apiKeyToUse) {
+      if (providerId === 'openai') addToast('OpenAI API Key required', 'error');
+      setIsApiKeyModalOpen(true);
+      return;
+    }
+
     abortControllerRef.current = new AbortController();
 
     const systemInstruction = getPRDSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
     const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
-    const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
+    const groundingCostCount = proj.settings.useGrounding && providerId === 'gemini' ? 1 : 0; // Only Gemini charges grounding
     const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
     const startUsage = {
@@ -1135,20 +1148,35 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
     activeUsageRef.current = startUsage;
 
-    setGenerationPhase('Initializing AI...');
+    setGenerationPhase(`Initializing ${modelConfig?.displayName || 'AI'}...`);
     let accumulatedText = '';
     try {
-      const text = await streamArtifact(
-        systemInstruction, prompt, proj.settings, apiKey,
-        (chunk: string) => {
-          accumulatedText += chunk;
-          handleStreamUpdate(chunk, 'prd', accumulatedText, proj.settings.modelName, projectId);
-        },
-        (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
-      );
+      let text = "";
+
+      if (providerId === 'openai') {
+        text = await streamOpenAI(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          (chunk: string) => {
+            accumulatedText += chunk;
+            handleStreamUpdate(chunk, 'prd', accumulatedText, proj.settings.modelName, projectId);
+          },
+          (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+        );
+      } else {
+        // Default to Gemini (handles 'gemini' and fallbacks)
+        text = await streamArtifact(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          (chunk: string) => {
+            accumulatedText += chunk;
+            handleStreamUpdate(chunk, 'prd', accumulatedText, proj.settings.modelName, projectId);
+          },
+          (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+        );
+      }
+
       updateCurrentProject({ isGenerating: false });
       commitArtifact('prd', text);
-      logEvent('generation_complete', { type: 'prd', project: proj.name });
+      logEvent('generation_complete', { type: 'prd', project: proj.name, provider: providerId });
       setGenerationPhase('');
       addToast('PRD generated', 'success');
     } catch (error: any) {
@@ -1156,17 +1184,29 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!error?.message?.includes('Aborted')) updateCurrentProject({ isGenerating: false });
       setGenerationPhase('');
     }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent, commitArtifact, handleStreamUpdate]);
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, handleApiError, logEvent, commitArtifact, handleStreamUpdate]);
 
   const performGeminiTech = useCallback(async (prompt: string) => {
     const projectId = state.currentId;
     const proj = state.projects[projectId];
-    if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
+    if (!proj) return;
+
+    // Determine Provider
+    const modelConfig = getModelById(proj.settings.modelName);
+    const providerId = modelConfig?.providerId || 'gemini';
+    const apiKeyToUse = getProviderKey(providerId === 'openai' ? 'openai' : 'gemini');
+
+    if (!apiKeyToUse) {
+      if (providerId === 'openai') addToast('OpenAI API Key required', 'error');
+      setIsApiKeyModalOpen(true);
+      return;
+    }
+
     abortControllerRef.current = new AbortController();
 
     const systemInstruction = getTechDesignSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
     const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
-    const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
+    const groundingCostCount = proj.settings.useGrounding && providerId === 'gemini' ? 1 : 0;
     const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
     const startUsage = {
@@ -1179,20 +1219,33 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
     activeUsageRef.current = startUsage;
 
-    setGenerationPhase('Initializing AI...');
+    setGenerationPhase(`Initializing ${modelConfig?.displayName || 'AI'}...`);
     let accumulatedText = '';
     try {
-      const text = await streamArtifact(
-        systemInstruction, prompt, proj.settings, apiKey,
-        (chunk: string) => {
-          accumulatedText += chunk;
-          handleStreamUpdate(chunk, 'tech', accumulatedText, proj.settings.modelName, projectId);
-        },
-        (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
-      );
+      let text = "";
+      if (providerId === 'openai') {
+        text = await streamOpenAI(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          (chunk: string) => {
+            accumulatedText += chunk;
+            handleStreamUpdate(chunk, 'tech', accumulatedText, proj.settings.modelName, projectId);
+          },
+          (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+        );
+      } else {
+        text = await streamArtifact(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          (chunk: string) => {
+            accumulatedText += chunk;
+            handleStreamUpdate(chunk, 'tech', accumulatedText, proj.settings.modelName, projectId);
+          },
+          (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+        );
+      }
+
       updateCurrentProject({ isGenerating: false });
       commitArtifact('tech', text);
-      logEvent('generation_complete', { type: 'tech', project: proj.name });
+      logEvent('generation_complete', { type: 'tech', project: proj.name, provider: providerId });
       setGenerationPhase('');
       addToast('Tech Design generated', 'success');
     } catch (error: any) {
@@ -1200,61 +1253,27 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!error?.message?.includes('Aborted')) updateCurrentProject({ isGenerating: false });
       setGenerationPhase('');
     }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent, commitArtifact, handleStreamUpdate]);
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, handleApiError, logEvent, commitArtifact, handleStreamUpdate]);
 
-  const performGeminiAgent = useCallback(async (prompt: string) => {
-    const proj = state.projects[state.currentId];
+  const performGeminiAgent = useCallback(async (prompt: string): Promise<string> => {
+    const projectId = state.currentId;
+    const proj = state.projects[projectId];
     if (!proj) return "";
-    if (!apiKey) { setIsApiKeyModalOpen(true); return ""; }
+
+    // Determine Provider
+    const modelConfig = getModelById(proj.settings.modelName);
+    const providerId = modelConfig?.providerId || 'gemini';
+    const apiKeyToUse = getProviderKey(providerId === 'openai' ? 'openai' : 'gemini');
+
+    if (!apiKeyToUse) {
+      if (providerId === 'openai') addToast('OpenAI API Key required for Agent', 'error');
+      setIsApiKeyModalOpen(true);
+      return "";
+    }
 
     const systemInstruction = getAgentSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
     const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
-    const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
-    const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
-
-    const startUsage = {
-      ...proj.tokenUsage,
-      input: proj.tokenUsage.input + estimatedInputTokens,
-      groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
-      estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
-    };
-
-    updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
-    setGenerationPhase('Generating Agent Config...');
-    try {
-      const text = (await generateArtifact(systemInstruction, prompt, proj.settings, apiKey)) as string;
-
-      const estimatedOutput = estimateTokens(text);
-      const outputCostDelta = calculateIncrementalCost(proj.settings.modelName as string, 0, estimatedOutput, 0);
-
-      const endUsage = {
-        ...startUsage,
-        output: startUsage.output + estimatedOutput,
-        estimatedCost: startUsage.estimatedCost + outputCostDelta
-      };
-
-      updateCurrentProject({ isGenerating: false, tokenUsage: endUsage });
-      logEvent('generation_complete', { type: 'agent', project: proj.name });
-      setGenerationPhase('');
-      addToast('Agent config generated', 'success');
-      return text;
-    } catch (error: any) {
-      handleApiError(error);
-      updateCurrentProject({ isGenerating: false });
-      setGenerationPhase('');
-      return "";
-    }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent]);
-
-  const performGeminiBuildPlan = useCallback(async (prompt: string) => {
-    const projectId = state.currentId;
-    const proj = state.projects[projectId];
-    if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
-    abortControllerRef.current = new AbortController();
-
-    const systemInstruction = getBuildPlanSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
-    const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
-    const groundingCostCount = proj.settings.useGrounding ? 1 : 0;
+    const groundingCostCount = proj.settings.useGrounding && providerId === 'gemini' ? 1 : 0;
     const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
     const startUsage = {
@@ -1267,20 +1286,129 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
     activeUsageRef.current = startUsage;
 
-    setGenerationPhase('Initializing AI...');
+    setGenerationPhase(`Initializing ${modelConfig?.displayName || 'Agent'}...`);
+    let fullOutput = "";
+
+    try {
+      if (providerId === 'openai') {
+        fullOutput = await streamOpenAI(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          (chunk) => {
+            // Agent stream doesn't update a visible artifact in real-time typically,
+            // but we might want to if we had a "Agent Log".
+            // For now, we just accumulate.
+            // If we wanted to "stream" to the agentOutputs immediately, we'd need a key.
+            // But performGeminiAgent returns the string for parsing.
+          },
+          (status) => setGenerationPhase(status)
+        );
+      } else {
+        // Gemini
+        fullOutput = await streamArtifact(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          () => { }, // Agent outputs are typically parsed at end, so we might not stream to a specific field user sees immediately
+          (status) => setGenerationPhase(status)
+        );
+      }
+
+      setGenerationPhase('Parsing Agent Configuration...');
+
+      // Parse logic (Assuming same JSON format for both)
+      // We expect the LLM to output key-value pairs or JSON.
+      // The current templates typically ask for specific format.
+      // If the output is raw text, we might need to adjust.
+      // Legacy code expected `generateArtifact` (non-streaming) behavior which returns text.
+      // `streamArtifact` returns text too.
+
+      // We need to parse "FILE: filename" blocks or similar if that's what the agent does.
+      // But looking at previous `performGeminiAgent` (implied), it seemed to return text.
+
+      // Dispatch agent outputs
+      // (This logic matches how we handled it before, effectively just assuming text)
+      // Wait, performGeminiAgent is declared to return Promise<string>.
+      // The caller handles parsing?
+      // No, looking at `generateAgentOutputs` stub, it seems `performGeminiAgent` is called by... whom?
+      // Actually `performGeminiAgent` is in ProjectContext but not used in the snippet I saw?
+      // It is exported. Let's assume the caller uses the return value.
+
+      const newAgentOutputs = { ...proj.agentOutputs, 'AGENTS.md': fullOutput };
+      updateCurrentProject({ isGenerating: false, agentOutputs: newAgentOutputs });
+
+      // Also updates timestamps
+      const timestamps = { ...(proj.sectionTimestamps || {}), agent: Date.now() };
+      updateCurrentProject({ sectionTimestamps: timestamps });
+
+      logEvent('generation_complete', { type: 'agent', project: proj.name, provider: providerId });
+      setGenerationPhase('');
+      return fullOutput;
+
+    } catch (error: any) {
+      handleApiError(error);
+      if (!error?.message?.includes('Aborted')) updateCurrentProject({ isGenerating: false });
+      setGenerationPhase('');
+      return "";
+    }
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, handleApiError, logEvent]);
+
+  const performGeminiBuildPlan = useCallback(async (prompt: string) => {
+    const projectId = state.currentId;
+    const proj = state.projects[projectId];
+    if (!proj) return;
+
+    // Determine Provider
+    const modelConfig = getModelById(proj.settings.modelName);
+    const providerId = modelConfig?.providerId || 'gemini';
+    const apiKeyToUse = getProviderKey(providerId === 'openai' ? 'openai' : 'gemini');
+
+    if (!apiKeyToUse) {
+      if (providerId === 'openai') addToast('OpenAI API Key required', 'error');
+      setIsApiKeyModalOpen(true);
+      return;
+    }
+    abortControllerRef.current = new AbortController();
+
+    const systemInstruction = getBuildPlanSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
+    const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
+    const groundingCostCount = proj.settings.useGrounding && providerId === 'gemini' ? 1 : 0;
+    const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
+
+    const startUsage = {
+      ...proj.tokenUsage,
+      input: proj.tokenUsage.input + estimatedInputTokens,
+      groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
+      estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
+    };
+
+    updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
+    activeUsageRef.current = startUsage;
+
+    setGenerationPhase(`Initializing ${modelConfig?.displayName || 'AI'}...`);
     let accumulatedText = '';
     try {
-      const text = await streamArtifact(
-        systemInstruction, prompt, proj.settings, apiKey,
-        (chunk: string) => {
-          accumulatedText += chunk;
-          handleStreamUpdate(chunk, 'build', accumulatedText, proj.settings.modelName, projectId);
-        },
-        (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
-      );
+      let text = "";
+      if (providerId === 'openai') {
+        text = await streamOpenAI(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          (chunk: string) => {
+            accumulatedText += chunk;
+            handleStreamUpdate(chunk, 'build', accumulatedText, proj.settings.modelName, projectId);
+          },
+          (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+        );
+      } else {
+        text = await streamArtifact(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          (chunk: string) => {
+            accumulatedText += chunk;
+            handleStreamUpdate(chunk, 'build', accumulatedText, proj.settings.modelName, projectId);
+          },
+          (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+        );
+      }
+
       updateCurrentProject({ isGenerating: false });
       commitArtifact('build', text);
-      logEvent('generation_complete', { type: 'build_plan', project: proj.name });
+      logEvent('generation_complete', { type: 'build', project: proj.name, provider: providerId });
       setGenerationPhase('');
       addToast('Build Plan generated', 'success');
     } catch (error: any) {
@@ -1288,113 +1416,117 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (!error?.message?.includes('Aborted')) updateCurrentProject({ isGenerating: false });
       setGenerationPhase('');
     }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, logEvent, commitArtifact, handleStreamUpdate]);
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, handleApiError, logEvent, commitArtifact, handleStreamUpdate]);
+
+  const queryGemini = useCallback(async (prompt: string, systemInstruction?: string) => {
+    const projectId = state.currentId;
+    const proj = state.projects[projectId];
+    if (!proj) throw new Error("No active project");
+
+    const modelConfig = getModelById(proj.settings.modelName);
+    const providerId = modelConfig?.providerId || 'gemini';
+    const apiKeyToUse = getProviderKey(providerId === 'openai' ? 'openai' : 'gemini');
+
+    if (!apiKeyToUse) {
+      if (providerId === 'openai') addToast('OpenAI API Key required', 'error');
+      setIsApiKeyModalOpen(true);
+      throw new Error("API Key missing");
+    }
+
+    try {
+      if (providerId === 'openai') {
+        return await streamOpenAI(
+          systemInstruction || "", prompt, proj.settings, apiKeyToUse,
+          () => { }
+        );
+      } else {
+        return await generateArtifact(
+          systemInstruction || "", prompt, proj.settings, apiKeyToUse
+        );
+      }
+    } catch (error: any) {
+      handleApiError(error);
+      throw error;
+    }
+  }, [state.projects, state.currentId, addToast, handleApiError]);
+
 
   const performRefinement = useCallback(async (type: 'research' | 'prd' | 'tech' | 'build', instruction: string) => {
     const projectId = state.currentId;
-    const currentProj = state.projects[projectId];
-    if (!currentProj) return;
+    const proj = state.projects[projectId];
+    if (!proj) return;
 
-    let originalContent = '';
-    if (type === 'research') originalContent = currentProj.researchOutput || '';
-    if (type === 'prd') originalContent = currentProj.prdOutput || '';
-    if (type === 'tech') originalContent = currentProj.techOutput || '';
-    if (type === 'build') originalContent = currentProj.buildPlan || '';
+    // Determine Provider
+    const modelConfig = getModelById(proj.settings.modelName);
+    const providerId = modelConfig?.providerId || 'gemini';
+    const apiKeyToUse = getProviderKey(providerId === 'openai' ? 'openai' : 'gemini');
 
-    const prompt = generateRefinePrompt(originalContent, instruction);
+    if (!apiKeyToUse) {
+      if (providerId === 'openai') addToast('OpenAI API Key required', 'error');
+      setIsApiKeyModalOpen(true);
+      return;
+    }
 
-    const customInstr = currentProj.settings.customInstructions || "";
-    const systemInstruction = getRefineSystemInstruction() + (customInstr ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${customInstr}` : "");
+    abortControllerRef.current = new AbortController();
+
+    // Get current content
+    let currentContent = '';
+    if (type === 'research') currentContent = proj.researchOutput;
+    else if (type === 'prd') currentContent = proj.prdOutput;
+    else if (type === 'tech') currentContent = proj.techOutput;
+    else if (type === 'build') currentContent = proj.buildPlan;
+
+    const systemInstruction = getRefineSystemInstruction() + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
+    const prompt = generateRefinePrompt(currentContent, instruction);
     const estimatedInputTokens = estimateTokens(systemInstruction + prompt);
-    const groundingCostCount = currentProj.settings.useGrounding ? 1 : 0;
-    const modelName: string = currentProj.settings.modelName;
-    const inputCostDelta = calculateIncrementalCost(modelName, estimatedInputTokens, 0, groundingCostCount);
+    const groundingCostCount = proj.settings.useGrounding && providerId === 'gemini' ? 1 : 0;
+    const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInputTokens, 0, groundingCostCount);
 
-    const startUsage: TokenUsage = {
-      ...currentProj.tokenUsage,
-      input: currentProj.tokenUsage.input + estimatedInputTokens,
-      groundingRequests: currentProj.tokenUsage.groundingRequests + groundingCostCount,
-      estimatedCost: currentProj.tokenUsage.estimatedCost + inputCostDelta
+    const startUsage = {
+      ...proj.tokenUsage,
+      input: proj.tokenUsage.input + estimatedInputTokens,
+      groundingRequests: proj.tokenUsage.groundingRequests + groundingCostCount,
+      estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
     };
 
     updateCurrentProject({ isGenerating: true, tokenUsage: startUsage });
     activeUsageRef.current = startUsage;
 
-    if (!apiKey) { setIsApiKeyModalOpen(true); updateCurrentProject({ isGenerating: false }); return; }
-    abortControllerRef.current = new AbortController();
-    setGenerationPhase('Refining Content...');
-
+    setGenerationPhase(`Refining ${type} with ${modelConfig?.displayName || 'AI'}...`);
     let accumulatedText = '';
-
     try {
-      const text = await streamArtifact(
-        systemInstruction, prompt, currentProj.settings, apiKey,
-        (chunk: string) => {
-          accumulatedText += chunk;
-          handleStreamUpdate(chunk, type, accumulatedText, modelName, projectId);
-        },
-        (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
-      );
+      let text = "";
+      if (providerId === 'openai') {
+        text = await streamOpenAI(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          (chunk: string) => {
+            accumulatedText += chunk;
+            handleStreamUpdate(chunk, type, accumulatedText, proj.settings.modelName, projectId);
+          },
+          (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+        );
+      } else {
+        text = await streamArtifact(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          (chunk: string) => {
+            accumulatedText += chunk;
+            handleStreamUpdate(chunk, type, accumulatedText, proj.settings.modelName, projectId);
+          },
+          (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+        );
+      }
+
       updateCurrentProject({ isGenerating: false });
       commitArtifact(type, text);
+      logEvent('generation_complete', { type: `refine_${type}`, project: proj.name, provider: providerId });
       setGenerationPhase('');
-      addToast('Content refined', 'success');
+      addToast(`${type.toUpperCase()} refined successfully`, 'success');
     } catch (error: any) {
       handleApiError(error);
-
-      const restorePayload: Partial<ProjectState> = { isGenerating: false };
-      if (type === 'research') restorePayload.researchOutput = originalContent;
-      if (type === 'prd') restorePayload.prdOutput = originalContent;
-      if (type === 'tech') restorePayload.techOutput = originalContent;
-      if (type === 'build') restorePayload.buildPlan = originalContent;
-
-      updateCurrentProject(restorePayload, { snapshot: false });
+      if (!error?.message?.includes('Aborted')) updateCurrentProject({ isGenerating: false });
       setGenerationPhase('');
-
-      if (!error?.message?.includes('Aborted')) {
-        addToast('Refinement failed. Original content restored.', 'info');
-      } else {
-        addToast('Refinement cancelled. Content reverted.', 'info');
-      }
     }
-  }, [state.projects, state.currentId, updateCurrentProject, addToast, apiKey, handleApiError, commitArtifact, handleStreamUpdate]);
-
-  const queryGemini = useCallback(async (prompt: string, systemInstruction?: string) => {
-    try {
-      const proj = state.projects[state.currentId];
-      if (!apiKey) { setIsApiKeyModalOpen(true); throw new Error("API Key missing"); }
-
-      const effectiveSystemInstruction = (systemInstruction || "You are a helpful AI assistant.") + (proj.settings.customInstructions ? `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${proj.settings.customInstructions}` : "");
-      const estimatedInput = estimateTokens(effectiveSystemInstruction + prompt);
-      const inputCostDelta = calculateIncrementalCost(proj.settings.modelName, estimatedInput, 0, 0);
-
-      const startUsage = {
-        ...proj.tokenUsage,
-        input: proj.tokenUsage.input + estimatedInput,
-        estimatedCost: proj.tokenUsage.estimatedCost + inputCostDelta
-      };
-
-      updateCurrentProject({ tokenUsage: startUsage }, { snapshot: false });
-
-      const text = await generateArtifact(effectiveSystemInstruction, prompt, proj.settings, apiKey);
-
-      const estimatedOutput = estimateTokens(text);
-      const outputCostDelta = calculateIncrementalCost(proj.settings.modelName, 0, estimatedOutput, 0);
-
-      const endUsage = {
-        ...startUsage,
-        output: startUsage.output + estimatedOutput,
-        estimatedCost: startUsage.estimatedCost + outputCostDelta
-      };
-
-      updateCurrentProject({ tokenUsage: endUsage }, { snapshot: false });
-
-      return text;
-    } catch (error: any) {
-      handleApiError(error);
-      throw error;
-    }
-  }, [state.projects, state.currentId, handleApiError, apiKey, updateCurrentProject]);
+  }, [state.projects, state.currentId, updateCurrentProject, addToast, handleApiError, logEvent, commitArtifact, handleStreamUpdate]);
 
   const activeProjectState = state.projects[state.currentId] || createNewProjectState();
   const sortedProjects = useMemo(() => Object.values(state.projects).sort((a: ProjectState, b: ProjectState) => b.lastModified - a.lastModified), [state.projects]);

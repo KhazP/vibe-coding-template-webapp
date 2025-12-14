@@ -167,3 +167,102 @@ export const runOpenAIDeepResearch = async (
         throw error;
     }
 };
+
+/**
+ * Streams text generation using OpenAI Chat Completions API.
+ * Used for standard artifacts (PRD, Tech, etc.) when OpenAI is the selected provider.
+ * 
+ * @param systemInstruction - System prompt.
+ * @param prompt - User prompt.
+ * @param settings - Configuration settings (model, temp, etc.)
+ * @param apiKey - OpenAI API Key.
+ * @param onChunk - Callback for text chunks.
+ * @param onStatusUpdate - Callback for status updates.
+ * @param signal - AbortSignal.
+ */
+export const streamOpenAI = async (
+    systemInstruction: string,
+    prompt: string,
+    settings: GeminiSettings,
+    apiKey: string,
+    onChunk: (text: string) => void,
+    onStatusUpdate?: (status: string) => void,
+    signal?: AbortSignal
+): Promise<string> => {
+    if (!apiKey) throw new Error("OpenAI API Key is missing.");
+
+    onStatusUpdate?.("Initializing OpenAI...");
+
+    const messages = [
+        { role: 'system', content: systemInstruction },
+        { role: 'user', content: prompt }
+    ];
+
+    try {
+        const response = await fetch(`${OPENAI_API_BASE}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+                model: settings.modelName,
+                messages: messages,
+                stream: true,
+                temperature: settings.temperature,
+                top_p: settings.topP,
+                // max_tokens: settings.maxOutputTokens // Add if available in settings
+            }),
+            signal: signal
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(`OpenAI API Error: ${errorData?.error?.message || response.statusText}`);
+        }
+
+        if (!response.body) throw new Error("No response body");
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = "";
+        let isFirst = true;
+
+        onStatusUpdate?.("Streaming Response...");
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+                if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                    try {
+                        const data = JSON.parse(line.slice(6));
+                        const content = data.choices[0]?.delta?.content;
+                        if (content) {
+                            if (isFirst) {
+                                isFirst = false;
+                                onStatusUpdate?.("Generating...");
+                            }
+                            fullText += content;
+                            onChunk(content);
+                        }
+                    } catch (e) {
+                        // Ignore parse errors for partial chunks
+                    }
+                }
+            }
+        }
+
+        return fullText;
+
+    } catch (error: any) {
+        if (error.name === 'AbortError' || signal?.aborted) {
+            throw new DOMException("Aborted", "AbortError");
+        }
+        throw error;
+    }
+};

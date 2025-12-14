@@ -172,8 +172,16 @@ const Part1Research: React.FC = React.memo(() => {
                         : 'bg-black/20 border-transparent text-slate-500 hover:bg-black/40'
                         }`}
                     >
-                      <div className="font-bold mb-0.5">Standard</div>
-                      <div className="opacity-70 text-[10px]">{standardModeInfo.modelName}</div>
+                      <Tooltip content={standardModeInfo.providerName !== 'Gemini' ? "Standard Research requires Gemini for Google Search Grounding. Your global provider selection will be ignored for this specific task." : "Standard research using Google Search Grounding."} position="top">
+                        <div className="font-bold mb-0.5">Standard</div>
+                        <div className="opacity-70 text-[10px]">
+                          {standardModeInfo.providerName !== 'Gemini' ? (
+                            <span className="flex items-center gap-1 text-amber-400"><Info size={10} /> Gemini (Forced)</span>
+                          ) : (
+                            standardModeInfo.modelName
+                          )}
+                        </div>
+                      </Tooltip>
                     </button>
                     <button
                       onClick={() => setResearchMode('deep')}
