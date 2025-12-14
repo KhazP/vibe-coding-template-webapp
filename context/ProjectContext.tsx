@@ -1194,7 +1194,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     // Determine Provider
     const modelConfig = getModelById(proj.settings.modelName);
     const providerId = modelConfig?.providerId || 'gemini';
-    const apiKeyToUse = getProviderKey(providerId === 'openai' ? 'openai' : 'gemini');
+    const apiKeyToUse = getProviderKey(providerId);
+
 
     if (!apiKeyToUse) {
       if (providerId === 'openai') addToast('OpenAI API Key required', 'error');

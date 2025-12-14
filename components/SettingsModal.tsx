@@ -109,7 +109,8 @@ const SettingsModal: React.FC = () => {
         // Save as default for this provider
         setDefaultModel(activeProvider, newModelId);
 
-        // For Gemini, also update the global settings
+        // Update global settings.modelName for ALL providers
+        const newModelConfig = getModelById(newModelId);
         if (activeProvider === 'gemini') {
             const maxBudget = MODEL_CONFIGS[newModelId as keyof typeof MODEL_CONFIGS]?.maxThinkingBudget || 0;
             updateSettings({
@@ -117,11 +118,32 @@ const SettingsModal: React.FC = () => {
                 thinkingBudget: maxBudget,
                 preset: 'custom'
             });
+        } else {
+            // For non-Gemini providers, just update the modelName
+            updateSettings({
+                modelName: newModelId,
+                preset: 'custom'
+            });
         }
     };
 
     const handleProviderChange = (newProvider: ProviderId) => {
         setActiveProvider(newProvider);
+
+        // When changing providers, also update modelName to the default model for that provider
+        const defaultModel = providerSettings.defaultModels[newProvider];
+        const models = getModelsForProvider(newProvider);
+        const modelToUse = defaultModel || (models.length > 0 ? models[0].id : '');
+
+        if (modelToUse) {
+            setSelectedModelId(modelToUse);
+            if (newProvider === 'gemini') {
+                const maxBudget = MODEL_CONFIGS[modelToUse as keyof typeof MODEL_CONFIGS]?.maxThinkingBudget || 0;
+                updateSettings({ modelName: modelToUse, thinkingBudget: maxBudget, preset: 'custom' });
+            } else {
+                updateSettings({ modelName: modelToUse, preset: 'custom' });
+            }
+        }
     };
 
     const handleBudgetChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -285,9 +307,13 @@ const SettingsModal: React.FC = () => {
                                                 onClick={() => {
                                                     setSelectedModelId(model.id);
                                                     setDefaultModel(activeProvider, model.id);
+                                                    // Update global settings.modelName for ALL providers
                                                     if (activeProvider === 'gemini') {
                                                         const maxBudget = MODEL_CONFIGS[model.id as keyof typeof MODEL_CONFIGS]?.maxThinkingBudget || 0;
                                                         updateSettings({ modelName: model.id, thinkingBudget: maxBudget, preset: 'custom' });
+                                                    } else {
+                                                        // For non-Gemini providers, just update the modelName
+                                                        updateSettings({ modelName: model.id, preset: 'custom' });
                                                     }
                                                 }}
                                                 className={`relative text-left p-4 rounded-xl border transition-all duration-300 group ${isActive

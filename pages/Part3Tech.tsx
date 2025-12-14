@@ -9,11 +9,16 @@ import { Sparkles, CheckCircle, AlertCircle, Loader2, Link } from 'lucide-react'
 import { ModelStatus } from '../components/ModelStatus';
 import { Persona } from '../types';
 import { useToast } from '../components/Toast';
+import { getModelById } from '../utils/modelUtils';
 
 const Part3Tech: React.FC = React.memo(() => {
   const { state, setAnswer, performGeminiTech, setValidationErrors, generationPhase } = useProject();
   const { answers, prdOutput, persona, isGenerating } = state;
   const { addToast } = useToast();
+
+  // Get model display name for dynamic button text
+  const modelConfig = getModelById(state.settings.modelName);
+  const providerDisplayName = modelConfig?.displayName || 'AI';
 
   // Sync/Map answers from Research to Tech to avoid duplicates
   useEffect(() => {
@@ -390,7 +395,7 @@ const Part3Tech: React.FC = React.memo(() => {
             {isGenerating ? (
               <><Loader2 className="animate-spin" size={18} /> {generationPhase || 'Designing...'}</>
             ) : (
-              <><Sparkles size={18} /> Generate Tech Design with Gemini</>
+              <><Sparkles size={18} /> Generate Tech Design with {providerDisplayName}</>
             )}
           </Button>
         </div>
@@ -402,7 +407,7 @@ const Part3Tech: React.FC = React.memo(() => {
             placeholder={
               <div className="max-w-xs">
                 <Sparkles className="mx-auto mb-3 opacity-50" size={32} />
-                <p>Fill in the details and click "Generate Tech Design" to let Gemini architect your solution.</p>
+                <p>Fill in the details and click "Generate Tech Design" to let {providerDisplayName} architect your solution.</p>
               </div>
             }
           />

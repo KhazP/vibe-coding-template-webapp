@@ -20,7 +20,7 @@ export const STORAGE_KEYS = {
 } as const;
 
 export const MODELS = {
-  GEMINI_PRO: 'gemini-3-pro-preview',
+  GEMINI_PRO: 'gemini-3-pro',
   GEMINI_FLASH: 'gemini-2.5-flash',
   DEEP_RESEARCH: 'deep-research-pro-preview-12-2025',
 } as const;

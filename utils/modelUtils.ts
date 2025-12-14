@@ -349,10 +349,19 @@ export const getModelsForProvider = (providerId: ProviderId): ModelConfig[] => {
 
 /**
  * Get a specific model by ID
+ * Includes legacy model name aliases for backwards compatibility
  */
+const MODEL_ID_ALIASES: Record<string, string> = {
+    'gemini-3-pro-preview': 'gemini-3-pro',
+    'gemini-2.5-pro-preview': 'gemini-2.5-pro',
+};
+
 export const getModelById = (modelId: string): ModelConfig | undefined => {
+    // Check for legacy aliases
+    const resolvedId = MODEL_ID_ALIASES[modelId] || modelId;
+
     for (const providerId of Object.keys(PROVIDER_MODELS) as ProviderId[]) {
-        const model = PROVIDER_MODELS[providerId].find((m) => m.id === modelId);
+        const model = PROVIDER_MODELS[providerId].find((m) => m.id === resolvedId);
         if (model) return model;
     }
     return undefined;
