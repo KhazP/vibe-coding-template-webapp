@@ -8,7 +8,6 @@ import SettingsModal from './SettingsModal';
 import { Tooltip, Breadcrumbs, Button } from './UI';
 import { ApiKeyGate } from './ApiKeyGate';
 import FlowFieldBackground from './FlowFieldBackground';
-import { BuyMeACoffee } from './BuyMeACoffee';
 
 const NavItem: React.FC<{
   to: string;
@@ -264,6 +263,20 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               {/* Action Buttons */}
               <div className="pt-6 border-t border-white/5 space-y-3">
                 <a
+                  href="https://www.buymeacoffee.com/alpyalayg"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full"
+                >
+                  <Button
+                    variant="secondary"
+                    className="w-full text-sm h-12 justify-start border-white/10 hover:brightness-110 px-4 text-white hover:text-white"
+                    style={{ backgroundColor: '#0d4921' }}
+                  >
+                    <span className="text-lg">☕</span> <span className="ml-2">Buy me a coffee</span>
+                  </Button>
+                </a>
+                <a
                   href="https://github.com/KhazP/vibe-coding-prompt-template"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -439,7 +452,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </main>
 
       <SettingsModal />
-      <BuyMeACoffee />
     </div>
   );
 };
