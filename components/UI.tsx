@@ -1546,7 +1546,7 @@ export const RefinementControl: React.FC<{
           onChange={(e) => setInstruction(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
           placeholder={placeholder || "Refine this output..."}
-          className="w-full bg-slate-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-primary-500/50 transition-colors pr-10"
+          className="w-full bg-surface/50 backdrop-blur-sm border border-white/10 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 focus:border-primary-500/50 focus:shadow-[0_0_15px_rgba(16,185,129,0.1)] transition-all duration-300 pr-10"
           disabled={isRefining}
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2">

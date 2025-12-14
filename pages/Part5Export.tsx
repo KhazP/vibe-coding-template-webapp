@@ -545,7 +545,7 @@ Your AI agent will use this as its primary context.
                         </div>
 
                         <div className="flex gap-2">
-                            <Button onClick={handleExport} className="flex-1 bg-primary-600 hover:bg-primary-500 text-white shadow-lg shadow-primary-500/20 group">
+                            <Button onClick={handleExport} className="flex-1 group">
                                 {isZipDefault ? <Download size={18} className="group-hover:-translate-y-1 transition-transform" /> : <Copy size={18} />}
                                 {isZipDefault ? "Download Kit (.zip)" : "Copy Full Markdown"}
                             </Button>

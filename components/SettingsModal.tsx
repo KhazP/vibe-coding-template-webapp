@@ -441,9 +441,9 @@ const SettingsModal: React.FC = () => {
     const TabButton: React.FC<{ id: SettingsTab; icon: React.ReactNode; label: string }> = ({ id, icon, label }) => (
         <button
             onClick={() => setActiveTab(id)}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 w-full text-left ${activeTab === id
-                ? 'bg-primary-500/10 text-primary-400 border border-primary-500/20'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent'
+            className={`flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all duration-200 w-full text-left border-l-2 ${activeTab === id
+                ? 'bg-primary-500/10 text-primary-400 border-primary-400'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5 border-transparent'
                 }`}
         >
             {icon}
@@ -634,7 +634,7 @@ const SettingsModal: React.FC = () => {
                                     placeholder="e.g. 'Always use TypeScript', 'Prefer functional components', 'Avoid external libraries unless necessary'."
                                     value={settings.customInstructions || ''}
                                     onChange={(e) => updateSettings({ customInstructions: e.target.value })}
-                                    className="min-h-[100px] text-xs font-mono bg-slate-950/50 border-slate-800"
+                                    className="min-h-[100px] text-xs font-mono"
                                     tooltip="These instructions are appended to every AI request (Research, PRD, Tech, etc.). Use this for project-wide constraints."
                                 />
                             </div>

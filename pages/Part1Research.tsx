@@ -134,7 +134,7 @@ const Part1Research: React.FC = React.memo(() => {
             <div className="flex items-center justify-between">
               <label className="text-sm font-bold text-slate-200">Research Method</label>
               <Tooltip content="In-App uses Gemini to research immediately. External AI generates a prompt you can paste into ChatGPT, Claude, or Perplexity." position="left">
-                <div className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary-400 transition-colors cursor-help">
+                <div className="flex items-center gap-2 text-xs text-slate-500 hover:text-primary-400 transition-colors cursor-help">
                   <Info size={12} />
                   <span>Which method to use?</span>
                 </div>
@@ -235,7 +235,7 @@ const Part1Research: React.FC = React.memo(() => {
                           <Tooltip content="Deep Research via Google's Gemini Agent" position="top">
                             <button
                               onClick={() => setResearchProvider('gemini')}
-                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${researchProvider === 'gemini'
+                              className={`flex items-center gap-2 px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${researchProvider === 'gemini'
                                 ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                                 : 'text-slate-400 hover:text-white'
                                 }`}
@@ -247,7 +247,7 @@ const Part1Research: React.FC = React.memo(() => {
                           <Tooltip content="Deep Research via OpenAI's o3-mini/deep models" position="top">
                             <button
                               onClick={() => setResearchProvider('openai')}
-                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${researchProvider === 'openai'
+                              className={`flex items-center gap-2 px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${researchProvider === 'openai'
                                 ? 'bg-green-500/20 text-green-300 border border-green-500/30'
                                 : 'text-slate-400 hover:text-white'
                                 }`}
