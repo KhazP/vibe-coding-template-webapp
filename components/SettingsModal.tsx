@@ -11,12 +11,15 @@ import { Modal, Tooltip, Select, TextArea, Button } from './UI';
 import { MODEL_CONFIGS, PRESETS, DEFAULT_SETTINGS } from '../utils/constants';
 import { PresetMode, ToastPosition, Persona, GeminiSafetyPreset, ExpertSettings } from '../types';
 import { useToast } from './Toast';
-import { getProviderSettings, setProviderSettings, setDefaultModel, getExpertSettings, setExpertSettings, resetExpertSettings, getEffectiveDefaultProvider } from '../utils/providerStorage';
+import { getProviderSettings, setProviderSettings, setDefaultModel, getExpertSettings, setExpertSettings, resetExpertSettings, getEffectiveDefaultProvider, getProviderKey } from '../utils/providerStorage';
 import { PROVIDERS, type ProviderId } from '../utils/providers';
 import { PROVIDER_MODELS, getModelsForProvider, getModelById, supportsReasoningEffort, type ModelConfig, type ReasoningEffort } from '../utils/modelUtils';
 import { ReasoningEffortSelector } from './ReasoningEffortSelector';
 import { useOpenRouterModels } from '../hooks/useOpenRouterModels';
 import { OpenRouterModelSelector } from './OpenRouterModelSelector';
+import { getGeminiModels, type GeminiModel } from '../utils/gemini';
+import { getOpenAIModels, type OpenAIModel } from '../utils/openai';
+import { getAnthropicModels, type AnthropicModel } from '../utils/anthropic';
 import { PricingIndicator } from './PricingIndicator';
 import { ContextBar } from './ContextBar';
 
@@ -50,6 +53,18 @@ const SettingsModal: React.FC = () => {
     const [expertSafetyPreset, setExpertSafetyPreset] = useState<GeminiSafetyPreset>(
         (activeProvider === 'gemini' && (savedExpertSettings as any)?.safetyPreset) || 'default'
     );
+
+    // Gemini Dynamic Models
+    const [geminiModels, setGeminiModels] = useState<GeminiModel[]>([]);
+    const [isLoadingGeminiModels, setIsLoadingGeminiModels] = useState(false);
+
+    // OpenAI Dynamic Models
+    const [openAIModels, setOpenAIModels] = useState<OpenAIModel[]>([]);
+    const [isLoadingOpenAIModels, setIsLoadingOpenAIModels] = useState(false);
+
+    // Anthropic Dynamic Models
+    const [anthropicModels, setAnthropicModels] = useState<AnthropicModel[]>([]);
+    const [isLoadingAnthropicModels, setIsLoadingAnthropicModels] = useState(false);
 
     // Sync expert settings when provider changes
     useEffect(() => {
@@ -131,6 +146,58 @@ const SettingsModal: React.FC = () => {
 
     const capabilities = useMemo(() => getModelCapabilities(selectedModelId), [selectedModelId]);
 
+    // Load Gemini Models
+    useEffect(() => {
+        if (activeProvider === 'gemini') {
+            const fetchGemini = async () => {
+                const key = getProviderKey('gemini');
+                if (key) {
+                    setIsLoadingGeminiModels(true);
+                    const models = await getGeminiModels(key);
+                    // Filter for generative models only and sort by name/version
+                    const sorted = models
+                        .filter(m => m.supportedGenerationMethods.includes('generateContent'))
+                        .sort((a, b) => b.displayName.localeCompare(a.displayName));
+                    setGeminiModels(sorted);
+                    setIsLoadingGeminiModels(false);
+                }
+            };
+            fetchGemini();
+        }
+    }, [activeProvider, isSettingsOpen]);
+
+    // Load OpenAI Models
+    useEffect(() => {
+        if (activeProvider === 'openai') {
+            const fetchOpenAI = async () => {
+                const key = getProviderKey('openai');
+                if (key) {
+                    setIsLoadingOpenAIModels(true);
+                    const models = await getOpenAIModels(key);
+                    setOpenAIModels(models);
+                    setIsLoadingOpenAIModels(false);
+                }
+            };
+            fetchOpenAI();
+        }
+    }, [activeProvider, isSettingsOpen]);
+
+    // Load Anthropic Models
+    useEffect(() => {
+        if (activeProvider === 'anthropic') {
+            const fetchAnthropic = async () => {
+                const key = getProviderKey('anthropic');
+                if (key) {
+                    setIsLoadingAnthropicModels(true);
+                    const models = await getAnthropicModels(key);
+                    setAnthropicModels(models);
+                    setIsLoadingAnthropicModels(false);
+                }
+            };
+            fetchAnthropic();
+        }
+    }, [activeProvider, isSettingsOpen]);
+
     // Sync selected model when provider changes
     useEffect(() => {
         const defaultModel = providerSettings.defaultModels[activeProvider];
@@ -174,6 +241,8 @@ const SettingsModal: React.FC = () => {
 
     // Check if current provider is Gemini (for Gemini-specific settings)
     const isGeminiProvider = activeProvider === 'gemini';
+    const isOpenAIProvider = activeProvider === 'openai';
+    const isAnthropicProvider = activeProvider === 'anthropic';
 
     // Check if current model supports reasoning effort (GPT-5.2)
     const showReasoningEffort = currentModelConfig && supportsReasoningEffort(currentModelConfig);
@@ -439,6 +508,7 @@ const SettingsModal: React.FC = () => {
                                         />
                                     </div>
                                 </div>
+
                             ) : (
                                 <div>
                                     <label className="block text-sm font-bold text-slate-200 mb-4">Model Tier</label>
@@ -463,13 +533,8 @@ const SettingsModal: React.FC = () => {
                                                         setSelectedModelId(model.id);
                                                         setDefaultModel(activeProvider, model.id);
                                                         // Update global settings.modelName for ALL providers
-                                                        if (activeProvider === 'gemini') {
-                                                            const maxBudget = MODEL_CONFIGS[model.id as keyof typeof MODEL_CONFIGS]?.maxThinkingBudget || 0;
-                                                            updateSettings({ modelName: model.id, thinkingBudget: maxBudget, preset: 'custom' });
-                                                        } else {
-                                                            // For non-Gemini providers, just update the modelName
-                                                            updateSettings({ modelName: model.id, preset: 'custom' });
-                                                        }
+                                                        // Update global settings.modelName for ALL providers
+                                                        updateSettings({ modelName: model.id, preset: 'custom' });
                                                     }}
                                                     className={`relative text-left p-4 rounded-xl border transition-all duration-300 group ${isActive
                                                         ? 'bg-primary-500/10 border-primary-500 ring-1 ring-primary-500/50 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
@@ -569,34 +634,166 @@ const SettingsModal: React.FC = () => {
                                         {/* Specific Model Selection - Hidden for OpenRouter */}
                                         {activeProvider !== 'openrouter' && (
                                             <div className="p-4 bg-slate-950/50 rounded-xl border border-slate-800/50 space-y-4">
-                                                <Select
-                                                    label={`Specific ${PROVIDERS[activeProvider].displayName} Model`}
-                                                    value={selectedModelId}
-                                                    onChange={handleModelChange}
-                                                    tooltip="Override the tier selection with a specific model variant."
-                                                >
-                                                    {providerModels.map((model) => (
-                                                        <option key={model.id} value={model.id}>
-                                                            {model.displayName} • {model.tier.toUpperCase()} • ${model.inputCostPerMillion}/1M
-                                                        </option>
-                                                    ))}
-                                                </Select>
+
+
+                                                {/* Anthropic Dynamic Selection Logic */}
+                                                {isAnthropicProvider && (
+                                                    <div className="space-y-4">
+                                                        <label className="text-sm font-bold text-slate-200 block">Specific Anthropic Model</label>
+                                                        <div className="text-xs text-slate-500 mb-2">Dynamically fetched from Anthropic API</div>
+
+                                                        {isLoadingAnthropicModels ? (
+                                                            <div className="flex items-center justify-center p-4 text-slate-500 text-sm border border-slate-800 rounded-lg">
+                                                                <RefreshCcw className="animate-spin mr-2" size={16} /> Loading Claude models...
+                                                            </div>
+                                                        ) : (
+                                                            <select
+                                                                value={selectedModelId}
+                                                                onChange={handleModelChange}
+                                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                                                            >
+                                                                {anthropicModels.map(model => (
+                                                                    <option key={model.id} value={model.id}>
+                                                                        {model.display_name} ({model.id})
+                                                                    </option>
+                                                                ))}
+                                                                {anthropicModels.length === 0 && providerModels.map(model => (
+                                                                    <option key={model.id} value={model.id}>
+                                                                        {model.displayName}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* OpenAI Dynamic Selection Logic */}
+                                                {isOpenAIProvider && (
+                                                    <div className="space-y-4">
+                                                        <label className="text-sm font-bold text-slate-200 block">Specific OpenAI Model</label>
+                                                        <div className="text-xs text-slate-500 mb-2">Dynamically fetched from OpenAI API</div>
+
+                                                        {isLoadingOpenAIModels ? (
+                                                            <div className="flex items-center justify-center p-4 text-slate-500 text-sm border border-slate-800 rounded-lg">
+                                                                <RefreshCcw className="animate-spin mr-2" size={16} /> Loading OpenAI models...
+                                                            </div>
+                                                        ) : (
+                                                            <select
+                                                                value={selectedModelId}
+                                                                onChange={handleModelChange}
+                                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                                                            >
+                                                                {openAIModels.map(model => (
+                                                                    <option key={model.id} value={model.id}>
+                                                                        {model.id}
+                                                                    </option>
+                                                                ))}
+                                                                {/* Add Static Fallbacks if API fails or specific static models desired? 
+                                                                    Actually the user said "Dynamically fetched from Gemini API" for Gemini. 
+                                                                    For OpenAI, "List models... Returns a list of model objects". 
+                                                                    So better to rely on dynamic list. 
+                                                                    But if empty (no key or error), show static?
+                                                                */}
+                                                                {openAIModels.length === 0 && providerModels.map(model => (
+                                                                    <option key={model.id} value={model.id}>
+                                                                        {model.displayName}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                {/* Gemini Dynamic Selection Logic */}
+                                                {isGeminiProvider && (
+                                                    <div className="space-y-4">
+                                                        <label className="text-sm font-bold text-slate-200 block">Specific Google Gemini Model</label>
+                                                        <div className="text-xs text-slate-500 mb-2">Dynamically fetched from Gemini API</div>
+
+                                                        {isLoadingGeminiModels ? (
+                                                            <div className="flex items-center justify-center p-4 text-slate-500 text-sm border border-slate-800 rounded-lg">
+                                                                <RefreshCcw className="animate-spin mr-2" size={16} /> Loading Gemini models...
+                                                            </div>
+                                                        ) : (
+                                                            <select
+                                                                value={selectedModelId}
+                                                                onChange={handleModelChange}
+                                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                                                            >
+                                                                {geminiModels.map(model => (
+                                                                    <option key={model.name} value={model.name.replace('models/', '')}>
+                                                                        {model.displayName} ({model.version})
+                                                                    </option>
+                                                                ))}
+                                                                {/* Fallback */}
+                                                                {geminiModels.length === 0 && (
+                                                                    <option value={selectedModelId}>{selectedModelId}</option>
+                                                                )}
+                                                            </select>
+                                                        )}
+
+                                                        {/* Gemini Features moved here per "easy mode" request */}
+                                                        <div className="space-y-4 pt-4 border-t border-slate-800/50">
+                                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Gemini Features</span>
+
+                                                            <div className="p-3 bg-slate-900/50 rounded-lg border border-slate-800/50">
+                                                                <div className="flex items-center gap-2 mb-2">
+                                                                    <BrainCircuit size={16} className="text-purple-400" />
+                                                                    <label className="text-sm font-medium text-slate-300">Thinking Budget</label>
+                                                                    <Tooltip content="Tokens reserved for reasoning.">
+                                                                        <span className="text-slate-600 hover:text-primary-400 cursor-help text-xs">ⓘ</span>
+                                                                    </Tooltip>
+                                                                    <span className="ml-auto text-xs font-mono text-slate-400">
+                                                                        {settings.thinkingBudget > 0 ? `${(settings.thinkingBudget / 1024).toFixed(0)}k` : 'Off'}
+                                                                    </span>
+                                                                </div>
+                                                                <input
+                                                                    type="range"
+                                                                    min="0"
+                                                                    max="32768"
+                                                                    step="1024"
+                                                                    value={settings.thinkingBudget}
+                                                                    onChange={handleBudgetChange}
+                                                                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                                                                />
+                                                            </div>
+
+                                                            <div className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-slate-800/50">
+                                                                <div className="flex items-center gap-3">
+                                                                    <Search size={16} className="text-blue-400" />
+                                                                    <div>
+                                                                        <label className="font-medium text-slate-300 text-sm">Search Grounding</label>
+                                                                    </div>
+                                                                </div>
+                                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={settings.useGrounding}
+                                                                        onChange={handleGroundingChange}
+                                                                        className="sr-only peer"
+                                                                    />
+                                                                    <div className="w-9 h-5 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-500"></div>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                                 {/* Model ID & Context Info */}
-                                                {currentModelConfig && (
+                                                {(currentModelConfig || (isGeminiProvider && geminiModels.find(m => m.name === `models/${selectedModelId}`))) && (
                                                     <div className="grid grid-cols-2 gap-4">
                                                         <div>
                                                             <label className="text-[10px] text-slate-600 uppercase tracking-wider mb-1 block">Model ID</label>
-                                                            <code className="text-[11px] text-slate-400 font-mono bg-slate-900 px-2 py-1 rounded block truncate" title={currentModelConfig.id}>
-                                                                {currentModelConfig.id}
+                                                            <code className="text-[11px] text-slate-400 font-mono bg-slate-900 px-2 py-1 rounded block truncate" title={currentModelConfig?.id || selectedModelId}>
+                                                                {currentModelConfig?.id || selectedModelId}
                                                             </code>
                                                         </div>
                                                         <div>
                                                             <label className="text-[10px] text-slate-600 uppercase tracking-wider mb-1 block">Pricing</label>
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-[11px] font-mono text-emerald-400">${currentModelConfig.inputCostPerMillion}</span>
+                                                                <span className="text-[11px] font-mono text-emerald-400">${currentModelConfig?.inputCostPerMillion ?? '?'}</span>
                                                                 <span className="text-[10px] text-slate-600">in /</span>
-                                                                <span className="text-[11px] font-mono text-amber-400">${currentModelConfig.outputCostPerMillion}</span>
+                                                                <span className="text-[11px] font-mono text-amber-400">${currentModelConfig?.outputCostPerMillion ?? '?'}</span>
                                                                 <span className="text-[10px] text-slate-600">out per 1M</span>
                                                             </div>
                                                         </div>
@@ -627,368 +824,322 @@ const SettingsModal: React.FC = () => {
                                             />
                                         )}
 
-                                        {/* Gemini-Specific Settings */}
-                                        {isGeminiProvider && (
-                                            <div className="space-y-4">
-                                                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Gemini Features</span>
+                                    </div>
+                                )}
 
-                                                <div className="p-4 bg-slate-950/50 rounded-xl border border-slate-800/50">
-                                                    <div className="flex items-center gap-2 mb-4">
-                                                        <BrainCircuit size={16} className="text-purple-400" />
-                                                        <label className="text-sm font-medium text-slate-300">Thinking Budget</label>
-                                                        <Tooltip content="Tokens reserved for internal reasoning before answering.">
-                                                            <span className="text-slate-600 hover:text-primary-400 cursor-help text-xs">ⓘ</span>
-                                                        </Tooltip>
-                                                        <span className="ml-auto text-xs font-mono text-slate-400">
-                                                            {settings.thinkingBudget > 0 ? `${(settings.thinkingBudget / 1024).toFixed(0)}k` : 'Off'}
+                                {/* Generation Parameters */}
+                                <div className="space-y-4">
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Generation Parameters</span>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className={`p-3 bg-slate-950/50 rounded-lg border border-slate-800/50 ${!supportsTemperature ? 'opacity-50 grayscale' : ''}`}>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="text-xs text-slate-400">Temperature</label>
+                                                <span className="text-xs font-mono text-primary-400">
+                                                    {!supportsTemperature ? 'N/A' : (settings.temperature ?? 0.7)}
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range" min="0" max="2" step="0.1"
+                                                value={settings.temperature ?? 0.7}
+                                                onChange={(e) => updateSettings({ temperature: parseFloat(e.target.value), preset: 'custom' })}
+                                                disabled={!supportsTemperature}
+                                                className={`w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer ${supportsTemperature ? 'accent-primary-500' : 'cursor-not-allowed'}`}
+                                            />
+                                            <p className="text-[9px] text-slate-600 mt-1">
+                                                {!supportsTemperature ? 'Not supported by this model' : 'Lower = focused, Higher = creative'}
+                                            </p>
+                                        </div>
+                                        <div className={`p-3 bg-slate-950/50 rounded-lg border border-slate-800/50 ${!supportsTopP ? 'opacity-50 grayscale' : ''}`}>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <label className="text-xs text-slate-400">Top P</label>
+                                                <span className="text-xs font-mono text-primary-400">
+                                                    {!supportsTopP ? 'N/A' : (settings.topP ?? 0.95)}
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range" min="0" max="1" step="0.05"
+                                                value={settings.topP ?? 0.95}
+                                                onChange={(e) => updateSettings({ topP: parseFloat(e.target.value), preset: 'custom' })}
+                                                disabled={!supportsTopP}
+                                                className={`w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer ${supportsTopP ? 'accent-primary-500' : 'cursor-not-allowed'}`}
+                                            />
+                                            <p className="text-[9px] text-slate-600 mt-1">
+                                                {!supportsTopP ? 'Not supported by this model' : 'Nucleus sampling threshold'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Expert Settings Section (v1) */}
+                                <div className="border-t border-slate-800/50 pt-4 mt-4">
+                                    <button
+                                        onClick={() => setShowExpertSettings(!showExpertSettings)}
+                                        className="flex items-center gap-2 text-xs font-medium text-amber-400/80 hover:text-amber-300 transition-colors mb-4 w-full"
+                                    >
+                                        <Wrench size={12} />
+                                        <ChevronDown size={14} className={`transition-transform duration-300 ${showExpertSettings ? 'rotate-180' : ''}`} />
+                                        {showExpertSettings ? 'Hide Expert Settings' : 'Show Expert Settings (API Overrides)'}
+                                    </button>
+
+                                    {showExpertSettings && (
+                                        <div className="space-y-4 animate-fade-in">
+                                            {/* Warning Banner */}
+                                            <div className="flex items-start gap-2 p-3 bg-amber-900/20 border border-amber-500/30 rounded-lg">
+                                                <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />
+                                                <p className="text-[10px] text-amber-200/80">
+                                                    These settings override API defaults. Only set values you understand—incorrect settings may cause errors or unexpected behavior.
+                                                </p>
+                                            </div>
+
+                                            <div className="space-y-4 p-4 bg-slate-950/50 rounded-xl border border-slate-800/50">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                        {PROVIDERS[activeProvider].displayName} Expert
+                                                    </span>
+                                                    <button
+                                                        onClick={handleResetExpertSettings}
+                                                        className="flex items-center gap-1.5 text-[10px] text-amber-400 hover:text-amber-300 px-2 py-1 rounded bg-amber-900/10 border border-amber-500/20 hover:bg-amber-900/20 transition-colors"
+                                                    >
+                                                        <RefreshCcw size={10} />
+                                                        Reset Expert
+                                                    </button>
+                                                </div>
+
+                                                {/* Max Output Tokens */}
+                                                {providerCapabilities.supportsMaxTokens && (
+                                                    <div>
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <label className="text-xs text-slate-400">Max Output Tokens</label>
+                                                            <span className="text-xs font-mono text-amber-400">
+                                                                {expertMaxTokens ?? 'default'}
+                                                            </span>
+                                                        </div>
+                                                        <input
+                                                            type="range"
+                                                            min="0"
+                                                            max={currentModelConfig?.outputContextLimit || 16384}
+                                                            step="256"
+                                                            value={expertMaxTokens ?? 0}
+                                                            onChange={(e) => {
+                                                                const val = parseInt(e.target.value);
+                                                                setExpertMaxTokens(val === 0 ? undefined : val);
+                                                            }}
+                                                            onMouseUp={saveExpertSettings}
+                                                            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                                        />
+                                                        <p className="text-[9px] text-slate-600 mt-1">
+                                                            Maximum tokens in the response. Set to 0 for provider default.
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Top K */}
+                                                {capabilities.supportsTopK && (
+                                                    <div>
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <label className="text-xs text-slate-400">Top K</label>
+                                                            <span className="text-xs font-mono text-amber-400">
+                                                                {expertTopK ?? 'default'}
+                                                            </span>
+                                                        </div>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max="100"
+                                                            value={expertTopK ?? ''}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                setExpertTopK(val === '' ? undefined : parseInt(val));
+                                                            }}
+                                                            onBlur={saveExpertSettings}
+                                                            placeholder="Model Default (1-100)"
+                                                            className="w-full px-3 py-2 text-xs font-mono bg-slate-900 border border-slate-800 rounded-lg text-slate-300 placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
+                                                        />
+                                                        <p className="text-[9px] text-slate-600 mt-1">
+                                                            Limit selection to the top K tokens. 0 or empty for default.
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Repetition Penalty */}
+                                                <div>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <label className="text-xs text-slate-400">Repetition Penalty</label>
+                                                        <span className="text-xs font-mono text-amber-400">
+                                                            {expertRepetitionPenalty ?? 'default'}
                                                         </span>
                                                     </div>
                                                     <input
                                                         type="range"
                                                         min="0"
-                                                        max={currentMaxBudget}
-                                                        step="1024"
-                                                        value={settings.thinkingBudget}
-                                                        onChange={handleBudgetChange}
-                                                        className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                                                        max="2"
+                                                        step="0.05"
+                                                        value={expertRepetitionPenalty ?? 0}
+                                                        onChange={(e) => {
+                                                            const val = parseFloat(e.target.value);
+                                                            setExpertRepetitionPenalty(val === 0 ? undefined : val);
+                                                        }}
+                                                        onMouseUp={saveExpertSettings}
+                                                        className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
                                                     />
+                                                    <p className="text-[9px] text-slate-600 mt-1">
+                                                        Higher values penalize repetition. 0 for default.
+                                                    </p>
                                                 </div>
 
-                                                <div className="flex items-center justify-between p-4 bg-slate-950/50 rounded-xl border border-slate-800/50">
-                                                    <div className="flex items-center gap-3">
-                                                        <Search size={18} className="text-blue-400" />
-                                                        <div>
-                                                            <label className="font-medium text-slate-300 text-sm">Search Grounding</label>
-                                                            <p className="text-[10px] text-slate-600">Access real-time web info</p>
+                                                {/* Reasoning & JSON */}
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="p-3 bg-slate-900 rounded-lg border border-slate-800/50">
+
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <label className="text-xs text-slate-400">Reasoning</label>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={expertIncludeReasoning}
+                                                                onChange={(e) => setExpertIncludeReasoning(e.target.checked)}
+                                                                className="rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500/20"
+                                                            />
                                                         </div>
-                                                    </div>
-                                                    <label className="relative inline-flex items-center cursor-pointer">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={settings.useGrounding}
-                                                            onChange={handleGroundingChange}
-                                                            className="sr-only peer"
-                                                        />
-                                                        <div className="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        )}
+                                                        {expertIncludeReasoning && (
+                                                            <div className="space-y-2 mt-2">
+                                                                <select
+                                                                    value={expertReasoningEffort}
+                                                                    onChange={(e) => setExpertReasoningEffort(e.target.value as any)}
+                                                                    className="w-full text-[10px] bg-slate-950 border border-slate-700 rounded px-1 py-1 text-slate-300"
+                                                                >
+                                                                    <option value="minimal">Minimal Effort</option>
+                                                                    <option value="low">Low Effort</option>
+                                                                    <option value="medium">Medium Effort</option>
+                                                                    <option value="high">High Effort</option>
+                                                                </select>
 
-                                        {/* Generation Parameters */}
-                                        <div className="space-y-4">
-                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Generation Parameters</span>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className={`p-3 bg-slate-950/50 rounded-lg border border-slate-800/50 ${!supportsTemperature ? 'opacity-50 grayscale' : ''}`}>
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <label className="text-xs text-slate-400">Temperature</label>
-                                                        <span className="text-xs font-mono text-primary-400">
-                                                            {!supportsTemperature ? 'N/A' : (settings.temperature ?? 0.7)}
-                                                        </span>
-                                                    </div>
-                                                    <input
-                                                        type="range" min="0" max="2" step="0.1"
-                                                        value={settings.temperature ?? 0.7}
-                                                        onChange={(e) => updateSettings({ temperature: parseFloat(e.target.value), preset: 'custom' })}
-                                                        disabled={!supportsTemperature}
-                                                        className={`w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer ${supportsTemperature ? 'accent-primary-500' : 'cursor-not-allowed'}`}
-                                                    />
-                                                    <p className="text-[9px] text-slate-600 mt-1">
-                                                        {!supportsTemperature ? 'Not supported by this model' : 'Lower = focused, Higher = creative'}
-                                                    </p>
-                                                </div>
-                                                <div className={`p-3 bg-slate-950/50 rounded-lg border border-slate-800/50 ${!supportsTopP ? 'opacity-50 grayscale' : ''}`}>
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <label className="text-xs text-slate-400">Top P</label>
-                                                        <span className="text-xs font-mono text-primary-400">
-                                                            {!supportsTopP ? 'N/A' : (settings.topP ?? 0.95)}
-                                                        </span>
-                                                    </div>
-                                                    <input
-                                                        type="range" min="0" max="1" step="0.05"
-                                                        value={settings.topP ?? 0.95}
-                                                        onChange={(e) => updateSettings({ topP: parseFloat(e.target.value), preset: 'custom' })}
-                                                        disabled={!supportsTopP}
-                                                        className={`w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer ${supportsTopP ? 'accent-primary-500' : 'cursor-not-allowed'}`}
-                                                    />
-                                                    <p className="text-[9px] text-slate-600 mt-1">
-                                                        {!supportsTopP ? 'Not supported by this model' : 'Nucleus sampling threshold'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
+                                                                {capabilities.supportsReasoningMaxTokens && (
+                                                                    <div>
+                                                                        <div className="flex justify-between text-[9px] text-slate-500 mb-1">
+                                                                            <span>Reasoning Tokens</span>
+                                                                            <span className="font-mono text-amber-500/80">{expertReasoningMaxTokens || 'Default'}</span>
+                                                                        </div>
+                                                                        <input
+                                                                            type="number"
+                                                                            min="1024"
+                                                                            max="32000"
+                                                                            placeholder="Max (1024-32000)"
+                                                                            value={expertReasoningMaxTokens || ''}
+                                                                            onChange={(e) => setExpertReasoningMaxTokens(e.target.value ? parseInt(e.target.value) : undefined)}
+                                                                            className="w-full text-[10px] bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-300 placeholder-slate-600"
+                                                                        />
+                                                                    </div>
+                                                                )}
 
-                                        {/* Expert Settings Section (v1) */}
-                                        <div className="border-t border-slate-800/50 pt-4 mt-4">
-                                            <button
-                                                onClick={() => setShowExpertSettings(!showExpertSettings)}
-                                                className="flex items-center gap-2 text-xs font-medium text-amber-400/80 hover:text-amber-300 transition-colors mb-4 w-full"
-                                            >
-                                                <Wrench size={12} />
-                                                <ChevronDown size={14} className={`transition-transform duration-300 ${showExpertSettings ? 'rotate-180' : ''}`} />
-                                                {showExpertSettings ? 'Hide Expert Settings' : 'Show Expert Settings (API Overrides)'}
-                                            </button>
-
-                                            {showExpertSettings && (
-                                                <div className="space-y-4 animate-fade-in">
-                                                    {/* Warning Banner */}
-                                                    <div className="flex items-start gap-2 p-3 bg-amber-900/20 border border-amber-500/30 rounded-lg">
-                                                        <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />
-                                                        <p className="text-[10px] text-amber-200/80">
-                                                            These settings override API defaults. Only set values you understand—incorrect settings may cause errors or unexpected behavior.
+                                                                <div className="text-[9px] text-amber-600/90 leading-tight">
+                                                                    ⚠️ Increases cost significantly
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        <p className="text-[9px] text-slate-600 mt-2">
+                                                            Enable chain-of-thought.
                                                         </p>
                                                     </div>
 
-                                                    <div className="space-y-4 p-4 bg-slate-950/50 rounded-xl border border-slate-800/50">
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                                                {PROVIDERS[activeProvider].displayName} Expert
-                                                            </span>
-                                                            <button
-                                                                onClick={handleResetExpertSettings}
-                                                                className="flex items-center gap-1.5 text-[10px] text-amber-400 hover:text-amber-300 px-2 py-1 rounded bg-amber-900/10 border border-amber-500/20 hover:bg-amber-900/20 transition-colors"
-                                                            >
-                                                                <RefreshCcw size={10} />
-                                                                Reset Expert
-                                                            </button>
-                                                        </div>
-
-                                                        {/* Max Output Tokens */}
-                                                        {providerCapabilities.supportsMaxTokens && (
-                                                            <div>
-                                                                <div className="flex items-center justify-between mb-2">
-                                                                    <label className="text-xs text-slate-400">Max Output Tokens</label>
-                                                                    <span className="text-xs font-mono text-amber-400">
-                                                                        {expertMaxTokens ?? 'default'}
-                                                                    </span>
-                                                                </div>
-                                                                <input
-                                                                    type="range"
-                                                                    min="0"
-                                                                    max={currentModelConfig?.outputContextLimit || 16384}
-                                                                    step="256"
-                                                                    value={expertMaxTokens ?? 0}
-                                                                    onChange={(e) => {
-                                                                        const val = parseInt(e.target.value);
-                                                                        setExpertMaxTokens(val === 0 ? undefined : val);
-                                                                    }}
-                                                                    onMouseUp={saveExpertSettings}
-                                                                    className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
-                                                                />
-                                                                <p className="text-[9px] text-slate-600 mt-1">
-                                                                    Maximum tokens in the response. Set to 0 for provider default.
-                                                                </p>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Top K */}
-                                                        {capabilities.supportsTopK && (
-                                                            <div>
-                                                                <div className="flex items-center justify-between mb-2">
-                                                                    <label className="text-xs text-slate-400">Top K</label>
-                                                                    <span className="text-xs font-mono text-amber-400">
-                                                                        {expertTopK ?? 'default'}
-                                                                    </span>
-                                                                </div>
-                                                                <input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    max="100"
-                                                                    value={expertTopK ?? ''}
-                                                                    onChange={(e) => {
-                                                                        const val = e.target.value;
-                                                                        setExpertTopK(val === '' ? undefined : parseInt(val));
-                                                                    }}
-                                                                    onBlur={saveExpertSettings}
-                                                                    placeholder="Model Default (1-100)"
-                                                                    className="w-full px-3 py-2 text-xs font-mono bg-slate-900 border border-slate-800 rounded-lg text-slate-300 placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
-                                                                />
-                                                                <p className="text-[9px] text-slate-600 mt-1">
-                                                                    Limit selection to the top K tokens. 0 or empty for default.
-                                                                </p>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Repetition Penalty */}
-                                                        <div>
-                                                            <div className="flex items-center justify-between mb-2">
-                                                                <label className="text-xs text-slate-400">Repetition Penalty</label>
-                                                                <span className="text-xs font-mono text-amber-400">
-                                                                    {expertRepetitionPenalty ?? 'default'}
-                                                                </span>
-                                                            </div>
+                                                    <div className="p-3 bg-slate-900 rounded-lg border border-slate-800/50">
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <label className="text-xs text-slate-400">Force JSON</label>
                                                             <input
-                                                                type="range"
-                                                                min="0"
-                                                                max="2"
-                                                                step="0.05"
-                                                                value={expertRepetitionPenalty ?? 0}
-                                                                onChange={(e) => {
-                                                                    const val = parseFloat(e.target.value);
-                                                                    setExpertRepetitionPenalty(val === 0 ? undefined : val);
-                                                                }}
-                                                                onMouseUp={saveExpertSettings}
-                                                                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                                                type="checkbox"
+                                                                checked={expertForceJson}
+                                                                onChange={(e) => setExpertForceJson(e.target.checked)}
+                                                                className="rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500/20"
                                                             />
-                                                            <p className="text-[9px] text-slate-600 mt-1">
-                                                                Higher values penalize repetition. 0 for default.
-                                                            </p>
                                                         </div>
-
-                                                        {/* Reasoning & JSON */}
-                                                        <div className="grid grid-cols-2 gap-4">
-                                                            <div className="p-3 bg-slate-900 rounded-lg border border-slate-800/50">
-
-                                                                <div className="flex items-center justify-between mb-2">
-                                                                    <label className="text-xs text-slate-400">Reasoning</label>
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={expertIncludeReasoning}
-                                                                        onChange={(e) => setExpertIncludeReasoning(e.target.checked)}
-                                                                        className="rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500/20"
-                                                                    />
-                                                                </div>
-                                                                {expertIncludeReasoning && (
-                                                                    <div className="space-y-2 mt-2">
-                                                                        <select
-                                                                            value={expertReasoningEffort}
-                                                                            onChange={(e) => setExpertReasoningEffort(e.target.value as any)}
-                                                                            className="w-full text-[10px] bg-slate-950 border border-slate-700 rounded px-1 py-1 text-slate-300"
-                                                                        >
-                                                                            <option value="minimal">Minimal Effort</option>
-                                                                            <option value="low">Low Effort</option>
-                                                                            <option value="medium">Medium Effort</option>
-                                                                            <option value="high">High Effort</option>
-                                                                        </select>
-
-                                                                        {capabilities.supportsReasoningMaxTokens && (
-                                                                            <div>
-                                                                                <div className="flex justify-between text-[9px] text-slate-500 mb-1">
-                                                                                    <span>Reasoning Tokens</span>
-                                                                                    <span className="font-mono text-amber-500/80">{expertReasoningMaxTokens || 'Default'}</span>
-                                                                                </div>
-                                                                                <input
-                                                                                    type="number"
-                                                                                    min="1024"
-                                                                                    max="32000"
-                                                                                    placeholder="Max (1024-32000)"
-                                                                                    value={expertReasoningMaxTokens || ''}
-                                                                                    onChange={(e) => setExpertReasoningMaxTokens(e.target.value ? parseInt(e.target.value) : undefined)}
-                                                                                    className="w-full text-[10px] bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-300 placeholder-slate-600"
-                                                                                />
-                                                                            </div>
-                                                                        )}
-
-                                                                        <div className="text-[9px] text-amber-600/90 leading-tight">
-                                                                            ⚠️ Increases cost significantly
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-                                                                <p className="text-[9px] text-slate-600 mt-2">
-                                                                    Enable chain-of-thought.
-                                                                </p>
-                                                            </div>
-
-                                                            <div className="p-3 bg-slate-900 rounded-lg border border-slate-800/50">
-                                                                <div className="flex items-center justify-between mb-2">
-                                                                    <label className="text-xs text-slate-400">Force JSON</label>
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        checked={expertForceJson}
-                                                                        onChange={(e) => setExpertForceJson(e.target.checked)}
-                                                                        className="rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500/20"
-                                                                    />
-                                                                </div>
-                                                                <p className="text-[9px] text-slate-600 mt-1">
-                                                                    Enforce valid JSON output structure.
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Stop Sequences */}
-                                                        {providerCapabilities.supportsStop && (
-                                                            <div>
-                                                                <label className="text-xs text-slate-400 block mb-2">
-                                                                    Stop Sequences <span className="text-slate-600">(one per line)</span>
-                                                                </label>
-                                                                <textarea
-                                                                    value={expertStopSequences}
-                                                                    onChange={(e) => setExpertStopSequences(e.target.value)}
-                                                                    onBlur={saveExpertSettings}
-                                                                    placeholder="Enter stop sequences...&#10;e.g. ```&#10;###"
-                                                                    className="w-full h-16 px-3 py-2 text-xs font-mono bg-slate-900 border border-slate-800 rounded-lg text-slate-300 placeholder-slate-600 resize-none focus:outline-none focus:border-amber-500/50"
-                                                                />
-                                                                <p className="text-[9px] text-slate-600 mt-1">
-                                                                    AI will stop generating when it encounters these strings.
-                                                                </p>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Seed (OpenAI/OpenRouter only) */}
-                                                        {providerCapabilities.supportsSeed && (
-                                                            <div>
-                                                                <div className="flex items-center justify-between mb-2">
-                                                                    <label className="text-xs text-slate-400">Seed</label>
-                                                                    <span className="text-xs font-mono text-amber-400">
-                                                                        {expertSeed ?? 'random'}
-                                                                    </span>
-                                                                </div>
-                                                                <input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    max="2147483647"
-                                                                    value={expertSeed ?? ''}
-                                                                    onChange={(e) => {
-                                                                        const val = e.target.value;
-                                                                        setExpertSeed(val === '' ? undefined : parseInt(val));
-                                                                    }}
-                                                                    onBlur={saveExpertSettings}
-                                                                    placeholder="Leave empty for random"
-                                                                    className="w-full px-3 py-2 text-xs font-mono bg-slate-900 border border-slate-800 rounded-lg text-slate-300 placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
-                                                                />
-                                                                <p className="text-[9px] text-slate-600 mt-1">
-                                                                    For deterministic outputs. May not be supported by all models.
-                                                                </p>
-                                                            </div>
-                                                        )}
-
-                                                        {/* Gemini Safety Preset */}
-                                                        {providerCapabilities.supportsSafety && (
-                                                            <div>
-                                                                <label className="text-xs text-slate-400 block mb-2">
-                                                                    Safety Level
-                                                                </label>
-                                                                <select
-                                                                    value={expertSafetyPreset}
-                                                                    onChange={(e) => {
-                                                                        setExpertSafetyPreset(e.target.value as GeminiSafetyPreset);
-                                                                        // Save immediately
-                                                                        const stopSeqArray = expertStopSequences.split('\n').map(s => s.trim()).filter(s => s.length > 0);
-                                                                        setExpertSettings(activeProvider, {
-                                                                            ...(expertMaxTokens !== undefined && { maxOutputTokens: expertMaxTokens }),
-                                                                            ...(stopSeqArray.length > 0 && { stopSequences: stopSeqArray }),
-                                                                            ...(expertSeed !== undefined && { seed: expertSeed }),
-                                                                            safetyPreset: e.target.value as GeminiSafetyPreset,
-                                                                        });
-                                                                    }}
-                                                                    className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-800 rounded-lg text-slate-300 focus:outline-none focus:border-amber-500/50"
-                                                                >
-                                                                    <option value="default">Default (Provider Standard)</option>
-                                                                    <option value="relaxed">Relaxed (Minimal Blocking)</option>
-                                                                    <option value="balanced">Balanced (Medium Blocking)</option>
-                                                                    <option value="strict">Strict (Maximum Blocking)</option>
-                                                                </select>
-                                                                <p className="text-[9px] text-slate-600 mt-1">
-                                                                    Controls content safety thresholds for all harm categories.
-                                                                </p>
-                                                            </div>
-                                                        )}
+                                                        <p className="text-[9px] text-slate-600 mt-1">
+                                                            Enforce valid JSON output structure.
+                                                        </p>
                                                     </div>
                                                 </div>
-                                            )}
+
+                                                {/* Stop Sequences */}
+                                                {providerCapabilities.supportsStop && (
+                                                    <div>
+                                                        <label className="text-xs text-slate-400 block mb-2">
+                                                            Stop Sequences <span className="text-slate-600">(one per line)</span>
+                                                        </label>
+                                                        <textarea
+                                                            value={expertStopSequences}
+                                                            onChange={(e) => setExpertStopSequences(e.target.value)}
+                                                            onBlur={saveExpertSettings}
+                                                            placeholder="Enter stop sequences...&#10;e.g. ```&#10;###"
+                                                            className="w-full h-16 px-3 py-2 text-xs font-mono bg-slate-900 border border-slate-800 rounded-lg text-slate-300 placeholder-slate-600 resize-none focus:outline-none focus:border-amber-500/50"
+                                                        />
+                                                        <p className="text-[9px] text-slate-600 mt-1">
+                                                            AI will stop generating when it encounters these strings.
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Seed (OpenAI/OpenRouter only) */}
+                                                {providerCapabilities.supportsSeed && (
+                                                    <div>
+                                                        <div className="flex items-center justify-between mb-2">
+                                                            <label className="text-xs text-slate-400">Seed</label>
+                                                            <span className="text-xs font-mono text-amber-400">
+                                                                {expertSeed ?? 'random'}
+                                                            </span>
+                                                        </div>
+                                                        <input
+                                                            type="number"
+                                                            min="0"
+                                                            max="2147483647"
+                                                            value={expertSeed ?? ''}
+                                                            onChange={(e) => {
+                                                                const val = e.target.value;
+                                                                setExpertSeed(val === '' ? undefined : parseInt(val));
+                                                            }}
+                                                            onBlur={saveExpertSettings}
+                                                            placeholder="Leave empty for random"
+                                                            className="w-full px-3 py-2 text-xs font-mono bg-slate-900 border border-slate-800 rounded-lg text-slate-300 placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
+                                                        />
+                                                        <p className="text-[9px] text-slate-600 mt-1">
+                                                            For deterministic outputs. May not be supported by all models.
+                                                        </p>
+                                                    </div>
+                                                )}
+
+                                                {/* Gemini Safety Preset */}
+                                                {providerCapabilities.supportsSafety && (
+                                                    <div>
+                                                        <label className="text-xs text-slate-400 block mb-2">
+                                                            Safety Level
+                                                        </label>
+                                                        <select
+                                                            value={expertSafetyPreset}
+                                                            onChange={(e) => {
+                                                                setExpertSafetyPreset(e.target.value as GeminiSafetyPreset);
+                                                                // Save immediately
+                                                                const stopSeqArray = expertStopSequences.split('\n').map(s => s.trim()).filter(s => s.length > 0);
+                                                                setExpertSettings(activeProvider, {
+                                                                    ...(expertMaxTokens !== undefined && { maxOutputTokens: expertMaxTokens }),
+                                                                    ...(stopSeqArray.length > 0 && { stopSequences: stopSeqArray }),
+                                                                    ...(expertSeed !== undefined && { seed: expertSeed }),
+                                                                    safetyPreset: e.target.value as GeminiSafetyPreset,
+                                                                });
+                                                            }}
+                                                            className="w-full px-3 py-2 text-xs bg-slate-900 border border-slate-800 rounded-lg text-slate-300 focus:outline-none focus:border-amber-500/50"
+                                                        >
+                                                            <option value="default">Default (Provider Standard)</option>
+                                                            <option value="relaxed">Relaxed (Minimal Blocking)</option>
+                                                            <option value="balanced">Balanced (Medium Blocking)</option>
+                                                            <option value="strict">Strict (Maximum Blocking)</option>
+                                                        </select>
+                                                        <p className="text-[9px] text-slate-600 mt-1">
+                                                            Controls content safety thresholds for all harm categories.
+                                                        </p>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
+
                             </div>
                         </div>
                     )}
@@ -1148,8 +1299,8 @@ const SettingsModal: React.FC = () => {
                     )}
 
                 </div>
-            </div>
-        </Modal>
+            </div >
+        </Modal >
     );
 };
 

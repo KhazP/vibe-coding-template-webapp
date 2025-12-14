@@ -436,3 +436,39 @@ export const streamArtifact = async (
 export const generateArtifact = async (systemInstruction: string, prompt: string, settings: GeminiSettings, apiKey: string): Promise<string> => {
   return streamArtifact(systemInstruction, prompt, settings, apiKey, () => { });
 }
+
+// ============================================================================
+// DYNAMIC MODEL RETRIEVAL
+// ============================================================================
+
+export interface GeminiModel {
+  name: string;
+  version: string;
+  displayName: string;
+  description: string;
+  inputTokenLimit: number;
+  outputTokenLimit: number;
+  supportedGenerationMethods: string[];
+  temperature?: number;
+  topP?: number;
+  topK?: number;
+  maxTemperature?: number;
+}
+
+export const getGeminiModels = async (apiKey: string): Promise<GeminiModel[]> => {
+  if (!apiKey) return [];
+
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!response.ok) {
+      console.warn(`Failed to fetch Gemini models: ${response.status}`);
+      return [];
+    }
+
+    const data = await response.json();
+    return (data.models || []) as GeminiModel[];
+  } catch (error) {
+    console.error("Error fetching Gemini models:", error);
+    return [];
+  }
+};

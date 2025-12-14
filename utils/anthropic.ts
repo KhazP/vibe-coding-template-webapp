@@ -153,3 +153,41 @@ export const streamAnthropic = async (
         throw new Error(getShortAnthropicError(error));
     }
 };
+export interface AnthropicModel {
+    id: string;
+    description?: string;
+    display_name: string;
+    created_at: string;
+}
+
+/**
+ * Fetches available models from Anthropic API.
+ * Uses direct fetch instead of SDK because SDK might not support model listing in browser directly/easily or validation.
+ * Note: Anthropic models endpoint usually requires CORS proxy or backend, but we'll try direct + allow browser.
+ * If direct access fails due to CORS, it will return empty list.
+ */
+export const getAnthropicModels = async (apiKey: string): Promise<AnthropicModel[]> => {
+    if (!apiKey) return [];
+
+    try {
+        const response = await fetch('https://api.anthropic.com/v1/models?limit=100', {
+            method: 'GET',
+            headers: {
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01',
+                // 'anthropic-beta': 'messages-2023-12-15' // Optional betas
+            }
+        });
+
+        if (!response.ok) {
+            console.warn(`Failed to fetch Anthropic models: ${response.status}`);
+            return [];
+        }
+
+        const data = await response.json();
+        return (data.data || []) as AnthropicModel[];
+    } catch (error) {
+        console.error("Error fetching Anthropic models:", error);
+        return [];
+    }
+};

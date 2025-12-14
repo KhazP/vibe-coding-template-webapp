@@ -383,3 +383,42 @@ export const streamOpenAI = async (
         throw error;
     }
 };
+export interface OpenAIModel {
+    id: string;
+    object: string;
+    created: number;
+    owned_by: string;
+}
+
+/**
+ * Fetches available models from OpenAI API.
+ * Filters for models that are likely chat/text generation models (gpt-*) to reduce noise.
+ */
+export const getOpenAIModels = async (apiKey: string): Promise<OpenAIModel[]> => {
+    if (!apiKey) return [];
+
+    try {
+        const response = await fetch(`${OPENAI_API_BASE}/models`, {
+            headers: {
+                'Authorization': `Bearer ${apiKey}`
+            }
+        });
+
+        if (!response.ok) {
+            console.warn(`Failed to fetch OpenAI models: ${response.status}`);
+            return [];
+        }
+
+        const data = await response.json();
+        const models = (data.data || []) as OpenAIModel[];
+
+        // Filter for GPT models to keep the list relevant
+        return models
+            .filter(m => m.id.includes('gpt') || m.id.includes('o1') || m.id.includes('o3'))
+            .sort((a, b) => b.created - a.created); // Sort by newest first
+
+    } catch (error) {
+        console.error("Error fetching OpenAI models:", error);
+        return [];
+    }
+};
