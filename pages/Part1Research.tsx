@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useProject } from '../context/ProjectContext';
 import { Button, PersonaError, Skeleton, StepNavigation, CopyBlock, TextArea, GlassCard, Tooltip } from '../components/UI';
 import { ProjectInput, ProjectTextArea, ProjectSelect } from '../components/FormFields';
@@ -8,6 +8,9 @@ import { Persona } from '../types';
 import { Sparkles, Globe, Loader2, Zap, ExternalLink, ArrowDown, CheckCircle2, ArrowRight, Info, BrainCircuit, ChevronDown } from 'lucide-react';
 import { ModelStatus } from '../components/ModelStatus';
 import { useToast } from '../components/Toast';
+import { getProviderSettings } from '../utils/providerStorage';
+import { PROVIDERS } from '../utils/providers';
+import { getModelById } from '../utils/modelUtils';
 
 // OpenAI Deep Research Models with pricing
 const OPENAI_DEEP_RESEARCH_MODELS = [
@@ -43,6 +46,20 @@ const Part1Research: React.FC = React.memo(() => {
   const [externalPrompt, setExternalPrompt] = useState<string>('');
   const [externalPasteBuffer, setExternalPasteBuffer] = useState<string>('');
 
+  // Get current provider settings for Standard mode display
+  const standardModeInfo = useMemo(() => {
+    const providerSettings = getProviderSettings();
+    const providerId = providerSettings.defaultProvider;
+    const modelId = providerSettings.defaultModels[providerId];
+    const provider = PROVIDERS[providerId];
+    const model = modelId ? getModelById(modelId) : null;
+    return {
+      providerName: provider?.displayName || 'Gemini',
+      modelName: model?.displayName || 'Default Model',
+      logoPath: provider?.logoPath || '/providers/gemini.svg',
+    };
+  }, []);
+
   // Sync buffer if researchOutput changes externally (e.g. undo/redo)
   useEffect(() => {
     if (researchOutput && !externalPasteBuffer) {
@@ -75,7 +92,7 @@ const Part1Research: React.FC = React.memo(() => {
   const handleRunResearch = async () => {
     if (validate() && persona) {
       const prompt = generateResearchPrompt(persona, answers);
-      await performGeminiResearch(prompt, researchMode);
+      await performGeminiResearch(prompt, researchMode, researchProvider, researchProvider === 'openai' ? openaiDeepModel : undefined);
     } else {
       addToast('Please fix validation errors before running research.', 'error');
     }
@@ -156,7 +173,7 @@ const Part1Research: React.FC = React.memo(() => {
                         }`}
                     >
                       <div className="font-bold mb-0.5">Standard</div>
-                      <div className="opacity-70 text-[10px]">Gemini 3 Pro + Search</div>
+                      <div className="opacity-70 text-[10px]">{standardModeInfo.modelName}</div>
                     </button>
                     <button
                       onClick={() => setResearchMode('deep')}
@@ -283,7 +300,7 @@ const Part1Research: React.FC = React.memo(() => {
                 field="research_vibe_who"
                 label="2. Who would use this app?"
                 placeholder="Describe your ideal user (e.g., “busy parents,” “small business owners”) and what they need most."
-                tooltip="Target audience analysis helps Gemini understand market fit."
+                tooltip="Target audience analysis helps the AI understand market fit."
                 maxLength={1000}
                 required
               />
@@ -515,12 +532,12 @@ const Part1Research: React.FC = React.memo(() => {
                   ? 'bg-gradient-to-r from-purple-700 to-indigo-600 hover:from-purple-600 hover:to-indigo-500 shadow-purple-500/20'
                   : 'bg-gradient-to-r from-blue-600 to-primary-600 hover:from-blue-500 hover:to-primary-500'
                   }`}
-                tooltip={researchMode === 'deep' ? "Uses 'deep-research-pro' agent. Takes 2-5 minutes." : "Standard Gemini 3 Pro research."}
+                tooltip={researchMode === 'deep' ? `Uses ${researchProvider === 'openai' ? openaiDeepModel : 'Gemini deep-research'} agent. Takes 2-10 minutes. Pricing: ${researchProvider === 'gemini' ? '$2.00/1M in, $12.00/1M out (Same as Gemini 3 Pro)' : ''}` : "Standard Gemini 3 Pro + Search research."}
               >
                 {isGenerating ? (
                   <><Loader2 className="animate-spin" size={18} /> {generationPhase || (researchMode === 'deep' ? 'Agent Working...' : 'Researching...')}</>
                 ) : (
-                  <><Sparkles size={18} /> Run {researchMode === 'deep' ? 'Deep Research' : 'Research'} with Gemini</>
+                  <><Sparkles size={18} /> Run {researchMode === 'deep' ? 'Deep Research' : 'Research'} with {researchMode === 'deep' ? (researchProvider === 'gemini' ? 'Gemini' : 'OpenAI') : standardModeInfo.providerName}</>
                 )}
               </Button>
             ) : (

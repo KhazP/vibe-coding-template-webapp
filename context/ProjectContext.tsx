@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useReducer, useRef, useCallback, useMemo } from 'react';
 import { Persona, ProjectState, GeminiSettings, GroundingChunk, ProjectFieldKey, ToolSettings, AnalyticsEvent, ArtifactSectionName, TokenUsage, ArtifactVersion } from '../types';
 import { runDeepResearch, runDeepResearchInteraction, generateArtifact, streamArtifact, streamDeepResearch } from '../utils/gemini';
+import { runOpenAIDeepResearch } from '../utils/openai';
 import { getPRDSystemInstruction, getTechDesignSystemInstruction, getAgentSystemInstruction, getRefineSystemInstruction, generateRefinePrompt, getBuildPlanSystemInstruction } from '../utils/templates';
 import { useToast } from '../components/Toast';
 import { STORAGE_KEYS, DEFAULT_SETTINGS, PRICING, MODELS } from '../utils/constants';
@@ -28,7 +29,7 @@ interface ProjectContextType {
   updateToolSettings: (settings: Partial<ToolSettings>) => void;
   generateAgentOutputs: () => void;
   toggleTool: (toolId: string) => void;
-  performGeminiResearch: (prompt: string, mode?: 'standard' | 'deep') => Promise<void>;
+  performGeminiResearch: (prompt: string, mode?: 'standard' | 'deep', provider?: 'gemini' | 'openai', model?: string) => Promise<void>;
   performGeminiPRD: (prompt: string) => Promise<void>;
   performGeminiTech: (prompt: string) => Promise<void>;
   performGeminiAgent: (prompt: string) => Promise<string>;
@@ -929,7 +930,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, []);
 
-  const performGeminiResearch = useCallback(async (prompt: string, mode: 'standard' | 'deep' = 'standard') => {
+  const performGeminiResearch = useCallback(async (prompt: string, mode: 'standard' | 'deep' = 'standard', provider: 'gemini' | 'openai' = 'gemini', model?: string) => {
     const projectId = state.currentId;
     const proj = state.projects[projectId];
     if (!proj || !apiKey) { setIsApiKeyModalOpen(true); return; }
@@ -950,6 +951,53 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     activeUsageRef.current = startUsage;
 
     if (mode === 'deep') {
+
+      // --- OPENAI DEEP RESEARCH BRANCH ---
+      if (provider === 'openai') {
+        const openaiKey = getProviderKey('openai');
+        if (!openaiKey) {
+          addToast('OpenAI API Key required for Deep Research.', 'error');
+          setIsApiKeyModalOpen(true); // Might need a way to open specific provider key
+          return;
+        }
+
+        setGenerationPhase('Starting OpenAI Deep Research Agent...');
+        try {
+          // Use provided model or default to o3-deep-research
+          const targetModel = model || 'o3-deep-research';
+          const { text, sources } = await runOpenAIDeepResearch(prompt, targetModel, openaiKey, (status) => setGenerationPhase(status), abortControllerRef.current.signal, proj.settings.customInstructions);
+
+          // Estimate usage (rough estimate for OpenAI as they bill differently but we track local token activity)
+          // OpenAI output cost is significantly higher for o3-deep-research, so strict token tracking is harder without usage data from API.
+          // We'll estimate based on text length for now to keep the UI populating.
+          const finalOutputTokens = estimateTokens(text);
+          // Pricing: o3-deep is $10 in / $40 out (approx). logic below uses hardcoded Gemini pricing, 
+          // but calculateIncrementalCost uses logic 'modelName.includes(k)'.
+          // We might want to pass the specific cost or update calculateIncrementalCost later.
+          // For now, we update usage stats generically.
+
+          const endUsage = {
+            ...startUsage,
+            output: startUsage.output + finalOutputTokens,
+            // We don't accurately track cost for OpenAI here yet without updating PRICING constants, 
+            // but this ensures the token count updates.
+            estimatedCost: startUsage.estimatedCost // TODO: Calculate OpenAI cost
+          };
+
+          updateCurrentProject({ researchSources: sources, isGenerating: false, tokenUsage: endUsage });
+          commitArtifact('research', text);
+          logEvent('generation_complete', { type: 'research_deep_openai', project: proj.name, model: targetModel });
+          setGenerationPhase('');
+          addToast('OpenAI Deep Research Report ready', 'success');
+        } catch (error: any) {
+          handleApiError(error);
+          updateCurrentProject({ isGenerating: false });
+          setGenerationPhase('');
+        }
+        return;
+      }
+
+      // --- GEMINI DEEP RESEARCH BRANCH ---
       setGenerationPhase('Starting Deep Research Agent...');
       try {
         const { text, sources } = await runDeepResearchInteraction(prompt, apiKey, (status) => setGenerationPhase(status), abortControllerRef.current.signal, proj.settings.customInstructions);
@@ -969,6 +1017,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setGenerationPhase('');
         addToast('Deep Research Report ready', 'success');
       } catch (error: any) {
+        // Fallback logic for Gemini
         const isFallbackCandidate =
           error?.message?.includes('not found') ||
           error?.message?.includes('404') ||
