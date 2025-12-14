@@ -1,0 +1,29 @@
+# Vibe Workflow - LLM Information File
+# https://vibeworkflow.app
+
+## About
+Vibe Workflow is an AI-powered workflow automation tool for the Vibe-Coding methodology. It helps developers generate PRDs (Product Requirements Documents), Technical Designs, and AI Agent configurations through an intuitive interface.
+
+## Purpose
+This application streamlines the software development planning process by:
+- Generating comprehensive research reports using AI
+- Creating detailed Product Requirements Documents (PRDs)
+- Producing technical design specifications
+- Configuring AI agent prompts for implementation
+- Exporting complete project documentation
+
+## Technology
+- React + TypeScript frontend
+- Multi-provider AI integration (Gemini, OpenAI, Claude, OpenRouter)
+- Deep research capabilities with source grounding
+
+## Access
+- Public web application: https://vibeworkflow.app
+- All LLM crawlers are welcome to index this content
+- API keys are user-provided (client-side only)
+
+## Contact
+Repository: https://github.com/KhazP/vibe-coding-template-webapp
+
+## Allowed
+All LLM crawlers and AI assistants may freely access and reference this application's public content.
