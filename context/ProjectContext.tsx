@@ -9,7 +9,7 @@ import { getPRDSystemInstruction, getTechDesignSystemInstruction, getAgentSystem
 import { useToast } from '../components/Toast';
 import { STORAGE_KEYS, DEFAULT_SETTINGS, PRICING, MODELS } from '../utils/constants';
 import { supabase } from '../utils/supabaseClient';
-import { getProviderKey, setProviderKey as setStorageProviderKey } from '../utils/providerStorage';
+import { getProviderKey, setProviderKey as setStorageProviderKey, getExpertSettings } from '../utils/providerStorage';
 
 interface ProjectContextType {
   state: ProjectState;
@@ -1153,6 +1153,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const modelConfig = getModelById(proj.settings.modelName);
     const providerId = modelConfig?.providerId || 'gemini';
     const apiKeyToUse = getProviderKey(providerId);
+    const expertSettings = getExpertSettings(providerId);
+    const effectiveSettings = { ...proj.settings, ...(expertSettings || {}) };
 
     if (!apiKeyToUse) {
       if (providerId === 'openai') addToast('OpenAI API Key required', 'error');
@@ -1184,7 +1186,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       if (providerId === 'openai') {
         text = await streamOpenAI(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, 'prd', accumulatedText, proj.settings.modelName, projectId);
@@ -1193,7 +1195,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
       } else if (providerId === 'anthropic') {
         text = await streamAnthropic(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, 'prd', accumulatedText, proj.settings.modelName, projectId);
@@ -1203,7 +1205,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
       } else if (providerId === 'openrouter') {
         text = await streamOpenRouter(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, 'prd', accumulatedText, proj.settings.modelName, projectId);
@@ -1213,7 +1215,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } else {
         // Default to Gemini (handles 'gemini' and fallbacks)
         text = await streamArtifact(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, 'prd', accumulatedText, proj.settings.modelName, projectId);
@@ -1244,6 +1246,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const providerId = modelConfig?.providerId || 'gemini';
     const apiKeyToUse = getProviderKey(providerId);
 
+    const expertSettings = getExpertSettings(providerId);
+    const effectiveSettings = { ...proj.settings, ...(expertSettings || {}) };
 
     if (!apiKeyToUse) {
       if (providerId === 'openai') addToast('OpenAI API Key required', 'error');
@@ -1274,7 +1278,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       let text = "";
       if (providerId === 'openai') {
         text = await streamOpenAI(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, 'tech', accumulatedText, proj.settings.modelName, projectId);
@@ -1283,7 +1287,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
       } else if (providerId === 'anthropic') {
         text = await streamAnthropic(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, 'tech', accumulatedText, proj.settings.modelName, projectId);
@@ -1292,7 +1296,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
       } else if (providerId === 'openrouter') {
         text = await streamOpenRouter(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, 'tech', accumulatedText, proj.settings.modelName, projectId);
@@ -1301,7 +1305,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
       } else {
         text = await streamArtifact(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, 'tech', accumulatedText, proj.settings.modelName, projectId);
@@ -1331,6 +1335,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const modelConfig = getModelById(proj.settings.modelName);
     const providerId = modelConfig?.providerId || 'gemini';
     const apiKeyToUse = getProviderKey(providerId);
+    const expertSettings = getExpertSettings(providerId);
+    const effectiveSettings = { ...proj.settings, ...(expertSettings || {}) };
 
     if (!apiKeyToUse) {
       if (providerId === 'openai') addToast('OpenAI API Key required for Agent', 'error');
@@ -1359,7 +1365,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       if (providerId === 'openai') {
         fullOutput = await streamOpenAI(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk) => {
             // Agent stream doesn't update a visible artifact in real-time typically,
             // but we might want to if we had a "Agent Log".
@@ -1371,20 +1377,20 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
       } else if (providerId === 'anthropic') {
         fullOutput = await streamAnthropic(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           () => { }, // Agent outputs parsed at end
           (status) => setGenerationPhase(status)
         );
       } else if (providerId === 'openrouter') {
         fullOutput = await streamOpenRouter(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           () => { }, // Agent outputs parsed at end
           (status) => setGenerationPhase(status)
         );
       } else {
         // Gemini
         fullOutput = await streamArtifact(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           () => { }, // Agent outputs are typically parsed at end, so we might not stream to a specific field user sees immediately
           (status) => setGenerationPhase(status)
         );
@@ -1438,6 +1444,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const modelConfig = getModelById(proj.settings.modelName);
     const providerId = modelConfig?.providerId || 'gemini';
     const apiKeyToUse = getProviderKey(providerId);
+    const expertSettings = getExpertSettings(providerId);
+    const effectiveSettings = { ...proj.settings, ...(expertSettings || {}) };
 
     if (!apiKeyToUse) {
       if (providerId === 'openai') addToast('OpenAI API Key required', 'error');
@@ -1467,7 +1475,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       let text = "";
       if (providerId === 'openai') {
         text = await streamOpenAI(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, 'build', accumulatedText, proj.settings.modelName, projectId);
@@ -1476,7 +1484,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
       } else if (providerId === 'anthropic') {
         text = await streamAnthropic(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, 'build', accumulatedText, proj.settings.modelName, projectId);
@@ -1485,7 +1493,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
       } else if (providerId === 'openrouter') {
         text = await streamOpenRouter(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, 'build', accumulatedText, proj.settings.modelName, projectId);
@@ -1494,7 +1502,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
       } else {
         text = await streamArtifact(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, 'build', accumulatedText, proj.settings.modelName, projectId);
@@ -1523,6 +1531,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const modelConfig = getModelById(proj.settings.modelName);
     const providerId = modelConfig?.providerId || 'gemini';
     const apiKeyToUse = getProviderKey(providerId);
+    const expertSettings = getExpertSettings(providerId);
+    const effectiveSettings = { ...proj.settings, ...(expertSettings || {}) };
 
     if (!apiKeyToUse) {
       if (providerId === 'openai') addToast('OpenAI API Key required', 'error');
@@ -1533,22 +1543,22 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       if (providerId === 'openai') {
         return await streamOpenAI(
-          systemInstruction || "", prompt, proj.settings, apiKeyToUse,
+          systemInstruction || "", prompt, effectiveSettings, apiKeyToUse,
           () => { }
         );
       } else if (providerId === 'anthropic') {
         return await streamAnthropic(
-          systemInstruction || "", prompt, proj.settings, apiKeyToUse,
+          systemInstruction || "", prompt, effectiveSettings, apiKeyToUse,
           () => { }
         );
       } else if (providerId === 'openrouter') {
         return await streamOpenRouter(
-          systemInstruction || "", prompt, proj.settings, apiKeyToUse,
+          systemInstruction || "", prompt, effectiveSettings, apiKeyToUse,
           () => { }
         );
       } else {
         return await generateArtifact(
-          systemInstruction || "", prompt, proj.settings, apiKeyToUse
+          systemInstruction || "", prompt, effectiveSettings, apiKeyToUse
         );
       }
     } catch (error: any) {
@@ -1567,6 +1577,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const modelConfig = getModelById(proj.settings.modelName);
     const providerId = modelConfig?.providerId || 'gemini';
     const apiKeyToUse = getProviderKey(providerId);
+    const expertSettings = getExpertSettings(providerId);
+    const effectiveSettings = { ...proj.settings, ...(expertSettings || {}) };
 
     if (!apiKeyToUse) {
       if (providerId === 'openai') addToast('OpenAI API Key required', 'error');
@@ -1605,7 +1617,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       let text = "";
       if (providerId === 'openai') {
         text = await streamOpenAI(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, type, accumulatedText, proj.settings.modelName, projectId);
@@ -1614,7 +1626,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
       } else if (providerId === 'anthropic') {
         text = await streamAnthropic(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, type, accumulatedText, proj.settings.modelName, projectId);
@@ -1623,7 +1635,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
       } else if (providerId === 'openrouter') {
         text = await streamOpenRouter(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, type, accumulatedText, proj.settings.modelName, projectId);
@@ -1632,7 +1644,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
       } else {
         text = await streamArtifact(
-          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          systemInstruction, prompt, effectiveSettings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;
             handleStreamUpdate(chunk, type, accumulatedText, proj.settings.modelName, projectId);

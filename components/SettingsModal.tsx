@@ -41,6 +41,12 @@ const SettingsModal: React.FC = () => {
     const [expertMaxTokens, setExpertMaxTokens] = useState<number | undefined>(savedExpertSettings.maxOutputTokens);
     const [expertStopSequences, setExpertStopSequences] = useState<string>(savedExpertSettings.stopSequences?.join('\n') || '');
     const [expertSeed, setExpertSeed] = useState<number | undefined>(savedExpertSettings.seed);
+    const [expertTopK, setExpertTopK] = useState<number | undefined>(savedExpertSettings.topK);
+    const [expertRepetitionPenalty, setExpertRepetitionPenalty] = useState<number | undefined>(savedExpertSettings.repetitionPenalty);
+    const [expertIncludeReasoning, setExpertIncludeReasoning] = useState<boolean>(savedExpertSettings.includeReasoning || false);
+    const [expertReasoningEffort, setExpertReasoningEffort] = useState<ExpertSettings['reasoningEffort']>(savedExpertSettings.reasoningEffort || 'medium');
+    const [expertReasoningMaxTokens, setExpertReasoningMaxTokens] = useState<number | undefined>(savedExpertSettings.reasoningMaxTokens);
+    const [expertForceJson, setExpertForceJson] = useState<boolean>(savedExpertSettings.responseFormat?.type === 'json_object');
     const [expertSafetyPreset, setExpertSafetyPreset] = useState<GeminiSafetyPreset>(
         (activeProvider === 'gemini' && (savedExpertSettings as any)?.safetyPreset) || 'default'
     );
@@ -51,11 +57,49 @@ const SettingsModal: React.FC = () => {
         setExpertMaxTokens(settings.maxOutputTokens);
         setExpertStopSequences(settings.stopSequences?.join('\n') || '');
         setExpertSeed(settings.seed);
+        setExpertTopK(settings.topK);
+        setExpertRepetitionPenalty(settings.repetitionPenalty);
+        setExpertIncludeReasoning(settings.includeReasoning || false);
+        setExpertReasoningEffort(settings.reasoningEffort || 'medium');
+        setExpertReasoningMaxTokens(settings.reasoningMaxTokens);
+        setExpertForceJson(settings.responseFormat?.type === 'json_object');
+
         if (activeProvider === 'gemini') {
             setExpertSafetyPreset((settings as any)?.safetyPreset || 'default');
         }
     }, [activeProvider]);
 
+    // Auto-save expert toggles/selects
+    useEffect(() => {
+        // Debounce or check if values actually changed? 
+        // For now, just save. saveExpertSettings uses current state vars.
+        // We need to ensure we don't save initial load (defaults).
+        // But savedExpertSettings initializes state, so it shouldn't drift.
+        // We'll trust the user interaction updates the state.
+
+        // However, we can't call saveExpertSettings directly here if it's not defined yet (it's defined later).
+        // We must move the definition of saveExpertSettings UP, or put this effect DOWN.
+        // `saveExpertSettings` is defined around line 224 (restored location?). 
+        // I will insert this effect AFTER `saveExpertSettings` definition.
+    }, []); // Placeholder to cancel this insertion here. 
+    // I will use a separate tool call to insert it later.
+
+    // Actually, I can just define the `saveExpertSettings` function inside a useCallback or similar early on?
+    // The component structure is: state -> effects -> methods -> render.
+    // Methods currently rely on state.
+    // I will skip adding the effect for now and handle persistence inline with `setTimeout` for the toggles, 
+    // or just rely on the user closing the modal (if I add a save-on-close)?
+    // No, `saveExpertSettings` is explicitly called onBlur currently.
+    // I will add the UI inputs now and use `onBlur` for inputs. 
+    // For checkboxes, I will use `onChange` + `setTimeout(saveExpertSettings, 0)`.
+    // BUT `saveExpertSettings` is defined lower down.
+
+    // I will proceed with just adding the UI inputs first.
+
+
+    // ... (skip down to saveExpertSettings)
+
+    // --- RESTORED LOGIC ---
     const { providers: openRouterProviders } = useOpenRouterModels();
 
     // Get provider capabilities
@@ -73,6 +117,19 @@ const SettingsModal: React.FC = () => {
     const supportsTopP = activeProvider === 'openrouter'
         ? (openRouterModel?.supported_parameters?.includes('top_p') ?? true)
         : true;
+
+    // Helper for simple capability check (also used in save validation)
+    const getModelCapabilities = (modelId: string) => {
+        const isAnthropic = modelId.startsWith('anthropic/') || modelId.includes('claude');
+        const isOpenAI = modelId.startsWith('openai/') || modelId.includes('gpt');
+
+        return {
+            supportsReasoningMaxTokens: isAnthropic,
+            supportsTopK: !isOpenAI || isAnthropic, // Rough heuristic matching utils/openrouter.ts
+        };
+    };
+
+    const capabilities = useMemo(() => getModelCapabilities(selectedModelId), [selectedModelId]);
 
     // Sync selected model when provider changes
     useEffect(() => {
@@ -223,10 +280,35 @@ const SettingsModal: React.FC = () => {
             .map(s => s.trim())
             .filter(s => s.length > 0);
 
+        // Validation / Clamping
+        let validRepPenalty = expertRepetitionPenalty;
+        if (validRepPenalty !== undefined) {
+            validRepPenalty = Math.max(0, Math.min(2, validRepPenalty));
+        }
+
+        let validTopK = expertTopK;
+        if (validTopK !== undefined) {
+            validTopK = Math.max(1, Math.min(100, Math.floor(validTopK)));
+        }
+
+        let validReasoningMaxTokens = expertReasoningMaxTokens;
+        if (validReasoningMaxTokens !== undefined) {
+            // Cap at 32k for safety, min 1024
+            validReasoningMaxTokens = Math.max(1024, Math.min(32000, Math.floor(validReasoningMaxTokens)));
+        }
+
         const expertData: ExpertSettings & { safetyPreset?: GeminiSafetyPreset } = {
             ...(expertMaxTokens !== undefined && { maxOutputTokens: expertMaxTokens }),
             ...(stopSeqArray.length > 0 && { stopSequences: stopSeqArray }),
             ...(expertSeed !== undefined && { seed: expertSeed }),
+            ...(validTopK !== undefined && { topK: validTopK }),
+            ...(validRepPenalty !== undefined && { repetitionPenalty: validRepPenalty }),
+            ...(expertIncludeReasoning && {
+                includeReasoning: true,
+                reasoningEffort: expertReasoningEffort,
+                ...(validReasoningMaxTokens && { reasoningMaxTokens: validReasoningMaxTokens })
+            }),
+            ...(expertForceJson && { responseFormat: { type: 'json_object' } }),
         };
 
         // Add Gemini-specific settings
@@ -237,11 +319,26 @@ const SettingsModal: React.FC = () => {
         setExpertSettings(activeProvider, expertData);
     };
 
+    // Auto-save when toggles change
+    // Auto-save when toggles change
+    useEffect(() => {
+        // Only trigger if we are safely loaded
+        if (activeProvider) {
+            saveExpertSettings();
+        }
+    }, [expertIncludeReasoning, expertForceJson, expertReasoningEffort, expertReasoningMaxTokens]);
+
     const handleResetExpertSettings = () => {
         resetExpertSettings(activeProvider);
         setExpertMaxTokens(undefined);
         setExpertStopSequences('');
         setExpertSeed(undefined);
+        setExpertTopK(undefined);
+        setExpertRepetitionPenalty(undefined);
+        setExpertIncludeReasoning(false);
+        setExpertReasoningEffort('medium');
+        setExpertReasoningMaxTokens(undefined);
+        setExpertForceJson(false);
         setExpertSafetyPreset('default');
     };
 
@@ -683,6 +780,130 @@ const SettingsModal: React.FC = () => {
                                                                 </p>
                                                             </div>
                                                         )}
+
+                                                        {/* Top K */}
+                                                        {capabilities.supportsTopK && (
+                                                            <div>
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <label className="text-xs text-slate-400">Top K</label>
+                                                                    <span className="text-xs font-mono text-amber-400">
+                                                                        {expertTopK ?? 'default'}
+                                                                    </span>
+                                                                </div>
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max="100"
+                                                                    value={expertTopK ?? ''}
+                                                                    onChange={(e) => {
+                                                                        const val = e.target.value;
+                                                                        setExpertTopK(val === '' ? undefined : parseInt(val));
+                                                                    }}
+                                                                    onBlur={saveExpertSettings}
+                                                                    placeholder="Model Default (1-100)"
+                                                                    className="w-full px-3 py-2 text-xs font-mono bg-slate-900 border border-slate-800 rounded-lg text-slate-300 placeholder-slate-600 focus:outline-none focus:border-amber-500/50"
+                                                                />
+                                                                <p className="text-[9px] text-slate-600 mt-1">
+                                                                    Limit selection to the top K tokens. 0 or empty for default.
+                                                                </p>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Repetition Penalty */}
+                                                        <div>
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <label className="text-xs text-slate-400">Repetition Penalty</label>
+                                                                <span className="text-xs font-mono text-amber-400">
+                                                                    {expertRepetitionPenalty ?? 'default'}
+                                                                </span>
+                                                            </div>
+                                                            <input
+                                                                type="range"
+                                                                min="0"
+                                                                max="2"
+                                                                step="0.05"
+                                                                value={expertRepetitionPenalty ?? 0}
+                                                                onChange={(e) => {
+                                                                    const val = parseFloat(e.target.value);
+                                                                    setExpertRepetitionPenalty(val === 0 ? undefined : val);
+                                                                }}
+                                                                onMouseUp={saveExpertSettings}
+                                                                className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                                                            />
+                                                            <p className="text-[9px] text-slate-600 mt-1">
+                                                                Higher values penalize repetition. 0 for default.
+                                                            </p>
+                                                        </div>
+
+                                                        {/* Reasoning & JSON */}
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div className="p-3 bg-slate-900 rounded-lg border border-slate-800/50">
+
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <label className="text-xs text-slate-400">Reasoning</label>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={expertIncludeReasoning}
+                                                                        onChange={(e) => setExpertIncludeReasoning(e.target.checked)}
+                                                                        className="rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500/20"
+                                                                    />
+                                                                </div>
+                                                                {expertIncludeReasoning && (
+                                                                    <div className="space-y-2 mt-2">
+                                                                        <select
+                                                                            value={expertReasoningEffort}
+                                                                            onChange={(e) => setExpertReasoningEffort(e.target.value as any)}
+                                                                            className="w-full text-[10px] bg-slate-950 border border-slate-700 rounded px-1 py-1 text-slate-300"
+                                                                        >
+                                                                            <option value="minimal">Minimal Effort</option>
+                                                                            <option value="low">Low Effort</option>
+                                                                            <option value="medium">Medium Effort</option>
+                                                                            <option value="high">High Effort</option>
+                                                                        </select>
+
+                                                                        {capabilities.supportsReasoningMaxTokens && (
+                                                                            <div>
+                                                                                <div className="flex justify-between text-[9px] text-slate-500 mb-1">
+                                                                                    <span>Reasoning Tokens</span>
+                                                                                    <span className="font-mono text-amber-500/80">{expertReasoningMaxTokens || 'Default'}</span>
+                                                                                </div>
+                                                                                <input
+                                                                                    type="number"
+                                                                                    min="1024"
+                                                                                    max="32000"
+                                                                                    placeholder="Max (1024-32000)"
+                                                                                    value={expertReasoningMaxTokens || ''}
+                                                                                    onChange={(e) => setExpertReasoningMaxTokens(e.target.value ? parseInt(e.target.value) : undefined)}
+                                                                                    className="w-full text-[10px] bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-300 placeholder-slate-600"
+                                                                                />
+                                                                            </div>
+                                                                        )}
+
+                                                                        <div className="text-[9px] text-amber-600/90 leading-tight">
+                                                                            ⚠️ Increases cost significantly
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                <p className="text-[9px] text-slate-600 mt-2">
+                                                                    Enable chain-of-thought.
+                                                                </p>
+                                                            </div>
+
+                                                            <div className="p-3 bg-slate-900 rounded-lg border border-slate-800/50">
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <label className="text-xs text-slate-400">Force JSON</label>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={expertForceJson}
+                                                                        onChange={(e) => setExpertForceJson(e.target.checked)}
+                                                                        className="rounded border-slate-700 bg-slate-800 text-amber-500 focus:ring-amber-500/20"
+                                                                    />
+                                                                </div>
+                                                                <p className="text-[9px] text-slate-600 mt-1">
+                                                                    Enforce valid JSON output structure.
+                                                                </p>
+                                                            </div>
+                                                        </div>
 
                                                         {/* Stop Sequences */}
                                                         {providerCapabilities.supportsStop && (

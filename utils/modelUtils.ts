@@ -364,6 +364,22 @@ export const getModelById = (modelId: string): ModelConfig | undefined => {
         const model = PROVIDER_MODELS[providerId].find((m) => m.id === resolvedId);
         if (model) return model;
     }
+
+    // Fallback: If model ID contains a slash, assume it's an OpenRouter model
+    if (resolvedId.includes('/')) {
+        return {
+            id: resolvedId,
+            displayName: resolvedId.split('/').pop() || resolvedId,
+            tier: 'mid', // Default assumption
+            providerId: 'openrouter',
+            inputCostPerMillion: 1, // Placeholder
+            outputCostPerMillion: 1, // Placeholder
+            inputContextLimit: 128000, // Safe default
+            outputContextLimit: 4096,
+            description: 'Dynamic OpenRouter Model',
+        };
+    }
+
     return undefined;
 };
 

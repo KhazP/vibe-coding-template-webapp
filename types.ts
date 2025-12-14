@@ -20,11 +20,7 @@ export type { ModelTier, ReasoningEffort, ModelConfig } from './utils/modelUtils
 export type GeminiSafetyPreset = 'default' | 'relaxed' | 'balanced' | 'strict';
 
 /** Normalized expert settings - provider adapters map to API field names */
-export interface ExpertSettings {
-  maxOutputTokens?: number;
-  stopSequences?: string[];
-  seed?: number;
-}
+
 
 /** Per-provider expert settings storage */
 export interface ProviderExpertSettings {
@@ -105,6 +101,25 @@ export interface GeminiSettings {
   maxOutputTokens?: number;
   stopSequences?: string[];
   seed?: number;
+
+  repetitionPenalty?: number;
+  includeReasoning?: boolean;
+  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
+  reasoningMaxTokens?: number;
+  responseFormat?: { type: 'json_object' | 'text' };
+}
+
+/** Normalized expert settings - provider adapters map to API field names */
+export interface ExpertSettings {
+  maxOutputTokens?: number;
+  stopSequences?: string[];
+  seed?: number;
+  topK?: number;
+  repetitionPenalty?: number;
+  includeReasoning?: boolean;
+  reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
+  reasoningMaxTokens?: number;
+  responseFormat?: { type: 'json_object' | 'text' };
 }
 
 export interface ToolSettings {

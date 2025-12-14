@@ -50,6 +50,38 @@ const getShortOpenRouterError = (code: string | number, fullMessage?: string): s
 };
 
 /**
+ * Helper to determine model capabilities based on ID conventions.
+ * This avoids sending unsupported parameters that might cause 400 errors.
+ */
+const getModelCapabilities = (modelId: string) => {
+    const isOpenAI = modelId.startsWith('openai/') || modelId.includes('gpt');
+    const isAnthropic = modelId.startsWith('anthropic/') || modelId.includes('claude');
+    const isReasoningModel = modelId.includes('o1') || modelId.includes('o4') || modelId.includes('o3') || modelId.includes('reasoning');
+    const isGoogle = modelId.startsWith('google/') || modelId.includes('gemini');
+
+    return {
+        // OpenAI models generally don't support top_k
+        supportsTopK: !isOpenAI || isAnthropic || isGoogle,
+
+        // Logical "reasoning" capability (o1/Claude thinking)
+        supportsReasoning: isReasoningModel || isAnthropic,
+
+        // Anthropic supports max_tokens inside reasoning block
+        supportsReasoningMaxTokens: isAnthropic,
+
+        // OpenAI allows max_completion_tokens (often mapped to max_tokens in OpenRouter)
+        // AND reasoning models have specific token limits
+        maxReasoningTokens: isAnthropic ? 32000 : undefined,
+
+        // Most modern models support JSON schema / response format
+        supportsJsonSchema: true,
+
+        // Frequency penalty is standard OpenAI param, supported by most
+        supportsFrequencyPenalty: true
+    };
+};
+
+/**
  * Streams text generation using OpenRouter's OpenAI-compatible Chat Completions API.
  * 
  * OpenRouter uses SSE (Server-Sent Events) with the format:
@@ -130,17 +162,60 @@ export const streamOpenRouter = async (
         model: modelId,
         messages,
         stream: true,
-        temperature: settings.temperature ?? 0.7,
     };
+
+    const capabilities = getModelCapabilities(modelId);
+
+    // Standard parameters
+    if (settings.temperature !== undefined) requestBody.temperature = settings.temperature;
 
     // Apply optional parameters if they exist
     if (settings.maxOutputTokens) requestBody.max_tokens = settings.maxOutputTokens;
+
+    // Top P is generally supported
     if (settings.topP !== undefined) requestBody.top_p = settings.topP;
-    if (settings.topK !== undefined) requestBody.top_k = settings.topK;
+
+    // Top K validity check
+    if (settings.topK !== undefined && capabilities.supportsTopK) {
+        requestBody.top_k = settings.topK;
+    }
+
     if (settings.seed !== undefined) requestBody.seed = settings.seed;
+
+    // Repetition Penalty (frequency_penalty in OpenAI/OpenRouter)
+    if (settings.repetitionPenalty !== undefined && capabilities.supportsFrequencyPenalty) {
+        requestBody.frequency_penalty = settings.repetitionPenalty;
+    }
+
+    // Reasoning Parameters (Beta structure)
+    // https://openrouter.ai/docs/api/reference/responses/reasoning
+    if (settings.includeReasoning) {
+        // Only include if user explicitly requested AND it seems relevant or if we just want to force it
+        // We will respect the user's setting even if our heuristic says "maybe not", 
+        // but we can warn in UI. Here we just send what is asked.
+
+        requestBody.include_reasoning = true;
+
+        const reasoningPayload: any = {
+            effort: settings.reasoningEffort || 'medium'
+        };
+
+        // Add max_tokens to reasoning if supported (e.g. Anthropic) and specified
+        if (capabilities.supportsReasoningMaxTokens && settings.reasoningMaxTokens) {
+            reasoningPayload.max_tokens = settings.reasoningMaxTokens;
+        }
+
+        requestBody.reasoning = reasoningPayload;
+    }
+
+    if (settings.responseFormat) requestBody.response_format = settings.responseFormat;
+
     if (settings.stopSequences && settings.stopSequences.length > 0) {
         requestBody.stop = settings.stopSequences;
     }
+
+    // Debug logging as requested
+    console.log('[OpenRouter] Request Body:', JSON.stringify(requestBody, null, 2));
 
     try {
         const response = await retryWithBackoff(async () => {
@@ -153,8 +228,26 @@ export const streamOpenRouter = async (
 
             // Fast-fail on non-retryable errors
             if (res.status === 400 || res.status === 401 || res.status === 402 || res.status === 403 || res.status === 404) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(getShortOpenRouterError(res.status, err?.error?.message));
+                // Try to parse error for more details
+                const errText = await res.text();
+                let err: any = {};
+                try {
+                    err = JSON.parse(errText);
+                } catch {
+                    // ignore parse error
+                }
+
+                // Specific handling for "invalid_request_error" which might indicate unsupported params
+                if (res.status === 400 && err?.error?.code === 'invalid_request_error') {
+                    // If it complains about top_k, we could theoretically retry without it, 
+                    // but for now we just throw a clearer error.
+                    // Improving this to valid auto-retry is complex without knowing exact field.
+                    if (JSON.stringify(err).includes('top_k')) {
+                        console.warn('[OpenRouter] Model does not support top_k, but it was sent.');
+                    }
+                }
+
+                throw new Error(getShortOpenRouterError(res.status, err?.error?.message || errText));
             }
 
             return res;
@@ -207,6 +300,14 @@ export const streamOpenRouter = async (
 
                         // Check for end of stream
                         if (data === '[DONE]') {
+                            // Validation: If JSON mode was requested, warn if result isn't valid JSON
+                            if (settings.responseFormat?.type === 'json_object') {
+                                try {
+                                    JSON.parse(fullText);
+                                } catch (e) {
+                                    console.warn('[OpenRouter] JSON mode requested but response is not valid JSON:', fullText.slice(0, 100) + '...');
+                                }
+                            }
                             return fullText;
                         }
 
