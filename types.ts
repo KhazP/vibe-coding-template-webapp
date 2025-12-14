@@ -100,6 +100,11 @@ export interface GeminiSettings {
   reducedMotion?: boolean;
   autoSaveInterval?: number; // milliseconds
   defaultExportFormat?: 'zip' | 'markdown';
+
+  // Expert Settings Propagation
+  maxOutputTokens?: number;
+  stopSequences?: string[];
+  seed?: number;
 }
 
 export interface ToolSettings {

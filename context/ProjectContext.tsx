@@ -3,6 +3,7 @@ import { Persona, ProjectState, GeminiSettings, GroundingChunk, ProjectFieldKey,
 import { runDeepResearch, runDeepResearchInteraction, generateArtifact, streamArtifact, streamDeepResearch } from '../utils/gemini';
 import { runOpenAIDeepResearch, streamOpenAI } from '../utils/openai';
 import { streamAnthropic } from '../utils/anthropic';
+import { streamOpenRouter } from '../utils/openrouter';
 import { getModelById } from '../utils/modelUtils';
 import { getPRDSystemInstruction, getTechDesignSystemInstruction, getAgentSystemInstruction, getRefineSystemInstruction, generateRefinePrompt, getBuildPlanSystemInstruction } from '../utils/templates';
 import { useToast } from '../components/Toast';
@@ -1172,6 +1173,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           },
           (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
         );
+
+      } else if (providerId === 'openrouter') {
+        text = await streamOpenRouter(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          (chunk: string) => {
+            accumulatedText += chunk;
+            handleStreamUpdate(chunk, 'prd', accumulatedText, proj.settings.modelName, projectId);
+          },
+          (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+        );
       } else {
         // Default to Gemini (handles 'gemini' and fallbacks)
         text = await streamArtifact(
@@ -1252,6 +1263,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           },
           (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
         );
+      } else if (providerId === 'openrouter') {
+        text = await streamOpenRouter(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          (chunk: string) => {
+            accumulatedText += chunk;
+            handleStreamUpdate(chunk, 'tech', accumulatedText, proj.settings.modelName, projectId);
+          },
+          (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+        );
       } else {
         text = await streamArtifact(
           systemInstruction, prompt, proj.settings, apiKeyToUse,
@@ -1324,6 +1344,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
       } else if (providerId === 'anthropic') {
         fullOutput = await streamAnthropic(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          () => { }, // Agent outputs parsed at end
+          (status) => setGenerationPhase(status)
+        );
+      } else if (providerId === 'openrouter') {
+        fullOutput = await streamOpenRouter(
           systemInstruction, prompt, proj.settings, apiKeyToUse,
           () => { }, // Agent outputs parsed at end
           (status) => setGenerationPhase(status)
@@ -1430,6 +1456,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           },
           (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
         );
+      } else if (providerId === 'openrouter') {
+        text = await streamOpenRouter(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          (chunk: string) => {
+            accumulatedText += chunk;
+            handleStreamUpdate(chunk, 'build', accumulatedText, proj.settings.modelName, projectId);
+          },
+          (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+        );
       } else {
         text = await streamArtifact(
           systemInstruction, prompt, proj.settings, apiKeyToUse,
@@ -1476,6 +1511,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
       } else if (providerId === 'anthropic') {
         return await streamAnthropic(
+          systemInstruction || "", prompt, proj.settings, apiKeyToUse,
+          () => { }
+        );
+      } else if (providerId === 'openrouter') {
+        return await streamOpenRouter(
           systemInstruction || "", prompt, proj.settings, apiKeyToUse,
           () => { }
         );
@@ -1547,6 +1587,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         );
       } else if (providerId === 'anthropic') {
         text = await streamAnthropic(
+          systemInstruction, prompt, proj.settings, apiKeyToUse,
+          (chunk: string) => {
+            accumulatedText += chunk;
+            handleStreamUpdate(chunk, type, accumulatedText, proj.settings.modelName, projectId);
+          },
+          (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+        );
+      } else if (providerId === 'openrouter') {
+        text = await streamOpenRouter(
           systemInstruction, prompt, proj.settings, apiKeyToUse,
           (chunk: string) => {
             accumulatedText += chunk;

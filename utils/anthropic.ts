@@ -10,6 +10,51 @@ import { GeminiSettings } from "../types";
 import { getModelById } from "./modelUtils";
 
 /**
+ * Converts Anthropic errors to short user-friendly messages.
+ */
+const getShortAnthropicError = (error: any): string => {
+    // Try to extract error type from the error object
+    let errorType = error?.error?.type || error?.type || '';
+    let message = error?.error?.message || error?.message || '';
+
+    // Handle SDK errors where message is "400 {json}" format
+    if (message && typeof message === 'string') {
+        const jsonMatch = message.match(/^\d{3}\s*(\{.+\})$/);
+        if (jsonMatch) {
+            try {
+                const parsed = JSON.parse(jsonMatch[1]);
+                errorType = parsed?.error?.type || errorType;
+                message = parsed?.error?.message || message;
+            } catch (e) {
+                // Ignore parse errors
+            }
+        }
+    }
+
+    switch (errorType) {
+        case 'invalid_request_error':
+            if (message.includes('balance is too low') || message.includes('credit')) {
+                return 'Anthropic balance too low. Please add credits.';
+            }
+            return 'Invalid request to Anthropic API.';
+        case 'authentication_error':
+            return 'Invalid Anthropic API key.';
+        case 'permission_error':
+            return 'Permission denied. Check your API access.';
+        case 'rate_limit_error':
+            return 'Rate limit exceeded. Please try again.';
+        case 'api_error':
+            return 'Anthropic server error. Please retry.';
+        case 'overloaded_error':
+            return 'Anthropic API overloaded. Try again later.';
+        default:
+            // Truncate long messages
+            const shortMsg = message.length > 60 ? message.substring(0, 57) + '...' : message;
+            return shortMsg || 'Anthropic API error';
+    }
+};
+
+/**
  * Streams text generation using Anthropic Messages API via official SDK.
  * Uses dangerouslyAllowBrowser: true to enable browser CORS.
  * 
@@ -98,11 +143,13 @@ export const streamAnthropic = async (
 
         // Check for CORS errors
         if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-            throw new Error("Anthropic API CORS error. If your organization has CORS disabled, use OpenRouter for Claude access instead.");
+            throw new Error("Anthropic CORS error. Use OpenRouter instead.");
         }
 
-        // Include request_id if available for debugging
-        const requestId = error?.request_id || error?.headers?.get?.('x-request-id') || 'unknown';
-        throw new Error(`Anthropic API Error (request_id: ${requestId}): ${error.message}`);
+        // Log full error for debugging
+        console.error('Anthropic API Error:', error);
+
+        // Throw user-friendly error
+        throw new Error(getShortAnthropicError(error));
     }
 };

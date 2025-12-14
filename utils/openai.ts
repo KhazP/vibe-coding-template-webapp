@@ -13,6 +13,30 @@ const POLLING_INTERVAL_MS = 5000; // 5 seconds between polls
 const MAX_POLLING_DURATION_MS = 60 * 60 * 1000; // 60 minutes max (OpenAI limit)
 
 /**
+ * Converts OpenAI error codes to short user-friendly messages.
+ */
+const getShortErrorMessage = (code: string, fullMessage?: string): string => {
+    switch (code) {
+        case 'insufficient_quota':
+            return 'OpenAI quota exceeded. Please check your billing.';
+        case 'invalid_api_key':
+            return 'Invalid OpenAI API key.';
+        case 'rate_limit_exceeded':
+            return 'Rate limit exceeded. Please try again later.';
+        case 'model_not_found':
+            return 'Model not available. Check your API access.';
+        case 'context_length_exceeded':
+            return 'Input too long for this model.';
+        case 'server_error':
+            return 'OpenAI server error. Please retry.';
+        default:
+            // Truncate long messages
+            const msg = fullMessage || 'Unknown error';
+            return msg.length > 60 ? msg.substring(0, 57) + '...' : `OpenAI: ${msg}`;
+    }
+};
+
+/**
  * Parses OpenAI response data to extract text and sources.
  */
 const parseOpenAIResponse = (data: any): { text: string; sources: GroundingChunk[] } => {
@@ -207,11 +231,12 @@ export const runOpenAIDeepResearch = async (
 };
 
 /**
- * Streams text generation using OpenAI Chat Completions API.
+ * Streams text generation using OpenAI Responses API.
+ * This is the recommended API for all new projects (replacing Chat Completions).
  * Used for standard artifacts (PRD, Tech, etc.) when OpenAI is the selected provider.
  * 
- * @param systemInstruction - System prompt.
- * @param prompt - User prompt.
+ * @param systemInstruction - System prompt (sent as 'instructions').
+ * @param prompt - User prompt (sent as 'input').
  * @param settings - Configuration settings (model, temp, etc.)
  * @param apiKey - OpenAI API Key.
  * @param onChunk - Callback for text chunks.
@@ -231,13 +256,9 @@ export const streamOpenAI = async (
 
     onStatusUpdate?.("Initializing OpenAI...");
 
-    const messages = [
-        { role: 'system', content: systemInstruction },
-        { role: 'user', content: prompt }
-    ];
-
     try {
-        const response = await fetch(`${OPENAI_API_BASE}/chat/completions`, {
+        // Use the new Responses API format
+        const response = await fetch(`${OPENAI_API_BASE}/responses`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -245,11 +266,11 @@ export const streamOpenAI = async (
             },
             body: JSON.stringify({
                 model: settings.modelName,
-                messages: messages,
-                stream: true,
-                temperature: settings.temperature,
-                top_p: settings.topP,
-                // max_tokens: settings.maxOutputTokens // Add if available in settings
+                instructions: systemInstruction,
+                input: prompt,
+                stream: true
+                // Note: temperature/top_p are not documented for Responses API
+                // but may still work. Omitting for now to follow docs.
             }),
             signal: signal
         });
@@ -265,6 +286,7 @@ export const streamOpenAI = async (
         const decoder = new TextDecoder();
         let fullText = "";
         let isFirst = true;
+        let buffer = "";
 
         onStatusUpdate?.("Streaming Response...");
 
@@ -272,25 +294,82 @@ export const streamOpenAI = async (
             const { done, value } = await reader.read();
             if (done) break;
 
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
+            // Append new data to buffer
+            buffer += decoder.decode(value, { stream: true });
+
+            // Process complete events from buffer
+            const lines = buffer.split('\n');
+            // Keep the last potentially incomplete line in buffer
+            buffer = lines.pop() || "";
 
             for (const line of lines) {
-                if (line.startsWith('data: ') && line !== 'data: [DONE]') {
+                if (!line.trim() || line.startsWith(':')) continue; // Skip empty lines and comments
+
+                if (line.startsWith('data: ')) {
+                    const dataStr = line.slice(6).trim();
+                    if (dataStr === '[DONE]') continue;
+
                     try {
-                        const data = JSON.parse(line.slice(6));
-                        const content = data.choices[0]?.delta?.content;
-                        if (content) {
-                            if (isFirst) {
-                                isFirst = false;
-                                onStatusUpdate?.("Generating...");
+                        const event = JSON.parse(dataStr);
+
+                        // Handle semantic streaming events from Responses API
+                        // Event types: response.created, response.output_text.delta, response.completed, error, response.failed
+                        if (event.type === 'response.output_text.delta') {
+                            const delta = event.delta || '';
+                            if (delta) {
+                                if (isFirst) {
+                                    isFirst = false;
+                                    onStatusUpdate?.("Generating...");
+                                }
+                                fullText += delta;
+                                onChunk(delta);
                             }
-                            fullText += content;
-                            onChunk(content);
+                        } else if (event.type === 'response.completed') {
+                            // Response complete - we could extract final text here if needed
+                            // but we've been accumulating it already
+                        } else if (event.type === 'error') {
+                            // Throw immediately - don't let this get caught by the parse error handler
+                            const errorCode = event.error?.code || '';
+                            const errorMsg = getShortErrorMessage(errorCode, event.error?.message);
+                            console.error('OpenAI API Error:', event.error);
+                            throw new Error(errorMsg);
+                        } else if (event.type === 'response.failed') {
+                            // Response failed event also contains error info
+                            const errorCode = event.response?.error?.code || '';
+                            const errorMsg = getShortErrorMessage(errorCode, event.response?.error?.message);
+                            console.error('OpenAI Response Failed:', event.response?.error);
+                            throw new Error(errorMsg);
                         }
-                    } catch (e) {
-                        // Ignore parse errors for partial chunks
+                        // Ignore other event types like response.created, response.in_progress, etc.
+                    } catch (e: any) {
+                        // Re-throw actual errors, only ignore JSON parse errors
+                        if (e.message?.startsWith('OpenAI')) {
+                            throw e;
+                        }
+                        // Ignore parse errors for partial/malformed chunks
                     }
+                } else if (line.startsWith('event: ')) {
+                    // Some SSE implementations send separate event: lines
+                    // We handle the data in the data: line, so we can skip this
+                }
+            }
+        }
+
+        // Process any remaining data in buffer
+        if (buffer.trim() && buffer.startsWith('data: ')) {
+            const dataStr = buffer.slice(6).trim();
+            if (dataStr && dataStr !== '[DONE]') {
+                try {
+                    const event = JSON.parse(dataStr);
+                    if (event.type === 'response.output_text.delta') {
+                        const delta = event.delta || '';
+                        if (delta) {
+                            fullText += delta;
+                            onChunk(delta);
+                        }
+                    }
+                } catch (e) {
+                    // Ignore
                 }
             }
         }

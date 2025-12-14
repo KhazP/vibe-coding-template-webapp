@@ -11,7 +11,7 @@ import { Modal, Tooltip, Select, TextArea, Button } from './UI';
 import { MODEL_CONFIGS, PRESETS, DEFAULT_SETTINGS } from '../utils/constants';
 import { PresetMode, ToastPosition, Persona, GeminiSafetyPreset, ExpertSettings } from '../types';
 import { useToast } from './Toast';
-import { getProviderSettings, setDefaultModel, getExpertSettings, setExpertSettings, resetExpertSettings, getEffectiveDefaultProvider } from '../utils/providerStorage';
+import { getProviderSettings, setProviderSettings, setDefaultModel, getExpertSettings, setExpertSettings, resetExpertSettings, getEffectiveDefaultProvider } from '../utils/providerStorage';
 import { PROVIDERS, type ProviderId } from '../utils/providers';
 import { PROVIDER_MODELS, getModelsForProvider, getModelById, supportsReasoningEffort, type ModelConfig, type ReasoningEffort } from '../utils/modelUtils';
 import { ReasoningEffortSelector } from './ReasoningEffortSelector';
@@ -129,6 +129,9 @@ const SettingsModal: React.FC = () => {
 
     const handleProviderChange = (newProvider: ProviderId) => {
         setActiveProvider(newProvider);
+
+        // Persist the provider change to localStorage
+        setProviderSettings({ defaultProvider: newProvider });
 
         // When changing providers, also update modelName to the default model for that provider
         const defaultModel = providerSettings.defaultModels[newProvider];

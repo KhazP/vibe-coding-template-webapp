@@ -29,41 +29,6 @@ export const ModelStatus: React.FC = () => {
             JSON.stringify(agentOutputs);
     }, [answers, researchOutput, prdOutput, techOutput, agentOutputs]);
 
-    // Debounced Token Counting (Uses API if available, else local estimate)
-    useEffect(() => {
-        let isMounted = true;
-        const timer = setTimeout(async () => {
-            if (!contextString) {
-                setTokenCount(0);
-                return;
-            }
-
-            // Use estimation for immediate feedback, refine with API
-            const estimated = estimateTokens(contextString);
-            if (!apiKey) {
-                setTokenCount(estimated);
-                return;
-            }
-
-            setIsCounting(true);
-            try {
-                // We use the exact count for precision as requested
-                const exact = await getExactTokenCount(contextString, settings.modelName, apiKey);
-                if (isMounted) setTokenCount(exact);
-            } catch (e) {
-                if (isMounted) setTokenCount(estimated); // Fallback
-            } finally {
-                if (isMounted) setIsCounting(false);
-            }
-        }, 2000); // 2s debounce to avoid API spam
-
-        return () => { isMounted = false; clearTimeout(timer); };
-    }, [contextString, apiKey, settings.modelName]);
-
-    const activePreset = Object.values(PRESETS).find(p => p.id === settings.preset);
-    const isCustom = !activePreset;
-    const costString = (tokenUsage?.estimatedCost || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 4 });
-
     // Get active provider and model info
     const providerInfo = useMemo(() => {
         const providerSettings = getProviderSettings();
@@ -79,6 +44,46 @@ export const ModelStatus: React.FC = () => {
             modelDisplayName: modelConfig?.displayName || modelId,
         };
     }, [isSettingsOpen]);  // Re-read when settings modal opens/closes
+
+    // Debounced Token Counting (Uses API if available, else local estimate)
+    useEffect(() => {
+        let isMounted = true;
+        const timer = setTimeout(async () => {
+            if (!contextString) {
+                setTokenCount(0);
+                return;
+            }
+
+            // Use estimation for immediate feedback, refine with API
+            const estimated = estimateTokens(contextString);
+
+            // Only use exact token counting for Gemini models
+            // Other providers (OpenAI, Anthropic) don't support Gemini's countTokens API
+            const isGeminiModel = providerInfo.providerId === 'gemini';
+
+            if (!apiKey || !isGeminiModel) {
+                setTokenCount(estimated);
+                return;
+            }
+
+            setIsCounting(true);
+            try {
+                // We use the exact count for precision as requested (Gemini only)
+                const exact = await getExactTokenCount(contextString, settings.modelName, apiKey);
+                if (isMounted) setTokenCount(exact);
+            } catch (e) {
+                if (isMounted) setTokenCount(estimated); // Fallback
+            } finally {
+                if (isMounted) setIsCounting(false);
+            }
+        }, 2000); // 2s debounce to avoid API spam
+
+        return () => { isMounted = false; clearTimeout(timer); };
+    }, [contextString, apiKey, settings.modelName, providerInfo.providerId]);
+
+    const activePreset = Object.values(PRESETS).find(p => p.id === settings.preset);
+    const isCustom = !activePreset;
+    const costString = (tokenUsage?.estimatedCost || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 4 });
 
     // Context Health Logic - use model's context limit
     const modelContextLimit = providerInfo.modelConfig?.inputContextLimit || TOKEN_LIMITS.INPUT_GLOBAL;
