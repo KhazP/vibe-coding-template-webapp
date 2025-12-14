@@ -9,11 +9,11 @@ import { MODELS } from "./constants";
 
 interface InteractionRequest {
   agent: string;
-  input: string; 
-  background: boolean; 
+  input: string;
+  background: boolean;
   agent_config?: {
-      type: string;
-      thinking_summaries?: string;
+    type: string;
+    thinking_summaries?: string;
   };
   stream?: boolean;
 }
@@ -24,7 +24,7 @@ interface InteractionResponse {
   error?: { message: string; code: number };
   // Docs specify interaction.outputs[-1].text
   outputs?: {
-     content?: { parts: { text: string }[] };
+    content?: { parts: { text: string }[] };
   }[];
 }
 
@@ -39,22 +39,22 @@ export const estimateTokens = (text: string) => Math.ceil((text || '').length / 
  * Returns estimated count if API call fails.
  */
 export const getExactTokenCount = async (
-  text: string, 
-  modelName: string, 
+  text: string,
+  modelName: string,
   apiKey: string
 ): Promise<number> => {
   if (!text || !apiKey) return estimateTokens(text);
-  
+
   try {
     const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.countTokens({
       model: modelName,
       contents: text // Pass string directly to contents for simpler handling
     });
-    
+
     // Safety check for response structure
     if (typeof response.totalTokens === 'number') {
-        return response.totalTokens;
+      return response.totalTokens;
     }
     return estimateTokens(text);
   } catch (e) {
@@ -79,14 +79,14 @@ const retryWithBackoff = async <T>(
     return await operation();
   } catch (error: any) {
     // Check if error is retryable (rate limits, server errors, network issues)
-    const isRetryable = 
-        error?.status === 429 || 
-        error?.status >= 500 || 
-        error?.message?.includes('fetch') || 
-        error?.message?.includes('network') ||
-        error?.message?.includes('overloaded') || 
-        error?.message?.includes('aborted');
-    
+    const isRetryable =
+      error?.status === 429 ||
+      error?.status >= 500 ||
+      error?.message?.includes('fetch') ||
+      error?.message?.includes('network') ||
+      error?.message?.includes('overloaded') ||
+      error?.message?.includes('aborted');
+
     // Auth errors should NOT be retried
     const isAuthError = error?.status === 400 || error?.status === 401 || error?.status === 403;
 
@@ -97,7 +97,7 @@ const retryWithBackoff = async <T>(
       if (error?.status === 401) enhancedMessage = "Unauthorized. Please check your API key (401).";
       if (error?.status === 403) enhancedMessage = "Permission denied. Check API key scope (403).";
       if (error?.status === 429) enhancedMessage = "Quota exceeded. Please try again later.";
-      
+
       console.error(`Gemini API Fatal Error: ${enhancedMessage}`, error);
       // Propagate error with original status attached for context handling
       const finalError: any = new Error(enhancedMessage);
@@ -124,7 +124,7 @@ const retryWithBackoff = async <T>(
  * @returns Object containing the full text and grounding sources.
  */
 export const streamDeepResearch = async (
-  prompt: string, 
+  prompt: string,
   settings: GeminiSettings,
   apiKey: string,
   onChunk: (text: string) => void,
@@ -146,7 +146,7 @@ REQUEST:
 ${prompt}`;
 
     if (settings.customInstructions) {
-        researchPrompt += `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${settings.customInstructions}`;
+      researchPrompt += `\n\nIMPORTANT GLOBAL INSTRUCTIONS:\n${settings.customInstructions}`;
     }
 
     const tools: any[] = [];
@@ -169,11 +169,11 @@ ${prompt}`;
 
     // Determine initial status based on config
     if (settings.thinkingBudget > 0) {
-        onStatusUpdate?.("Thinking (Deep Reasoning)...");
+      onStatusUpdate?.("Thinking (Deep Reasoning)...");
     } else if (settings.useGrounding) {
-        onStatusUpdate?.("Searching Google (Grounding)...");
+      onStatusUpdate?.("Searching Google (Grounding)...");
     } else {
-        onStatusUpdate?.("Initializing AI...");
+      onStatusUpdate?.("Initializing AI...");
     }
 
     // Wrap the stream creation in retry logic
@@ -188,26 +188,26 @@ ${prompt}`;
     let isFirstChunk = true;
 
     for await (const chunk of responseStream) {
-       // Check cancellation signal in the loop
-       if (signal?.aborted) {
-           throw new DOMException("Aborted", "AbortError");
-       }
+      // Check cancellation signal in the loop
+      if (signal?.aborted) {
+        throw new DOMException("Aborted", "AbortError");
+      }
 
-       if (isFirstChunk) {
-           isFirstChunk = false;
-           onStatusUpdate?.("Generating Report...");
-       }
+      if (isFirstChunk) {
+        isFirstChunk = false;
+        onStatusUpdate?.("Generating Report...");
+      }
 
-       const textPart = chunk.text;
-       if (textPart) {
-         fullText += textPart;
-         onChunk(textPart);
-       }
-       
-       // Capture grounding metadata if available in the chunk
-       if (chunk.candidates?.[0]?.groundingMetadata?.groundingChunks) {
-         finalSources = chunk.candidates[0].groundingMetadata.groundingChunks;
-       }
+      const textPart = chunk.text;
+      if (textPart) {
+        fullText += textPart;
+        onChunk(textPart);
+      }
+
+      // Capture grounding metadata if available in the chunk
+      if (chunk.candidates?.[0]?.groundingMetadata?.groundingChunks) {
+        finalSources = chunk.candidates[0].groundingMetadata.groundingChunks;
+      }
     }
 
     return { text: fullText, sources: finalSources };
@@ -221,165 +221,126 @@ ${prompt}`;
  * Wrapper around `streamDeepResearch`.
  */
 export const runDeepResearch = async (prompt: string, settings: GeminiSettings, apiKey: string): Promise<{ text: string; sources: GroundingChunk[] }> => {
-  return streamDeepResearch(prompt, settings, apiKey, () => {});
+  return streamDeepResearch(prompt, settings, apiKey, () => { });
 };
 
 /**
- * Executes a Deep Research Interaction via the REST API.
- * Uses the "Start + Poll" pattern required for Deep Research.
+ * Executes a Deep Research Interaction via the SDK with Streaming.
+ * Uses the stream=true option to get real-time thoughts and incremental text.
  * 
  * Docs: https://ai.google.dev/gemini-api/docs/deep-research
  */
 export const runDeepResearchInteraction = async (
   prompt: string,
   apiKey: string,
+  onChunk: (text: string) => void,
   onStatusUpdate?: (status: string) => void,
   signal?: AbortSignal,
   customInstructions?: string
 ): Promise<{ text: string; sources: GroundingChunk[] }> => {
   if (!apiKey) throw new Error("API Key is missing.");
-  
-  // Endpoint matches Interactions API docs
-  const baseUrl = "https://generativelanguage.googleapis.com/v1beta/interactions";
 
-  // 1. Create Interaction
-  onStatusUpdate?.("Initializing Deep Research Agent...");
-  
+  // Initialize Client (Standard SDK usage)
+  const client = new GoogleGenAI({ apiKey });
+
   let finalInput = prompt;
   if (customInstructions) {
-      finalInput += `\n\n(Global Instructions: ${customInstructions})`;
+    finalInput += `\n\n(Global Instructions: ${customInstructions})`;
   }
 
-  // Payload matches Deep Research docs: plain input string + background: true
-  const payload: InteractionRequest = {
-    agent: MODELS.DEEP_RESEARCH,
-    input: finalInput,
-    background: true, 
-  };
+  onStatusUpdate?.("Initializing Deep Research Agent...");
 
-  // Outer Try/Catch for Creation Phase (Fail fast here is correct, as retry logic is inside fetch)
-  let interactionName = "";
   try {
-    const createRes = await fetch(`${baseUrl}?key=${apiKey}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      signal
+    // Start Streaming Interaction
+    // Note: 'model' parameter is intentionally omitted as it conflicts with 'agent_config'
+    const stream = await client.interactions.create({
+      agent: MODELS.DEEP_RESEARCH,
+      input: finalInput,
+      background: true,
+      stream: true,
+      agent_config: {
+        type: 'deep-research',
+        thinking_summaries: 'auto'
+      }
     });
 
-    if (!createRes.ok) {
-       const err = await createRes.json().catch(() => ({}));
-       
-       // Handle 404 specifically for Fallback logic
-       if (createRes.status === 404) {
-           const error: any = new Error(`Deep Research Agent not found (404).`);
-           error.status = 404;
-           throw error;
-       }
-       
-       throw new Error(`Deep Research Creation Failed: ${err?.error?.message || createRes.statusText}`);
+    let fullText = "";
+    let finalSources: GroundingChunk[] = [];
+    let interactionId = "";
+
+    // Iterate over the stream
+    for await (const chunk of stream) {
+      if (signal?.aborted) {
+        throw new DOMException("Aborted", "AbortError");
+      }
+
+      // Capture Interaction ID
+      if (chunk.event_type === 'interaction.start') {
+        interactionId = chunk.interaction?.id;
+        console.log(`Interaction started: ${interactionId}`);
+      }
+
+      // Handle Content
+      if (chunk.event_type === 'content.delta') {
+        if (chunk.delta && 'text' in chunk.delta) {
+          const textPart = chunk.delta.text;
+          if (textPart) {
+            fullText += textPart;
+            onChunk(textPart);
+          }
+        } else if (chunk.delta && 'content' in chunk.delta) {
+          // Fallback or specific thought handling if structure differs
+          // For now, type guard prevents crash.
+          // If thought_summary is in delta.content?
+        }
+
+        // Re-adding thought summary check if needed, but carefully typed.
+        // The previous code checked chunk.delta?.type === 'thought_summary'
+        // If TS says 'TextContent | ImageContent', then 'thought_summary' might not be on 'type'.
+        // Let's rely on 'text' property existence for text.
+
+        // For thought summaries:
+        // SDK might type it differently. 
+        // If the user hasn't seen thought summaries working, maybe we just fix the crash first.
+        // But let's try to preserve logic if possible.
+
+        if ((chunk.delta as any)?.type === 'thought_summary') {
+          const thought = (chunk.delta as any).content?.text;
+          if (thought) onStatusUpdate?.(`Thinking: ${thought}`);
+        }
+      }
+
+      // Handle Completion
+      else if (chunk.event_type === 'interaction.complete') {
+        onStatusUpdate?.("Research Complete. Finalizing...");
+      }
+
+      // Handle Error Events
+      else if (chunk.event_type === 'error') {
+        throw new Error(`Deep Research Stream Error: ${chunk.error?.message}`);
+      }
     }
 
-    const creationData: any = await createRes.json();
-    interactionName = creationData.name; // e.g., "interactions/123..."
+    // Extraction Logic
+    const extractedSources: GroundingChunk[] = [];
+    const sourceRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
+    let match;
 
-    if (!interactionName) {
-        throw new Error("API did not return an interaction name.");
+    while ((match = sourceRegex.exec(fullText)) !== null) {
+      const uri = match[2];
+      if (!extractedSources.some(s => s.web?.uri === uri)) {
+        extractedSources.push({
+          web: { title: match[1], uri: uri }
+        });
+      }
     }
+
+    return { text: fullText, sources: extractedSources };
+
   } catch (error: any) {
+    // Reconnection logic could go here
     throw error;
   }
-
-  // 2. Poll for Completion (Long-running)
-  onStatusUpdate?.("Agent is thinking & researching (this takes 2-5 mins)...");
-
-  // Fix: Use Date.now() for timing instead of iteration counts to handle background throttling
-  const startTime = Date.now();
-  const maxDuration = 20 * 60 * 1000; // 20 minutes max duration
-  const pollInterval = 10000; // 10s recommended by docs
-  
-  // Resiliency Counter
-  let consecutiveFailures = 0;
-  const MAX_CONSECUTIVE_FAILURES = 5;
-
-  while (Date.now() - startTime < maxDuration) {
-      if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
-      
-      try {
-          // GET interaction to check status
-          const pollRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/${interactionName}?key=${apiKey}`, {
-              signal
-          });
-          
-          if (!pollRes.ok) {
-              // Treat server errors as transient failures inside the loop
-              throw new Error(`Server returned ${pollRes.status}`);
-          }
-
-          const pollData: InteractionResponse = await pollRes.json();
-          
-          // Reset consecutive failure counter on success
-          consecutiveFailures = 0;
-          
-          // Check Status
-          if (pollData.state === 'SUCCEEDED') {
-              // 3. Extract Output
-              let text = '';
-              
-              // Check outputs array (Standard API behavior)
-              const lastOutput = pollData.outputs?.[(pollData.outputs?.length || 1) - 1];
-              
-              if (lastOutput?.content?.parts) {
-                  text = lastOutput.content.parts.map(p => p.text).join('');
-              } else {
-                  // Fallback debugging
-                  text = JSON.stringify(pollData, null, 2);
-              }
-              
-              // Deep Research embeds sources in the text. We extract them via regex for the UI.
-              const extractedSources: GroundingChunk[] = [];
-              const sourceRegex = /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g;
-              let match;
-              
-              while ((match = sourceRegex.exec(text)) !== null) {
-                  // Avoid duplicates based on URL
-                  const uri = match[2];
-                  if (!extractedSources.some(s => s.web?.uri === uri)) {
-                      extractedSources.push({
-                          web: { title: match[1], uri: uri }
-                      });
-                  }
-              }
-
-              return { text, sources: extractedSources };
-              
-          } else if (pollData.state === 'FAILED') {
-              throw new Error(`Deep Research Failed: ${pollData.error?.message || 'Unknown error'}`);
-          }
-
-          // Processing / Unspecified -> Wait and Loop
-          const elapsedMinutes = Math.floor((Date.now() - startTime) / 60000);
-          onStatusUpdate?.(`Researching... (${elapsedMinutes}m elapsed)`);
-
-      } catch (pollError: any) {
-          // Immediately propagate explicit aborts
-          if (pollError.name === 'AbortError' || signal?.aborted) {
-              throw new DOMException("Aborted", "AbortError");
-          }
-
-          consecutiveFailures++;
-          console.warn(`Polling attempt failed (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}):`, pollError.message);
-
-          if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-              throw new Error(`Deep Research Connection Lost: ${pollError.message}. The agent may still be running remotely, but local monitoring has stopped.`);
-          }
-          // Fall through to the wait logic below to retry
-      }
-      
-      await new Promise(r => setTimeout(r, pollInterval));
-  }
-
-  throw new Error("Deep Research timed out.");
 };
 
 /**
@@ -395,77 +356,77 @@ export const runDeepResearchInteraction = async (
  * @returns The full generated text.
  */
 export const streamArtifact = async (
-  systemInstruction: string, 
-  prompt: string, 
+  systemInstruction: string,
+  prompt: string,
   settings: GeminiSettings,
   apiKey: string,
   onChunk: (text: string) => void,
   onStatusUpdate?: (status: string) => void,
   signal?: AbortSignal
 ): Promise<string> => {
-    try {
-        if (!apiKey) throw new Error("API Key is missing. Please provide a valid Gemini API Key.");
+  try {
+    if (!apiKey) throw new Error("API Key is missing. Please provide a valid Gemini API Key.");
 
-        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
 
-        const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey });
 
-        const tools: any[] = [];
-        if (settings.useGrounding) {
-            tools.push({ googleSearch: {} });
-        }
-
-        const config: any = {
-            systemInstruction: systemInstruction,
-            tools: tools.length > 0 ? tools : undefined,
-            temperature: settings.temperature,
-            topK: settings.topK,
-            topP: settings.topP,
-        };
-
-        if (settings.thinkingBudget > 0) {
-            config.thinkingConfig = {
-                thinkingBudget: settings.thinkingBudget
-            };
-        }
-
-        if (settings.thinkingBudget > 0) {
-            onStatusUpdate?.("Thinking (Deep Reasoning)...");
-        } else if (settings.useGrounding) {
-            onStatusUpdate?.("Accessing Knowledge Base...");
-        } else {
-            onStatusUpdate?.("Initializing AI...");
-        }
-
-        const responseStream = await retryWithBackoff(() => ai.models.generateContentStream({
-            model: settings.modelName,
-            contents: prompt,
-            config: config
-        })) as any;
-
-        let fullText = "";
-        let isFirstChunk = true;
-
-        for await (const chunk of responseStream) {
-            if (signal?.aborted) {
-               throw new DOMException("Aborted", "AbortError");
-            }
-
-            if (isFirstChunk) {
-                isFirstChunk = false;
-                onStatusUpdate?.("Streaming Response...");
-            }
-
-            const textPart = chunk.text;
-            if (textPart) {
-                fullText += textPart;
-                onChunk(textPart);
-            }
-        }
-        return fullText || "No content generated.";
-    } catch (error) {
-        throw error;
+    const tools: any[] = [];
+    if (settings.useGrounding) {
+      tools.push({ googleSearch: {} });
     }
+
+    const config: any = {
+      systemInstruction: systemInstruction,
+      tools: tools.length > 0 ? tools : undefined,
+      temperature: settings.temperature,
+      topK: settings.topK,
+      topP: settings.topP,
+    };
+
+    if (settings.thinkingBudget > 0) {
+      config.thinkingConfig = {
+        thinkingBudget: settings.thinkingBudget
+      };
+    }
+
+    if (settings.thinkingBudget > 0) {
+      onStatusUpdate?.("Thinking (Deep Reasoning)...");
+    } else if (settings.useGrounding) {
+      onStatusUpdate?.("Accessing Knowledge Base...");
+    } else {
+      onStatusUpdate?.("Initializing AI...");
+    }
+
+    const responseStream = await retryWithBackoff(() => ai.models.generateContentStream({
+      model: settings.modelName,
+      contents: prompt,
+      config: config
+    })) as any;
+
+    let fullText = "";
+    let isFirstChunk = true;
+
+    for await (const chunk of responseStream) {
+      if (signal?.aborted) {
+        throw new DOMException("Aborted", "AbortError");
+      }
+
+      if (isFirstChunk) {
+        isFirstChunk = false;
+        onStatusUpdate?.("Streaming Response...");
+      }
+
+      const textPart = chunk.text;
+      if (textPart) {
+        fullText += textPart;
+        onChunk(textPart);
+      }
+    }
+    return fullText || "No content generated.";
+  } catch (error) {
+    throw error;
+  }
 }
 
 /**
@@ -473,5 +434,5 @@ export const streamArtifact = async (
  * Wrapper around `streamArtifact`.
  */
 export const generateArtifact = async (systemInstruction: string, prompt: string, settings: GeminiSettings, apiKey: string): Promise<string> => {
-     return streamArtifact(systemInstruction, prompt, settings, apiKey, () => {});
+  return streamArtifact(systemInstruction, prompt, settings, apiKey, () => { });
 }

@@ -594,13 +594,23 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   const handleApiError = useCallback((error: any) => {
-    const msg = error?.message || '';
-    if (msg.includes('Aborted') || msg.includes('AbortError') || error.name === 'AbortError') return;
-    if (msg.includes('400') || msg.includes('401') || msg.includes('403') || msg.includes('API key') || msg.includes('valid')) {
+    const msg = (error?.message || '').toLowerCase();
+
+    // Ignore Aborts/Cancellations
+    if (msg.includes('aborted') || msg.includes('aborterror') || error.name === 'AbortError') return;
+
+    // Strict check for Invalid Key to avoid clearing on 403/404/500 or Validation errors
+    const isInvalidKey =
+      msg.includes('api key not valid') ||
+      msg.includes('api key invalid') ||
+      msg.includes('unauthorized') || // 401
+      error?.status === 401;
+
+    if (isInvalidKey) {
       clearApiKey();
       addToast('API Key invalid or expired. Please update.', 'error');
     } else {
-      addToast(msg || 'An unexpected error occurred.', 'error');
+      addToast(error?.message || 'An unexpected error occurred.', 'error');
     }
   }, [clearApiKey, addToast]);
 
@@ -1000,7 +1010,18 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       // --- GEMINI DEEP RESEARCH BRANCH ---
       setGenerationPhase('Starting Deep Research Agent...');
       try {
-        const { text, sources } = await runDeepResearchInteraction(prompt, apiKey, (status) => setGenerationPhase(status), abortControllerRef.current.signal, proj.settings.customInstructions);
+        let accumulatedText = '';
+        const { text, sources } = await runDeepResearchInteraction(
+          prompt,
+          apiKey,
+          (chunk: string) => {
+            accumulatedText += chunk;
+            handleStreamUpdate(chunk, 'research', accumulatedText, MODELS.DEEP_RESEARCH, projectId);
+          },
+          (status) => setGenerationPhase(status),
+          abortControllerRef.current.signal,
+          proj.settings.customInstructions
+        );
 
         const finalOutputTokens = estimateTokens(text);
         const outputCostDelta = calculateIncrementalCost(proj.settings.modelName, 0, finalOutputTokens, 0);
@@ -1017,39 +1038,50 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setGenerationPhase('');
         addToast('Deep Research Report ready', 'success');
       } catch (error: any) {
-        // Fallback logic for Gemini
-        const isFallbackCandidate =
-          error?.message?.includes('not found') ||
-          error?.message?.includes('404') ||
-          error?.status === 404 ||
-          error?.status === 400 ||
-          error?.status === 403 ||
-          error?.message?.includes('400') ||
-          error?.message?.includes('403');
+        // Check if strict Auth error (401)
+        const isStrictAuthError = error?.status === 401 || (error?.message || '').toLowerCase().includes('unauthorized') || (error?.message || '').toLowerCase().includes('api key invalid');
 
-        if (isFallbackCandidate) {
-          console.warn("Deep Research fallback triggered:", error.message);
-          addToast('Deep Research Agent unavailable. Falling back.', 'warning');
-          setGenerationPhase('Falling back to Standard Research...');
-          try {
-            let accumulatedText = '';
-            const fallbackSettings = { ...proj.settings, useGrounding: true, thinkingBudget: 8192 };
-            const { text, sources } = await streamDeepResearch(
-              prompt, fallbackSettings, apiKey,
-              (chunk: string) => {
-                accumulatedText += chunk;
-                handleStreamUpdate(chunk, 'research', accumulatedText, fallbackSettings.modelName, projectId);
-              },
-              (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
-            );
-            updateCurrentProject({ researchSources: sources, isGenerating: false });
-            commitArtifact('research', text);
-            logEvent('generation_complete', { type: 'research_fallback', project: proj.name });
-            setGenerationPhase('');
-            addToast('Research completed', 'success');
-          } catch (fallbackError: any) { handleApiError(fallbackError); updateCurrentProject({ isGenerating: false }); setGenerationPhase(''); }
-          return;
+        // If NOT auth error, try fallback logic
+        if (!isStrictAuthError) {
+          const isFallbackCandidate =
+            error?.message?.includes('not found') ||
+            error?.message?.includes('404') ||
+            error?.status === 404 ||
+            error?.status === 400 || // Bad Request (often validation) -> Fallback
+            error?.status === 403 || // Permission Denied (often regional) -> Fallback
+            error?.message?.includes('experimental'); // Experimental warning treated as error by some SDKs
+
+          if (isFallbackCandidate) {
+            console.warn("Deep Research failed (Non-Auth), attempting fallback:", error.message);
+            addToast('Deep Research Agent unavailable. Falling back.', 'warning');
+            setGenerationPhase('Falling back to Standard Research...');
+            try {
+              let accumulatedText = '';
+              const fallbackSettings = { ...proj.settings, useGrounding: true, thinkingBudget: 8192 };
+              const { text, sources } = await streamDeepResearch(
+                prompt, fallbackSettings, apiKey,
+                (chunk: string) => {
+                  accumulatedText += chunk;
+                  handleStreamUpdate(chunk, 'research', accumulatedText, fallbackSettings.modelName, projectId);
+                },
+                (status: string) => setGenerationPhase(status), abortControllerRef.current.signal
+              );
+              updateCurrentProject({ researchSources: sources, isGenerating: false });
+              commitArtifact('research', text);
+              logEvent('generation_complete', { type: 'research_fallback', project: proj.name });
+              setGenerationPhase('');
+              addToast('Research completed', 'success');
+            } catch (fallbackError: any) {
+              // If fallback also fails, then handle it as API error
+              handleApiError(fallbackError);
+              updateCurrentProject({ isGenerating: false });
+              setGenerationPhase('');
+            }
+            return;
+          }
         }
+
+        // If it WAS an Auth error, or NOT a fallback candidate
         handleApiError(error);
         updateCurrentProject({ isGenerating: false });
         setGenerationPhase('');

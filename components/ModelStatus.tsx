@@ -172,7 +172,7 @@ export const ModelStatus: React.FC = () => {
                     </div>
                 )}
 
-                {settings.useGrounding && (
+                {settings.useGrounding && providerInfo.providerId === 'gemini' && (
                     <div className="flex items-center gap-1.5 text-slate-300">
                         <Search size={14} className="text-blue-400" />
                         <span className="hidden md:inline">Grounding</span>
