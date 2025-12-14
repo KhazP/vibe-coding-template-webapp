@@ -129,135 +129,164 @@ const Part1Research: React.FC = React.memo(() => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-6">
 
-          {/* Research Method Toggle */}
+          {/* Research Method Segmented Toggle */}
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 w-full md:w-fit">
-                <button
-                  onClick={() => setResearchMethod('in-app')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all duration-300 ${researchMethod === 'in-app' ? 'bg-primary-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
-                    }`}
-                >
-                  <Zap size={14} /> In-App (Gemini)
-                </button>
-                <button
-                  onClick={() => setResearchMethod('external')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-xs font-medium transition-all duration-300 ${researchMethod === 'external' ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'
-                    }`}
-                >
-                  <ExternalLink size={14} /> External AI
-                </button>
-              </div>
-              <Tooltip content="In-App uses Gemini to research immediately. External AI generates a prompt you can paste into ChatGPT, Claude, or Perplexity." position="right">
-                <div className="p-2 text-slate-500 hover:text-slate-300 transition-colors cursor-help">
-                  <Info size={16} />
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-bold text-slate-200">Research Method</label>
+              <Tooltip content="In-App uses Gemini to research immediately. External AI generates a prompt you can paste into ChatGPT, Claude, or Perplexity." position="left">
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-primary-400 transition-colors cursor-help">
+                  <Info size={12} />
+                  <span>Which method to use?</span>
                 </div>
               </Tooltip>
             </div>
 
-            {/* In-App Research Depth Toggle */}
+            <div className="bg-slate-950/50 p-1 rounded-xl border border-white/10 flex relative">
+              <button
+                onClick={() => setResearchMethod('in-app')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-medium transition-all duration-300 ${researchMethod === 'in-app'
+                  ? 'bg-primary-600/20 text-primary-300 shadow-[0_0_15px_rgb(var(--color-primary-500)/0.1)] ring-1 ring-primary-500/50'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  }`}
+              >
+                <Zap size={14} className={researchMethod === 'in-app' ? 'text-primary-400' : ''} />
+                In-App Agent
+              </button>
+              <button
+                onClick={() => setResearchMethod('external')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-medium transition-all duration-300 ${researchMethod === 'external'
+                  ? 'bg-blue-600/20 text-blue-300 shadow-[0_0_15px_rgba(37,99,235,0.1)] ring-1 ring-blue-500/50'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  }`}
+              >
+                <ExternalLink size={14} className={researchMethod === 'external' ? 'text-blue-400' : ''} />
+                External AI
+              </button>
+            </div>
+
+            {/* In-App Research Depth Selection */}
             {researchMethod === 'in-app' && (
-              <GlassCard className="p-3 bg-surface/30 border-primary-500/10">
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                      <BrainCircuit size={12} className="text-primary-400" /> Research Agent
+              <GlassCard className="p-5 bg-gradient-to-br from-slate-900/90 to-slate-900/50 border-white/5">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <BrainCircuit size={14} className="text-primary-400" /> Research Agent Depth
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* Standard Mode Tile */}
                     <button
                       onClick={() => setResearchMode('standard')}
-                      className={`text-left px-3 py-2 rounded-lg border text-xs transition-all ${researchMode === 'standard'
-                        ? 'bg-primary-500/20 border-primary-500/50 text-white'
-                        : 'bg-black/20 border-transparent text-slate-500 hover:bg-black/40'
+                      className={`relative text-left p-3 rounded-xl border transition-all duration-300 group ${researchMode === 'standard'
+                        ? 'bg-primary-500/10 border-primary-500/50 ring-1 ring-primary-500/20'
+                        : 'bg-black/20 border-white/5 hover:border-white/10 hover:bg-white/5'
                         }`}
                     >
-                      <Tooltip content={standardModeInfo.providerName !== 'Gemini' ? "Standard Research requires Gemini for Google Search Grounding. Your global provider selection will be ignored for this specific task." : "Standard research using Google Search Grounding."} position="top">
-                        <div className="font-bold mb-0.5">Standard</div>
-                        <div className="opacity-70 text-[10px]">
-                          {standardModeInfo.providerName !== 'Gemini' ? (
-                            <span className="flex items-center gap-1 text-amber-400"><Info size={10} /> Gemini (Forced)</span>
-                          ) : (
-                            standardModeInfo.modelName
-                          )}
+                      <div className="flex items-start justify-between mb-2">
+                        <div className={`p-1.5 rounded-lg ${researchMode === 'standard' ? 'bg-primary-500/20 text-primary-400' : 'bg-slate-800 text-slate-400'}`}>
+                          <Zap size={16} />
                         </div>
-                      </Tooltip>
+                        {researchMode === 'standard' && <CheckCircle2 size={16} className="text-primary-400" />}
+                      </div>
+                      <div className="font-bold text-sm text-slate-200 mb-1 group-hover:text-white transition-colors">Standard</div>
+                      <div className="text-[10px] text-slate-500 leading-relaxed">
+                        Fast & efficient. Uses Google Search Grounding.
+                        {standardModeInfo.providerName !== 'Gemini' && (
+                          <div className="mt-1.5 flex items-center gap-1.5 text-amber-400/90 bg-amber-400/10 px-1.5 py-0.5 rounded w-fit">
+                            <Info size={10} />
+                            <span>Forces Gemini</span>
+                          </div>
+                        )}
+                      </div>
                     </button>
+
+                    {/* Deep Mode Tile */}
                     <button
                       onClick={() => setResearchMode('deep')}
-                      className={`text-left px-3 py-2 rounded-lg border text-xs transition-all ${researchMode === 'deep'
-                        ? 'bg-purple-500/20 border-purple-500/50 text-white'
-                        : 'bg-black/20 border-transparent text-slate-500 hover:bg-black/40'
+                      className={`relative text-left p-3 rounded-xl border transition-all duration-300 group ${researchMode === 'deep'
+                        ? 'bg-purple-500/10 border-purple-500/50 ring-1 ring-purple-500/20'
+                        : 'bg-black/20 border-white/5 hover:border-white/10 hover:bg-white/5'
                         }`}
                     >
-                      <div className="font-bold mb-0.5 flex items-center gap-1">Deep Research <span className="bg-purple-500 text-white text-[8px] px-1 rounded">NEW</span></div>
-                      <div className="opacity-70 text-[10px]">Agentic Deep Dive (Slow)</div>
+                      <div className="absolute -top-2 -right-2">
+                        <span className="bg-purple-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-lg shadow-purple-500/20">NEW</span>
+                      </div>
+                      <div className="flex items-start justify-between mb-2">
+                        <div className={`p-1.5 rounded-lg ${researchMode === 'deep' ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-800 text-slate-400'}`}>
+                          <BrainCircuit size={16} />
+                        </div>
+                        {researchMode === 'deep' && <CheckCircle2 size={16} className="text-purple-400" />}
+                      </div>
+                      <div className="font-bold text-sm text-slate-200 mb-1 group-hover:text-white transition-colors">Deep Research</div>
+                      <div className="text-[10px] text-slate-500 leading-relaxed">
+                        Autonomous agentic deep dive. Reads & synthesizes multiple sources.
+                      </div>
                     </button>
                   </div>
 
-                  {/* Deep Research Provider Selection - Only show for deep mode */}
-                  {researchMode === 'deep' && (
-                    <div className="mt-2 space-y-2">
-                      {/* Provider Toggle */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-slate-500 uppercase tracking-wider">Provider:</span>
-                        <div className="flex bg-black/40 p-0.5 rounded-md border border-white/5">
-                          <Tooltip content="Preview Feature: Deep Research (via Interactions API) is rolling out gradually. If unavailable for your key, we will automatically fall back to Standard mode." position="top">
+                  {/* Deep Research Configuration */}
+                  <div className={`overflow-hidden transition-all duration-500 ease-in-out ${researchMode === 'deep' ? 'max-h-[200px] opacity-100 pt-2' : 'max-h-0 opacity-0'}`}>
+                    <div className="p-3 bg-black/20 rounded-xl border border-white/5 space-y-3">
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Agent Model</span>
+                        <div className="flex bg-slate-950 p-0.5 rounded-lg border border-white/5">
+                          <Tooltip content="Deep Research via Google's Gemini Agent" position="top">
                             <button
                               onClick={() => setResearchProvider('gemini')}
-                              className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-medium transition-all ${researchProvider === 'gemini'
-                                ? 'bg-purple-600 text-white'
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${researchProvider === 'gemini'
+                                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
                                 : 'text-slate-400 hover:text-white'
                                 }`}
                             >
-                              <img src="/providers/gemini.svg" alt="Gemini" className="w-3 h-3" />
+                              <img src="/providers/gemini.svg" alt="Gemini" className="w-3 h-3 opacity-80" />
                               Gemini
                             </button>
                           </Tooltip>
-                          <Tooltip content="Uses OpenAI Responses API with web search. Takes 2-10 minutes for comprehensive analysis." position="top">
+                          <Tooltip content="Deep Research via OpenAI's o3-mini/deep models" position="top">
                             <button
                               onClick={() => setResearchProvider('openai')}
-                              className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-medium transition-all ${researchProvider === 'openai'
-                                ? 'bg-green-600 text-white'
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${researchProvider === 'openai'
+                                ? 'bg-green-500/20 text-green-300 border border-green-500/30'
                                 : 'text-slate-400 hover:text-white'
                                 }`}
                             >
-                              <img src="/providers/openai.svg" alt="OpenAI" className="w-3 h-3" />
+                              <img src="/providers/openai.svg" alt="OpenAI" className="w-3 h-3 opacity-80" />
                               OpenAI
                             </button>
                           </Tooltip>
                         </div>
                       </div>
 
-                      {/* OpenAI Model Dropdown - Only show for OpenAI provider */}
+                      {/* OpenAI Model Selector */}
                       {researchProvider === 'openai' && (
-                        <div className="relative">
+                        <div className="relative animate-in fade-in slide-in-from-top-1 duration-200">
                           <button
                             onClick={() => setShowModelDropdown(!showModelDropdown)}
-                            className="w-full flex items-center justify-between px-3 py-2 bg-slate-900/80 border border-green-500/20 rounded-lg text-xs hover:border-green-500/40 transition-all"
+                            className="w-full flex items-center justify-between px-3 py-2 bg-slate-900 border border-green-500/20 rounded-lg text-xs hover:border-green-500/40 transition-all group"
                           >
                             <div className="flex items-center gap-2">
-                              <img src="/providers/openai.svg" alt="OpenAI" className="w-4 h-4" />
+                              <div className="w-5 h-5 rounded bg-green-900/20 flex items-center justify-center text-green-400 group-hover:bg-green-900/30 transition-colors">
+                                <Sparkles size={12} />
+                              </div>
                               <div className="text-left">
-                                <div className="font-medium text-white">
+                                <div className="font-medium text-slate-200 flex items-center gap-2">
                                   {OPENAI_DEEP_RESEARCH_MODELS.find(m => m.id === openaiDeepModel)?.name}
-                                </div>
-                                <div className="text-[10px] text-slate-500">
-                                  {OPENAI_DEEP_RESEARCH_MODELS.find(m => m.id === openaiDeepModel)?.description}
                                 </div>
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-mono text-emerald-400">
+                              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
                                 ${OPENAI_DEEP_RESEARCH_MODELS.find(m => m.id === openaiDeepModel)?.inputCost}/1M
                               </span>
                               <ChevronDown size={14} className={`text-slate-400 transition-transform ${showModelDropdown ? 'rotate-180' : ''}`} />
                             </div>
                           </button>
 
-                          {/* Dropdown Menu - Opens upward to avoid being cut off */}
+                          {/* Dropdown Menu */}
                           {showModelDropdown && (
-                            <div className="absolute bottom-full left-0 right-0 mb-1 bg-slate-900 border border-green-500/20 rounded-lg overflow-hidden z-50 shadow-xl animate-in fade-in slide-in-from-bottom-1 duration-200">
+                            <div className="absolute bottom-full left-0 right-0 mb-1 bg-slate-900 border border-green-500/20 rounded-xl overflow-hidden z-50 shadow-2xl animate-in fade-in slide-in-from-bottom-1 duration-200 ring-1 ring-black/50">
                               {OPENAI_DEEP_RESEARCH_MODELS.map((model) => (
                                 <button
                                   key={model.id}
@@ -268,18 +297,12 @@ const Part1Research: React.FC = React.memo(() => {
                                   className={`w-full flex items-center justify-between px-3 py-2.5 text-xs hover:bg-green-500/10 transition-all ${openaiDeepModel === model.id ? 'bg-green-500/5' : ''
                                     }`}
                                 >
-                                  <div className="text-left">
-                                    <div className="font-medium text-white flex items-center gap-2">
-                                      {model.name}
-                                      {openaiDeepModel === model.id && (
-                                        <CheckCircle2 size={12} className="text-green-400" />
-                                      )}
+                                  <div className="text-left flex items-center gap-2">
+                                    {openaiDeepModel === model.id ? <CheckCircle2 size={12} className="text-green-400 shrink-0" /> : <div className="w-3" />}
+                                    <div>
+                                      <div className="font-medium text-slate-200">{model.name}</div>
+                                      <div className="text-[10px] text-slate-500">{model.description}</div>
                                     </div>
-                                    <div className="text-[10px] text-slate-500">{model.description}</div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-[10px] font-mono text-emerald-400">${model.inputCost}/1M in</div>
-                                    <div className="text-[10px] font-mono text-amber-400">${model.outputCost}/1M out</div>
                                   </div>
                                 </button>
                               ))}
@@ -288,7 +311,8 @@ const Part1Research: React.FC = React.memo(() => {
                         </div>
                       )}
                     </div>
-                  )}
+                  </div>
+
                 </div>
               </GlassCard>
             )}
