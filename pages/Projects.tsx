@@ -156,7 +156,7 @@ const Projects: React.FC = () => {
       <div className="space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-3xl font-bold text-slate-100 mb-2">My Projects</h2>
+            <h1 className="text-3xl font-bold text-slate-100 mb-2">My Projects</h1>
             <p className="text-slate-400">Manage your saved vibe-coding sessions.</p>
           </div>
           <div className="flex items-center gap-3">

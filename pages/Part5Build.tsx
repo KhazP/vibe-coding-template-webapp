@@ -136,7 +136,7 @@ const Part5Build: React.FC = React.memo(() => {
     return (
         <div className="space-y-12 animate-fade-in pb-20">
             <div>
-                <h2 className="text-3xl font-bold text-slate-100 mb-2">Part V: Build Execution</h2>
+                <h1 className="text-3xl font-bold text-slate-100 mb-2">Part V: Build Execution</h1>
                 <p className="text-slate-400">Your mission control for orchestrating AI Agents. Generate a plan, then execute phase-by-phase.</p>
             </div>
 
@@ -362,8 +362,8 @@ const Part5Build: React.FC = React.memo(() => {
                                                         key={idx}
                                                         onClick={() => setSelectedPhase(phase)}
                                                         className={`w-full text-left px-4 py-3 rounded-lg text-sm transition-colors ${selectedPhase === phase
-                                                                ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                                                                : 'bg-black/20 text-slate-400 hover:bg-black/40 border border-transparent'
+                                                            ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+                                                            : 'bg-black/20 text-slate-400 hover:bg-black/40 border border-transparent'
                                                             }`}
                                                     >
                                                         {phase}

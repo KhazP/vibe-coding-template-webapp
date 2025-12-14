@@ -120,7 +120,7 @@ const Part1Research: React.FC = React.memo(() => {
   return (
     <div className="space-y-8 animate-fade-in">
       <div>
-        <h2 className="text-3xl font-bold text-slate-100 mb-2">Part I: Deep Research</h2>
+        <h1 className="text-3xl font-bold text-slate-100 mb-2">Part I: Deep Research</h1>
         <p className="text-slate-400">Validate your idea and tech stack using Google Search Grounding.</p>
       </div>
 

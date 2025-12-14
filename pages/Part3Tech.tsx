@@ -137,7 +137,7 @@ const Part3Tech: React.FC = React.memo(() => {
   return (
     <div className="space-y-8 animate-fade-in">
       <div>
-        <h2 className="text-3xl font-bold text-slate-100 mb-2">Part III: Tech Design</h2>
+        <h1 className="text-3xl font-bold text-slate-100 mb-2">Part III: Tech Design</h1>
         <p className="text-slate-400">Define HOW you will build it. Tailored complexity based on your profile.</p>
       </div>
 

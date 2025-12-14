@@ -446,7 +446,7 @@ Your AI agent will use this as its primary context.
     return (
         <div className="space-y-12 animate-fade-in pb-20">
             <div>
-                <h2 className="text-3xl font-bold text-slate-100 mb-2">Part V: Export & Deploy</h2>
+                <h1 className="text-3xl font-bold text-slate-100 mb-2">Part V: Export & Deploy</h1>
                 <p className="text-slate-400">Mission Control. Download your kit, follow the protocol, and launch.</p>
             </div>
 

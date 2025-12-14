@@ -208,7 +208,7 @@ Your AI agent will use this as its primary context.
   return (
     <div className="space-y-8 animate-fade-in">
       <div>
-        <h2 className="text-3xl font-bold text-slate-100 mb-2">Part IV: Universal Agent Config</h2>
+        <h1 className="text-3xl font-bold text-slate-100 mb-2">Part IV: Universal Agent Config</h1>
         <p className="text-slate-400">Generate an <code className="text-primary-400">{FILE_NAMES.AGENTS_MD}</code> file that works across Cursor, Windsurf, Copilot, and more.</p>
       </div>
 

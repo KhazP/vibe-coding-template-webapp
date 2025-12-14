@@ -112,7 +112,7 @@ const Part2PRD: React.FC = React.memo(() => {
   return (
     <div className="space-y-8 animate-fade-in">
       <div>
-        <h2 className="text-3xl font-bold text-slate-100 mb-2">Part II: Product Requirements</h2>
+        <h1 className="text-3xl font-bold text-slate-100 mb-2">Part II: Product Requirements</h1>
         <p className="text-slate-400">Define WHAT you are building using a framework tailored to your style.</p>
       </div>
 
