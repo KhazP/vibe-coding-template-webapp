@@ -12,6 +12,9 @@ Disallow: /admindashboard/
 # Sitemap location
 Sitemap: https://vibeworkflow.app/sitemap.xml
 
+# IndexNow for instant content update notifications (Bing, Yandex)
+IndexNow-Key: b836e2e568cb46229061106069c69405
+
 # === Search Engine Crawlers (explicitly allowed) ===
 User-agent: Googlebot
 Allow: /
