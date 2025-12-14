@@ -66,6 +66,30 @@ const SettingsModal: React.FC = () => {
     const [anthropicModels, setAnthropicModels] = useState<AnthropicModel[]>([]);
     const [isLoadingAnthropicModels, setIsLoadingAnthropicModels] = useState(false);
 
+    // Track which providers have API keys
+    const [providerKeys, setProviderKeys] = useState<Record<ProviderId, boolean>>({
+        gemini: false,
+        openai: false,
+        anthropic: false,
+        openrouter: false
+    });
+
+    useEffect(() => {
+        const checkKeys = () => {
+            const keys = {
+                gemini: !!getProviderKey('gemini'),
+                openai: !!getProviderKey('openai'),
+                anthropic: !!getProviderKey('anthropic'),
+                openrouter: !!getProviderKey('openrouter')
+            };
+            setProviderKeys(keys);
+        };
+        checkKeys();
+        // Listen for storage changes in case keys are added elsewhere while modal is open
+        window.addEventListener('storage', checkKeys);
+        return () => window.removeEventListener('storage', checkKeys);
+    }, [isSettingsOpen]);
+
     // Sync expert settings when provider changes
     useEffect(() => {
         const settings = getExpertSettings(activeProvider) || {};
@@ -469,23 +493,29 @@ const SettingsModal: React.FC = () => {
                                 </div>
                                 {/* Provider Switch Buttons */}
                                 <div className="flex gap-1 bg-slate-900/50 rounded-lg p-1 border border-white/5">
-                                    {(['gemini', 'openai', 'anthropic', 'openrouter'] as ProviderId[]).map((pid) => (
-                                        <button
-                                            key={pid}
-                                            onClick={() => handleProviderChange(pid)}
-                                            className={`p-2 rounded-md transition-all ${activeProvider === pid
-                                                ? 'bg-primary-500/20 border border-primary-500/30'
-                                                : 'hover:bg-white/5'
-                                                }`}
-                                            title={PROVIDERS[pid].displayName}
-                                        >
-                                            <img
-                                                src={PROVIDERS[pid].logoPath}
-                                                alt={PROVIDERS[pid].displayName}
-                                                className={`w-4 h-4 object-contain ${activeProvider !== pid ? 'opacity-50' : ''}`}
-                                            />
-                                        </button>
-                                    ))}
+                                    {(['gemini', 'openai', 'anthropic', 'openrouter'] as ProviderId[]).map((pid) => {
+                                        const hasKey = providerKeys[pid];
+                                        const isActive = activeProvider === pid;
+
+                                        return (
+                                            <button
+                                                key={pid}
+                                                onClick={() => handleProviderChange(pid)}
+                                                disabled={!hasKey}
+                                                className={`p-2 rounded-md transition-all ${isActive
+                                                    ? 'bg-primary-500/20 border border-primary-500/30'
+                                                    : 'hover:bg-white/5'
+                                                    } ${!hasKey ? 'opacity-75 grayscale pointer-events-none cursor-not-allowed' : ''}`}
+                                                title={hasKey ? PROVIDERS[pid].displayName : `${PROVIDERS[pid].displayName} (No API Key)`}
+                                            >
+                                                <img
+                                                    src={PROVIDERS[pid].logoPath}
+                                                    alt={PROVIDERS[pid].displayName}
+                                                    className={`w-4 h-4 object-contain ${!isActive && hasKey ? 'opacity-50' : ''}`}
+                                                />
+                                            </button>
+                                        )
+                                    })}
                                 </div>
                             </div>
 
