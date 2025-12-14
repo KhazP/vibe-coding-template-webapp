@@ -297,12 +297,13 @@ export const Button: React.FC<ButtonProps> = ({
 export const FieldWrapper: React.FC<{
   label: string;
   tooltip?: string;
+  tooltipPosition?: 'top' | 'bottom' | 'left' | 'right';
   error?: string;
   rightLabel?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
   required?: boolean;
-}> = ({ label, tooltip, error, rightLabel, children, className = '', required }) => (
+}> = ({ label, tooltip, tooltipPosition = 'right', error, rightLabel, children, className = '', required }) => (
   <div className={`mb-5 group ${className}`}>
     <div className="flex flex-wrap items-center justify-between mb-2 gap-2">
       <div className="flex items-center gap-2">
@@ -310,7 +311,7 @@ export const FieldWrapper: React.FC<{
           {label} {required && <span className="text-destructive-400 ml-0.5">*</span>}
         </label>
         {tooltip && (
-          <Tooltip content={tooltip}>
+          <Tooltip content={tooltip} position={tooltipPosition}>
             <Info size={12} className="text-slate-600 hover:text-primary-400 cursor-help transition-colors" />
           </Tooltip>
         )}
@@ -335,12 +336,13 @@ export const FieldWrapper: React.FC<{
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label: string;
   tooltip?: string;
+  tooltipPosition?: 'top' | 'bottom' | 'left' | 'right';
   error?: string;
   rightLabel?: React.ReactNode;
 }
 
-export const Input: React.FC<InputProps> = ({ label, tooltip, error, rightLabel, className = '', ...props }) => (
-  <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={rightLabel} required={props.required}>
+export const Input: React.FC<InputProps> = ({ label, tooltip, tooltipPosition, error, rightLabel, className = '', ...props }) => (
+  <FieldWrapper label={label} tooltip={tooltip} tooltipPosition={tooltipPosition} error={error} rightLabel={rightLabel} required={props.required}>
     <input
       className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-base md:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 ${error
         ? 'border-destructive-500/50 focus:border-destructive-500 focus:shadow-[0_0_15px_rgba(239,68,68,0.1)]'
@@ -361,6 +363,7 @@ export const TextInput = Input;
 interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
   tooltip?: string;
+  tooltipPosition?: 'top' | 'bottom' | 'left' | 'right';
   error?: string;
   showCount?: boolean;
   rightLabel?: React.ReactNode;
@@ -369,6 +372,7 @@ interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
 export const TextArea: React.FC<TextAreaProps> = ({
   label,
   tooltip,
+  tooltipPosition,
   error,
   showCount = true,
   maxLength,
@@ -397,7 +401,7 @@ export const TextArea: React.FC<TextAreaProps> = ({
   ) : undefined;
 
   return (
-    <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={displayLabel} required={props.required}>
+    <FieldWrapper label={label} tooltip={tooltip} tooltipPosition={tooltipPosition} error={error} rightLabel={displayLabel} required={props.required}>
       <textarea
         className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-base md:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 min-h-[120px] resize-y custom-scrollbar ${error || isOverLimit
           ? 'border-destructive-500/50 focus:border-destructive-500 focus:shadow-[0_0_15px_rgba(239,68,68,0.1)]'
@@ -415,13 +419,14 @@ export const TextArea: React.FC<TextAreaProps> = ({
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label: string;
   tooltip?: string;
+  tooltipPosition?: 'top' | 'bottom' | 'left' | 'right';
   error?: string;
   rightLabel?: React.ReactNode;
   options?: { label: string; value: string }[];
 }
 
-export const Select: React.FC<SelectProps> = ({ label, tooltip, error, rightLabel, children, options, className = '', ...props }) => (
-  <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={rightLabel} required={props.required}>
+export const Select: React.FC<SelectProps> = ({ label, tooltip, tooltipPosition, error, rightLabel, children, options, className = '', ...props }) => (
+  <FieldWrapper label={label} tooltip={tooltip} tooltipPosition={tooltipPosition} error={error} rightLabel={rightLabel} required={props.required}>
     <div className="relative group">
       <select
         className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-base md:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 appearance-none cursor-pointer ${error
