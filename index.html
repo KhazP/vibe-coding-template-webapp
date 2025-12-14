@@ -28,6 +28,11 @@
                 500: 'rgb(var(--color-secondary-500) / <alpha-value>)',
                 900: 'rgb(var(--color-secondary-900) / <alpha-value>)',
               },
+              destructive: {
+                 400: 'rgb(var(--color-destructive-400) / <alpha-value>)',
+                 500: 'rgb(var(--color-destructive-500) / <alpha-value>)',
+                 900: 'rgb(var(--color-destructive-900) / <alpha-value>)',
+              },
               glass: {
                 100: 'rgba(255, 255, 255, 0.03)',
                 200: 'rgba(255, 255, 255, 0.07)',
@@ -69,15 +74,22 @@
 
     <style>
       :root {
-        /* Default Theme (Developer/Emerald) */
-        --color-primary-400: 52 211 153;
-        --color-primary-500: 16 185 129;
-        --color-primary-600: 5 150 105;
-        --color-primary-900: 6 78 59;
+        /* Default Theme (Magenta/Cyan) */
+        /* Primary - Magenta/Fuchsia Range */
+        --color-primary-400: 232 121 249; /* fuchsia-400 */
+        --color-primary-500: 217 70 239;  /* fuchsia-500 */
+        --color-primary-600: 192 38 211;  /* fuchsia-600 */
+        --color-primary-900: 112 26 117;  /* fuchsia-900 */
         
-        --color-secondary-400: 45 212 191;
-        --color-secondary-500: 20 184 166;
-        --color-secondary-900: 19 78 74;
+        /* Secondary - Cyan Range */
+        --color-secondary-400: 34 211 238; /* cyan-400 */
+        --color-secondary-500: 6 182 212;  /* cyan-500 */
+        --color-secondary-900: 22 78 99;   /* cyan-900 */
+
+        /* Destructive - Red Range */
+        --color-destructive-400: 248 113 113; /* red-400 */
+        --color-destructive-500: 239 68 68;   /* red-500 */
+        --color-destructive-900: 127 29 29;   /* red-900 */
       }
 
       body {

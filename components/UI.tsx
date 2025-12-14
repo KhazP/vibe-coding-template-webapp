@@ -69,7 +69,7 @@ export const GenerationLoader: React.FC<{ label?: string; onCancel?: () => void 
 // --- Components ---
 
 export const Breadcrumbs: React.FC<{ items: { label: string; path?: string }[] }> = ({ items }) => (
-  <nav className="flex items-center text-xs font-mono text-slate-500 mb-6 uppercase tracking-wider overflow-x-auto whitespace-nowrap pb-1">
+  <nav className="flex items-center text-xs font-mono text-slate-400 mb-6 uppercase tracking-wider overflow-x-auto whitespace-nowrap pb-1">
     {items.map((item, index) => (
       <React.Fragment key={index}>
         {index > 0 && <span className="mx-2 text-slate-700">/</span>}
@@ -246,9 +246,9 @@ export const GlassCard: React.FC<{ children: React.ReactNode; className?: string
 );
 
 interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onDrag' | 'onDragStart' | 'onDragEnd' | 'onAnimationStart' | 'onAnimationEnd'> {
-  variant?: 'primary' | 'secondary' | 'outline';
+  variant?: 'primary' | 'secondary' | 'outline' | 'destructive';
   tooltip?: string;
-  children?: React.ReactNode;
+  icon?: React.ReactNode;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -261,9 +261,10 @@ export const Button: React.FC<ButtonProps> = ({
   const baseStyles = "px-6 py-3 rounded-xl font-medium transition-all duration-300 flex items-center justify-center gap-2 relative overflow-hidden group disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base";
 
   const variants = {
-    primary: "bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] border border-white/10",
+    primary: "bg-gradient-to-r from-primary-600 to-primary-500 text-white shadow-[0_0_20px_rgba(217,70,239,0.3)] hover:shadow-[0_0_30px_rgba(217,70,239,0.5)] border border-white/10",
     secondary: "bg-surface/50 backdrop-blur-md text-slate-200 hover:bg-surface/80 border border-white/5 hover:border-white/10",
-    outline: "border border-white/10 text-slate-400 hover:border-primary-500/50 hover:text-primary-400 bg-transparent"
+    outline: "border border-white/10 text-slate-400 hover:border-primary-500/50 hover:text-primary-400 bg-transparent",
+    destructive: "bg-destructive-500/10 text-destructive-400 border border-destructive-500/50 hover:bg-destructive-500/20 hover:border-destructive-500 hover:text-destructive-300"
   };
 
   const btn = (
@@ -305,8 +306,8 @@ export const FieldWrapper: React.FC<{
   <div className={`mb-5 group ${className}`}>
     <div className="flex flex-wrap items-center justify-between mb-2 gap-2">
       <div className="flex items-center gap-2">
-        <label className={`block text-xs font-mono font-medium uppercase tracking-widest transition-colors ${error ? 'text-red-400' : 'text-slate-500 group-focus-within:text-primary-400'}`}>
-          {label} {required && <span className="text-red-400 ml-0.5">*</span>}
+        <label className={`block text-xs font-mono font-medium uppercase tracking-widest transition-colors ${error ? 'text-destructive-400' : 'text-slate-400 group-focus-within:text-primary-400'}`}>
+          {label} {required && <span className="text-destructive-400 ml-0.5">*</span>}
         </label>
         {tooltip && (
           <Tooltip content={tooltip}>
@@ -323,7 +324,7 @@ export const FieldWrapper: React.FC<{
       <motion.p
         initial={{ opacity: 0, y: -5 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-red-400 text-[10px] mt-1.5 font-medium flex items-center gap-1"
+        className="text-destructive-400 text-[10px] mt-1.5 font-medium flex items-center gap-1"
       >
         {error}
       </motion.p>
@@ -342,18 +343,20 @@ export const Input: React.FC<InputProps> = ({ label, tooltip, error, rightLabel,
   <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={rightLabel} required={props.required}>
     <input
       className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-base md:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 ${error
-        ? 'border-red-500/50 focus:border-red-500 focus:shadow-[0_0_15px_rgba(239,68,68,0.1)]'
-        : 'border-white/10 focus:border-primary-500/50 focus:shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+        ? 'border-destructive-500/50 focus:border-destructive-500 focus:shadow-[0_0_15px_rgba(239,68,68,0.1)]'
+        : 'border-white/10 focus:border-primary-500/50 focus:shadow-[0_0_15px_rgba(217,70,239,0.1)]'
         } ${className}`}
       {...props}
     />
     {error && (
-      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500 pointer-events-none">
+      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-destructive-500 pointer-events-none">
         <AlertCircle size={16} />
       </div>
     )}
   </FieldWrapper>
 );
+// Alias for compatibility
+export const TextInput = Input;
 
 interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   label: string;
@@ -380,7 +383,7 @@ export const TextArea: React.FC<TextAreaProps> = ({
   const isOverLimit = maxLength && currentLength > maxLength;
 
   const countLabel = showCount && maxLength ? (
-    <span className={`text-[10px] font-mono transition-colors ${isOverLimit ? 'text-red-400 font-bold' : isNearLimit ? 'text-amber-400' : 'text-slate-600'
+    <span className={`text-[10px] font-mono transition-colors ${isOverLimit ? 'text-destructive-400 font-bold' : isNearLimit ? 'text-amber-400' : 'text-slate-600'
       }`}>
       {currentLength}/{maxLength}
     </span>
@@ -396,9 +399,9 @@ export const TextArea: React.FC<TextAreaProps> = ({
   return (
     <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={displayLabel} required={props.required}>
       <textarea
-        className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-base md:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 min-h-[120px] resize-y ${error || isOverLimit
-          ? 'border-red-500/50 focus:border-red-500 focus:shadow-[0_0_15px_rgba(239,68,68,0.1)]'
-          : 'border-white/10 focus:border-primary-500/50 focus:shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+        className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-base md:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 min-h-[120px] resize-y custom-scrollbar ${error || isOverLimit
+          ? 'border-destructive-500/50 focus:border-destructive-500 focus:shadow-[0_0_15px_rgba(239,68,68,0.1)]'
+          : 'border-white/10 focus:border-primary-500/50 focus:shadow-[0_0_15px_rgba(217,70,239,0.1)]'
           } ${className}`}
         value={value}
         onChange={onChange}
@@ -414,21 +417,29 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   tooltip?: string;
   error?: string;
   rightLabel?: React.ReactNode;
+  options?: { label: string; value: string }[];
 }
 
-export const Select: React.FC<SelectProps> = ({ label, tooltip, error, rightLabel, children, className = '', ...props }) => (
+export const Select: React.FC<SelectProps> = ({ label, tooltip, error, rightLabel, children, options, className = '', ...props }) => (
   <FieldWrapper label={label} tooltip={tooltip} error={error} rightLabel={rightLabel} required={props.required}>
-    <select
-      className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-base md:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 appearance-none ${error
-        ? 'border-red-500/50 focus:border-red-500 focus:shadow-[0_0_15px_rgba(239,68,68,0.1)]'
-        : 'border-white/10 focus:border-primary-500/50 focus:shadow-[0_0_15px_rgba(16,185,129,0.1)]'
-        } ${className}`}
-      {...props}
-    >
-      {children}
-    </select>
-    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
-      <ChevronDown size={14} />
+    <div className="relative group">
+      <select
+        className={`w-full bg-surface/50 backdrop-blur-sm border rounded-xl px-4 py-3 text-base md:text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:bg-surface/80 transition-all duration-300 appearance-none cursor-pointer ${error
+          ? 'border-destructive-500/50 focus:border-destructive-500 focus:shadow-[0_0_15px_rgba(239,68,68,0.1)]'
+          : 'border-white/10 focus:border-primary-500/50 focus:shadow-[0_0_15px_rgba(217,70,239,0.1)]'
+          } ${className}`}
+        {...props}
+      >
+        {children}
+        {options?.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 group-hover:text-slate-300 transition-colors">
+        <ChevronDown size={14} />
+      </div>
     </div>
   </FieldWrapper>
 );
@@ -620,7 +631,7 @@ const TableOfContents: React.FC<{ content: string; onSelect: (id: string) => voi
 
   return (
     <div className="absolute top-20 right-6 w-64 max-h-[70vh] overflow-y-auto custom-scrollbar bg-slate-900/80 backdrop-blur-md border border-white/10 rounded-xl p-4 shadow-2xl z-50 animate-fade-in hidden xl:block">
-      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
         <Hash size={12} /> Table of Contents
       </h4>
       <div className="space-y-1">
@@ -669,7 +680,7 @@ const MagicWandMenu: React.FC<MagicWandMenuProps> = ({ position, onSelect, isLoa
         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
           <Sparkles size={10} className="text-primary-400" /> Magic Wand
         </span>
-        <button onClick={onClose} className="text-slate-500 hover:text-white" aria-label="Close menu"><X size={12} /></button>
+        <button onClick={onClose} className="text-slate-400 hover:text-white" aria-label="Close menu"><X size={12} /></button>
       </div>
       <div className="p-1 space-y-0.5">
         <button onClick={() => onSelect('Make shorter')} className="w-full text-left px-3 py-2 text-xs text-slate-200 hover:bg-primary-500/20 hover:text-primary-300 rounded flex items-center gap-2 transition-colors">
@@ -1086,7 +1097,7 @@ export const CopyBlock: React.FC<{
           <div className="flex items-center gap-3">
             {label && <div className="text-xs font-mono text-primary-400 uppercase tracking-widest">{label}</div>}
             {timestamp && (
-              <div className="hidden md:flex items-center gap-1 text-[10px] text-slate-500">
+              <div className="hidden md:flex items-center gap-1 text-[10px] text-slate-400">
                 <Clock size={10} />
                 <span>{new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
@@ -1096,7 +1107,7 @@ export const CopyBlock: React.FC<{
           <div className="flex items-center gap-1">
             <button
               onClick={() => setIsFullscreen(true)}
-              className="p-1.5 text-slate-500 hover:text-white hover:bg-white/10 rounded transition-colors"
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded transition-colors"
               title="Fullscreen Editor"
               aria-label="Enter fullscreen"
             >
@@ -1106,7 +1117,7 @@ export const CopyBlock: React.FC<{
             {onEdit && !isEditing && (
               <button
                 onClick={() => setIsEditing(true)}
-                className="p-1.5 text-slate-500 hover:text-primary-400 hover:bg-white/10 rounded transition-colors"
+                className="p-1.5 text-slate-400 hover:text-primary-400 hover:bg-white/10 rounded transition-colors"
                 title="Edit content"
                 aria-label="Edit content"
               >
@@ -1117,7 +1128,7 @@ export const CopyBlock: React.FC<{
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowExport(!showExport)}
-                className="p-1.5 text-slate-500 hover:text-primary-400 hover:bg-white/10 rounded transition-colors"
+                className="p-1.5 text-slate-400 hover:text-primary-400 hover:bg-white/10 rounded transition-colors"
                 title="Export options"
                 aria-label="Export options"
               >
@@ -1140,7 +1151,7 @@ export const CopyBlock: React.FC<{
 
             <button
               onClick={handleCopy}
-              className="p-1.5 text-slate-500 hover:text-primary-400 hover:bg-white/10 rounded transition-colors"
+              className="p-1.5 text-slate-400 hover:text-primary-400 hover:bg-white/10 rounded transition-colors"
               title="Copy to clipboard"
               aria-label="Copy to clipboard"
             >
@@ -1235,7 +1246,7 @@ export const CopyBlock: React.FC<{
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-slate-200">{fileName}</h3>
-                    <div className="flex items-center gap-3 text-[10px] text-slate-500 font-mono">
+                    <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono">
                       <span>{editValue.length} chars</span>
                       <span>•</span>
                       <span>{Math.ceil(editValue.length / 4)} tokens</span>
@@ -1323,7 +1334,7 @@ export const CopyBlock: React.FC<{
                       >
                         {/* Search Input Row */}
                         <div className="flex items-center gap-2 bg-[#1a1a1c] border border-white/5 rounded-lg px-2 py-1.5 focus-within:border-primary-500/50 transition-colors">
-                          <Search size={14} className="text-slate-500 shrink-0" />
+                          <Search size={14} className="text-slate-400 shrink-0" />
                           <input
                             autoFocus
                             type="text"
@@ -1341,7 +1352,7 @@ export const CopyBlock: React.FC<{
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => setSearchOptions(prev => ({ ...prev, caseSensitive: !prev.caseSensitive }))}
-                              className={`p-1 rounded hover:bg-white/10 ${searchOptions.caseSensitive ? 'text-primary-400 bg-primary-500/10' : 'text-slate-500'}`}
+                              className={`p-1 rounded hover:bg-white/10 ${searchOptions.caseSensitive ? 'text-primary-400 bg-primary-500/10' : 'text-slate-400'}`}
                               title="Match Case"
                               aria-label="Match Case"
                             >
@@ -1349,7 +1360,7 @@ export const CopyBlock: React.FC<{
                             </button>
                             <button
                               onClick={() => setSearchOptions(prev => ({ ...prev, wholeWord: !prev.wholeWord }))}
-                              className={`p-1 rounded hover:bg-white/10 ${searchOptions.wholeWord ? 'text-primary-400 bg-primary-500/10' : 'text-slate-500'}`}
+                              className={`p-1 rounded hover:bg-white/10 ${searchOptions.wholeWord ? 'text-primary-400 bg-primary-500/10' : 'text-slate-400'}`}
                               title="Match Whole Word"
                               aria-label="Match Whole Word"
                             >
@@ -1368,7 +1379,7 @@ export const CopyBlock: React.FC<{
                               className="overflow-hidden"
                             >
                               <div className="flex items-center gap-2 bg-[#1a1a1c] border border-white/5 rounded-lg px-2 py-1.5 focus-within:border-primary-500/50 transition-colors mb-2">
-                                <Replace size={14} className="text-slate-500 shrink-0" />
+                                <Replace size={14} className="text-slate-400 shrink-0" />
                                 <input
                                   type="text"
                                   placeholder="Replace"
@@ -1387,11 +1398,11 @@ export const CopyBlock: React.FC<{
 
                         {/* Controls Row */}
                         <div className="flex items-center justify-between">
-                          <div className="text-[10px] text-slate-500 font-mono pl-1">
+                          <div className="text-[10px] text-slate-400 font-mono pl-1">
                             {matches.length > 0 ? `${currentMatchIdx + 1} of ${matches.length}` : 'No results'}
                           </div>
                           <div className="flex items-center gap-1">
-                            <button onClick={() => setShowReplace(!showReplace)} className={`p-1.5 rounded hover:bg-white/10 transition-colors ${showReplace ? 'text-slate-200' : 'text-slate-500'}`} title="Toggle Replace" aria-label="Toggle Replace">
+                            <button onClick={() => setShowReplace(!showReplace)} className={`p-1.5 rounded hover:bg-white/10 transition-colors ${showReplace ? 'text-slate-200' : 'text-slate-400'}`} title="Toggle Replace" aria-label="Toggle Replace">
                               <ChevronDown size={14} className={`transition-transform ${showReplace ? 'rotate-180' : ''}`} />
                             </button>
                             <div className="w-px h-3 bg-white/10 mx-1"></div>

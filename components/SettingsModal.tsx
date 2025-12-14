@@ -488,7 +488,7 @@ const SettingsModal: React.FC = () => {
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-bold text-white">{PROVIDERS[activeProvider].displayName}</h3>
-                                        <p className="text-xs text-slate-500">Select model tier below</p>
+                                        <p className="text-xs text-slate-400">Select model tier below</p>
                                     </div>
                                 </div>
                                 {/* Provider Switch Buttons */}
@@ -523,7 +523,7 @@ const SettingsModal: React.FC = () => {
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between mb-2">
                                         <label className="text-sm font-bold text-slate-200">Select Model</label>
-                                        <div className="text-xs text-slate-500">
+                                        <div className="text-xs text-slate-400">
                                             Access 100+ models via OpenRouter
                                         </div>
                                     </div>
@@ -651,7 +651,7 @@ const SettingsModal: React.FC = () => {
                                 {showAdvancedAI && (
                                     <div className="space-y-6 animate-fade-in pl-1">
                                         <div className="flex justify-between items-center">
-                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Fine-Tune Model</span>
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Fine-Tune Model</span>
                                             <button
                                                 onClick={handleResetDefaults}
                                                 className="flex items-center gap-1.5 text-[10px] text-primary-400 hover:text-primary-300 px-2 py-1 rounded bg-primary-900/10 border border-primary-500/20 hover:bg-primary-900/20 transition-colors"
@@ -669,18 +669,16 @@ const SettingsModal: React.FC = () => {
                                                 {/* Anthropic Dynamic Selection Logic */}
                                                 {isAnthropicProvider && (
                                                     <div className="space-y-4">
-                                                        <label className="text-sm font-bold text-slate-200 block">Specific Anthropic Model</label>
-                                                        <div className="text-xs text-slate-500 mb-2">Dynamically fetched from Anthropic API</div>
-
                                                         {isLoadingAnthropicModels ? (
-                                                            <div className="flex items-center justify-center p-4 text-slate-500 text-sm border border-slate-800 rounded-lg">
+                                                            <div className="flex items-center justify-center p-4 text-slate-400 text-sm border border-slate-800 rounded-lg">
                                                                 <RefreshCcw className="animate-spin mr-2" size={16} /> Loading Claude models...
                                                             </div>
                                                         ) : (
-                                                            <select
+                                                            <Select
+                                                                label="Specific Anthropic Model"
+                                                                rightLabel={<span className="text-xs text-slate-400 normal-case tracking-normal font-normal">Fetched from API</span>}
                                                                 value={selectedModelId}
                                                                 onChange={handleModelChange}
-                                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
                                                             >
                                                                 {anthropicModels.map(model => (
                                                                     <option key={model.id} value={model.id}>
@@ -692,7 +690,7 @@ const SettingsModal: React.FC = () => {
                                                                         {model.displayName}
                                                                     </option>
                                                                 ))}
-                                                            </select>
+                                                            </Select>
                                                         )}
                                                     </div>
                                                 )}
@@ -700,36 +698,28 @@ const SettingsModal: React.FC = () => {
                                                 {/* OpenAI Dynamic Selection Logic */}
                                                 {isOpenAIProvider && (
                                                     <div className="space-y-4">
-                                                        <label className="text-sm font-bold text-slate-200 block">Specific OpenAI Model</label>
-                                                        <div className="text-xs text-slate-500 mb-2">Dynamically fetched from OpenAI API</div>
-
                                                         {isLoadingOpenAIModels ? (
-                                                            <div className="flex items-center justify-center p-4 text-slate-500 text-sm border border-slate-800 rounded-lg">
+                                                            <div className="flex items-center justify-center p-4 text-slate-400 text-sm border border-slate-800 rounded-lg">
                                                                 <RefreshCcw className="animate-spin mr-2" size={16} /> Loading OpenAI models...
                                                             </div>
                                                         ) : (
-                                                            <select
+                                                            <Select
+                                                                label="Specific OpenAI Model"
+                                                                rightLabel={<span className="text-xs text-slate-400 normal-case tracking-normal font-normal">Fetched from API</span>}
                                                                 value={selectedModelId}
                                                                 onChange={handleModelChange}
-                                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
                                                             >
                                                                 {openAIModels.map(model => (
                                                                     <option key={model.id} value={model.id}>
                                                                         {model.id}
                                                                     </option>
                                                                 ))}
-                                                                {/* Add Static Fallbacks if API fails or specific static models desired? 
-                                                                    Actually the user said "Dynamically fetched from Gemini API" for Gemini. 
-                                                                    For OpenAI, "List models... Returns a list of model objects". 
-                                                                    So better to rely on dynamic list. 
-                                                                    But if empty (no key or error), show static?
-                                                                */}
                                                                 {openAIModels.length === 0 && providerModels.map(model => (
                                                                     <option key={model.id} value={model.id}>
                                                                         {model.displayName}
                                                                     </option>
                                                                 ))}
-                                                            </select>
+                                                            </Select>
                                                         )}
                                                     </div>
                                                 )}
@@ -737,34 +727,31 @@ const SettingsModal: React.FC = () => {
                                                 {/* Gemini Dynamic Selection Logic */}
                                                 {isGeminiProvider && (
                                                     <div className="space-y-4">
-                                                        <label className="text-sm font-bold text-slate-200 block">Specific Google Gemini Model</label>
-                                                        <div className="text-xs text-slate-500 mb-2">Dynamically fetched from Gemini API</div>
-
                                                         {isLoadingGeminiModels ? (
-                                                            <div className="flex items-center justify-center p-4 text-slate-500 text-sm border border-slate-800 rounded-lg">
+                                                            <div className="flex items-center justify-center p-4 text-slate-400 text-sm border border-slate-800 rounded-lg">
                                                                 <RefreshCcw className="animate-spin mr-2" size={16} /> Loading Gemini models...
                                                             </div>
                                                         ) : (
-                                                            <select
+                                                            <Select
+                                                                label="Specific Gemini Model"
+                                                                rightLabel={<span className="text-xs text-slate-400 normal-case tracking-normal font-normal">Fetched from API</span>}
                                                                 value={selectedModelId}
                                                                 onChange={handleModelChange}
-                                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
                                                             >
                                                                 {geminiModels.map(model => (
                                                                     <option key={model.name} value={model.name.replace('models/', '')}>
                                                                         {model.displayName} ({model.version})
                                                                     </option>
                                                                 ))}
-                                                                {/* Fallback */}
                                                                 {geminiModels.length === 0 && (
                                                                     <option value={selectedModelId}>{selectedModelId}</option>
                                                                 )}
-                                                            </select>
+                                                            </Select>
                                                         )}
 
                                                         {/* Gemini Features moved here per "easy mode" request */}
                                                         <div className="space-y-4 pt-4 border-t border-slate-800/50">
-                                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Gemini Features</span>
+                                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Gemini Features</span>
 
                                                             <div className="p-3 bg-slate-900/50 rounded-lg border border-slate-800/50">
                                                                 <div className="flex items-center gap-2 mb-2">
@@ -859,7 +846,7 @@ const SettingsModal: React.FC = () => {
 
                                 {/* Generation Parameters */}
                                 <div className="space-y-4">
-                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Generation Parameters</span>
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Generation Parameters</span>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className={`p-3 bg-slate-950/50 rounded-lg border border-slate-800/50 ${!supportsTemperature ? 'opacity-50 grayscale' : ''}`}>
                                             <div className="flex items-center justify-between mb-2">
@@ -923,7 +910,7 @@ const SettingsModal: React.FC = () => {
 
                                             <div className="space-y-4 p-4 bg-slate-950/50 rounded-xl border border-slate-800/50">
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                                                         {PROVIDERS[activeProvider].displayName} Expert
                                                     </span>
                                                     <button
@@ -1045,7 +1032,7 @@ const SettingsModal: React.FC = () => {
 
                                                                 {capabilities.supportsReasoningMaxTokens && (
                                                                     <div>
-                                                                        <div className="flex justify-between text-[9px] text-slate-500 mb-1">
+                                                                        <div className="flex justify-between text-[9px] text-slate-400 mb-1">
                                                                             <span>Reasoning Tokens</span>
                                                                             <span className="font-mono text-amber-500/80">{expertReasoningMaxTokens || 'Default'}</span>
                                                                         </div>
@@ -1185,7 +1172,7 @@ const SettingsModal: React.FC = () => {
                                 </div>
                                 <div className="flex-1">
                                     <label className="font-medium text-slate-300 block text-xs">Default Persona</label>
-                                    <p className="text-[10px] text-slate-500">Skip selection screen</p>
+                                    <p className="text-[10px] text-slate-400">Skip selection screen</p>
                                 </div>
                                 <div className="w-32">
                                     <Select
@@ -1208,7 +1195,7 @@ const SettingsModal: React.FC = () => {
                                 </div>
                                 <div className="flex-1">
                                     <label className="font-medium text-slate-300 block text-xs">Notifications</label>
-                                    <p className="text-[10px] text-slate-500">Toast position</p>
+                                    <p className="text-[10px] text-slate-400">Toast position</p>
                                 </div>
                                 <div className="w-32">
                                     <Select
@@ -1231,7 +1218,7 @@ const SettingsModal: React.FC = () => {
                                 </div>
                                 <div className="flex-1">
                                     <label className="font-medium text-slate-300 block text-xs">Auto-Save</label>
-                                    <p className="text-[10px] text-slate-500">Interval (ms)</p>
+                                    <p className="text-[10px] text-slate-400">Interval (ms)</p>
                                 </div>
                                 <div className="w-32 flex items-center gap-2">
                                     <input
@@ -1252,7 +1239,7 @@ const SettingsModal: React.FC = () => {
                                         </div>
                                         <div>
                                             <label className="font-medium text-slate-300 block text-xs">Reduced Motion</label>
-                                            <p className="text-[10px] text-slate-500">Disable heavy animations.</p>
+                                            <p className="text-[10px] text-slate-400">Disable heavy animations.</p>
                                         </div>
                                     </div>
                                     <label className="relative inline-flex items-center cursor-pointer">
@@ -1273,7 +1260,7 @@ const SettingsModal: React.FC = () => {
                                         </div>
                                         <div>
                                             <label className="font-medium text-slate-300 block text-xs">Usage Analytics</label>
-                                            <p className="text-[10px] text-slate-500">Help improve Vibe Coding.</p>
+                                            <p className="text-[10px] text-slate-400">Help improve Vibe Coding.</p>
                                         </div>
                                     </div>
                                     <label className="relative inline-flex items-center cursor-pointer">
@@ -1301,7 +1288,7 @@ const SettingsModal: React.FC = () => {
                                 </div>
                                 <div className="flex-1">
                                     <label className="font-medium text-slate-300 block text-xs">Default Export Format</label>
-                                    <p className="text-[10px] text-slate-500">Kit download type</p>
+                                    <p className="text-[10px] text-slate-400">Kit download type</p>
                                 </div>
                                 <div className="w-32">
                                     <Select

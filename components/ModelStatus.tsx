@@ -109,7 +109,9 @@ export const ModelStatus: React.FC = () => {
     };
 
     return (
-        <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-1 flex flex-wrap items-center gap-4 text-xs font-mono text-slate-400 mb-6 shadow-sm">
+        <div className="bg-glass-100 backdrop-blur-xl border border-glass-border rounded-2xl p-2 flex flex-wrap items-center gap-4 text-xs font-mono text-slate-400 mb-8 shadow-sm relative overflow-hidden">
+            {/* Subtle gradient sheen */}
+            <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent opacity-50 pointer-events-none" />
 
             {/* Provider & Model Label */}
             <Tooltip content={`Provider: ${providerInfo.provider.displayName}\nModel: ${providerInfo.modelId}\nInput: $${providerInfo.modelConfig?.inputCostPerMillion || '?'}/1M\nOutput: $${providerInfo.modelConfig?.outputCostPerMillion || '?'}/1M`}>

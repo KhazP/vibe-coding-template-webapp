@@ -160,7 +160,7 @@ const Projects: React.FC = () => {
 
                 <h3 className="text-lg font-bold text-white mb-2 truncate pr-8">{project.name}</h3>
 
-                <div className="flex items-center gap-4 text-xs text-slate-500 mb-6">
+                <div className="flex items-center gap-4 text-xs text-slate-400 mb-6">
                   <div className="flex items-center gap-1">
                     <User size={12} />
                     <span>{getPersonaLabel(project.persona)}</span>
@@ -217,10 +217,10 @@ const Projects: React.FC = () => {
           {/* Create New Card (Empty State) */}
           <button
             onClick={openCreateModal}
-            className="flex flex-col items-center justify-center p-6 rounded-2xl border border-dashed border-white/10 bg-white/5 hover:bg-white/10 hover:border-primary-500/30 text-slate-400 hover:text-white transition-all min-h-[200px] group"
+            className="flex flex-col items-center justify-center p-6 rounded-2xl border border-dashed border-white/10 bg-glass-100 hover:bg-glass-200 hover:border-primary-500/30 text-slate-400 hover:text-primary-400 transition-all min-h-[200px] group"
           >
-            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <Plus size={24} className="text-primary-400" />
+            <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-lg shadow-black/20">
+              <Plus size={24} className="text-slate-400 group-hover:text-primary-400 transition-colors" />
             </div>
             <span className="font-medium">Create New Project</span>
           </button>

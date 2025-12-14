@@ -338,6 +338,20 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           {/* Action Bar */}
           <div className="flex flex-col gap-2 mb-4">
             <a
+              href="https://www.buymeacoffee.com/alpyalayg"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full"
+            >
+              <Button
+                variant="secondary"
+                className="w-full text-xs h-10 justify-start border-white/10 hover:brightness-110 px-3 text-white hover:text-white"
+                style={{ backgroundColor: '#0d4921' }}
+              >
+                <span className="text-base">☕</span> <span className="ml-2">Buy me a coffee</span>
+              </Button>
+            </a>
+            <a
               href="https://github.com/KhazP/vibe-coding-prompt-template"
               target="_blank"
               rel="noopener noreferrer"
