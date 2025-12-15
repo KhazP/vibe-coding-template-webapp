@@ -70,6 +70,11 @@ Instead of manually copy-pasting prompts into ChatGPT or Claude, this web app au
 - Includes all agent configs and the universal `AGENTS.md`
 - Launch protocol checklists for deployment
 
+### 🔐 Privacy & Security
+- **Your API keys stay with you** – stored only in your browser's [localStorage](utils/providerStorage.ts#L67-L83)
+- **Zero backend** – all AI calls go directly from your browser to the provider
+- **We never see your keys** – no server, no database, no tracking
+
 ---
 
 ##  The 5-Step Workflow
