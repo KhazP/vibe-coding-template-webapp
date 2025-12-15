@@ -560,7 +560,7 @@ const Part1Research: React.FC = React.memo(() => {
           )}
 
           {/* Action Area - Sticky on mobile for easy access */}
-          <div className="pt-4 border-t border-white/5 md:static fixed bottom-0 left-0 right-0 md:border-t md:bg-transparent md:p-0 md:pb-0 bg-slate-950/95 backdrop-blur-xl p-4 pb-6 z-40 border-t border-white/10 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] md:shadow-none">
+          <div className="pt-4 border-t border-white/5 md:static fixed bottom-0 left-0 right-0 md:border-t md:bg-transparent md:p-0 md:pb-0 bg-slate-950/95 backdrop-blur-xl p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] z-40 border-t border-white/10 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] md:shadow-none">
             {researchMethod === 'in-app' ? (
               <Button
                 onClick={handleRunResearch}

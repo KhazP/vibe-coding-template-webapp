@@ -138,111 +138,122 @@ export const ModelStatus: React.FC = () => {
     if (isDismissed) return null;
 
     return (
-        <div className="bg-glass-100 backdrop-blur-xl border border-glass-border rounded-2xl p-2 flex flex-wrap items-center gap-4 text-xs font-mono text-slate-400 mb-8 shadow-sm relative">
+        <div className="bg-glass-100 backdrop-blur-xl border border-glass-border rounded-2xl p-2 md:p-2 text-xs font-mono text-slate-400 mb-4 md:mb-8 shadow-sm relative">
             {/* Subtle gradient sheen */}
-            <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent opacity-50 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent opacity-50 pointer-events-none rounded-2xl" />
 
-            {/* Provider & Model Label */}
-            <Tooltip content={`Provider: ${providerInfo.provider.displayName}\nModel: ${providerInfo.modelId}\nInput: $${providerInfo.modelConfig?.inputCostPerMillion || '?'}/1M\nOutput: $${providerInfo.modelConfig?.outputCostPerMillion || '?'}/1M`}>
-                <div className="flex items-center gap-2 px-3 py-2 bg-slate-800/50 rounded-lg border border-white/5 cursor-help">
-                    <img
-                        src={providerInfo.provider.logoPath}
-                        alt={providerInfo.provider.displayName}
-                        className="w-4 h-4 object-contain"
-                    />
-                    <span className="text-slate-200 max-w-[120px] truncate" title={providerInfo.modelDisplayName}>
-                        {providerInfo.modelDisplayName}
-                    </span>
+            {/* Mobile Layout: compact rows | Desktop: Single row with config on right */}
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4">
+
+                {/* Left section: Provider + Context Bar */}
+                <div className="flex items-center gap-2 md:gap-3 flex-wrap flex-1">
+                    {/* Provider & Model Label - Compact on mobile */}
+                    <Tooltip content={`Provider: ${providerInfo.provider.displayName}\nModel: ${providerInfo.modelId}\nInput: $${providerInfo.modelConfig?.inputCostPerMillion || '?'}/1M\nOutput: $${providerInfo.modelConfig?.outputCostPerMillion || '?'}/1M`}>
+                        <div className="flex items-center gap-1.5 md:gap-2 px-2 py-1 md:py-1.5 bg-slate-800/50 rounded-lg border border-white/5 cursor-help min-h-[36px] md:min-h-0">
+                            <img
+                                src={providerInfo.provider.logoPath}
+                                alt={providerInfo.provider.displayName}
+                                className="w-4 h-4 object-contain"
+                            />
+                            <span className="text-slate-200 max-w-[90px] md:max-w-[120px] truncate text-xs" title={providerInfo.modelDisplayName}>
+                                {providerInfo.modelDisplayName}
+                            </span>
+                            {providerInfo.modelConfig && (
+                                <span className="hidden md:inline text-[10px] text-emerald-400/70 font-mono">
+                                    ${providerInfo.modelConfig.inputCostPerMillion}/1M
+                                </span>
+                            )}
+                        </div>
+                    </Tooltip>
+
+                    {/* Context Health Bar */}
+                    <Tooltip content={`Current Context: ${tokenCount.toLocaleString()} / ${modelContextLimit.toLocaleString()} tokens. ${healthStatus === 'Heavy' ? 'High latency expected.' : ''}`}>
+                        <div className="flex flex-col gap-0.5 flex-1 min-w-[80px] md:w-40 px-1 cursor-help">
+                            <div className="flex justify-between items-center text-[10px] uppercase tracking-wider font-bold">
+                                <span className="flex items-center gap-1">
+                                    Context {isCounting && <RefreshCw size={8} className="animate-spin ml-1" />}
+                                </span>
+                                <span className={healthStatus === 'Critical' ? 'text-red-400' : healthStatus === 'Heavy' ? 'text-amber-400' : 'text-emerald-400'}>
+                                    {Math.round(contextUsagePercent)}%
+                                </span>
+                            </div>
+                            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${contextUsagePercent}%` }}
+                                    className={`h-full ${healthColor}`}
+                                    transition={{ duration: 0.5 }}
+                                />
+                            </div>
+                        </div>
+                    </Tooltip>
+
+                    {/* Optimize Action (Only if heavy) */}
+                    <AnimatePresence>
+                        {healthStatus !== 'Healthy' && (
+                            <motion.button
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.8 }}
+                                onClick={handleOptimizeContext}
+                                className="flex items-center gap-1 px-2 py-1 rounded bg-amber-900/20 border border-amber-500/20 text-amber-400 hover:bg-amber-900/40 transition-colors min-h-[36px] md:min-h-0"
+                            >
+                                <AlertCircle size={12} />
+                                <span className="text-xs">Check</span>
+                            </motion.button>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Middle section: Stats (desktop: visible, mobile: compact row) */}
+                <div className="flex items-center gap-2 md:gap-3 overflow-x-auto scrollbar-none border-t md:border-t-0 md:border-l border-white/5 pt-1.5 md:pt-0 md:pl-3">
+                    {settings.thinkingBudget > 0 && providerInfo.providerId === 'gemini' && (
+                        <div className="flex items-center gap-1 text-slate-300 shrink-0">
+                            <BrainCircuit size={12} className="text-purple-400" />
+                            <span className="text-xs">{(settings.thinkingBudget / 1024).toFixed(0)}k</span>
+                        </div>
+                    )}
+
+                    {settings.useGrounding && providerInfo.providerId === 'gemini' && (
+                        <div className="flex items-center gap-1 text-slate-300 shrink-0">
+                            <Search size={12} className="text-blue-400" />
+                        </div>
+                    )}
+
+                    {/* Cost Estimator */}
+                    <Tooltip content={`Total Session Usage:\nInput: ${tokenUsage?.input.toLocaleString()}\nOutput: ${tokenUsage?.output.toLocaleString()}\nGrounding: ${tokenUsage?.groundingRequests || 0}`}>
+                        <div className="flex items-center gap-1 text-emerald-400 bg-emerald-950/20 px-1.5 py-1 rounded border border-emerald-500/10 cursor-help shrink-0">
+                            <DollarSign size={10} />
+                            <span className="text-xs">${costString}</span>
+                        </div>
+                    </Tooltip>
+
+                    {/* Mobile price indicator */}
                     {providerInfo.modelConfig && (
-                        <span className="text-[10px] text-emerald-400/70 font-mono">
-                            ${providerInfo.modelConfig.inputCostPerMillion}/1M
-                        </span>
+                        <div className="flex md:hidden items-center gap-1 text-[10px] text-emerald-400/70 font-mono shrink-0">
+                            <span>${providerInfo.modelConfig.inputCostPerMillion}/1M in</span>
+                        </div>
                     )}
                 </div>
-            </Tooltip>
 
-            {/* Context Health Bar (Smart Indicator) */}
-            <Tooltip content={`Current Context: ${tokenCount.toLocaleString()} / ${modelContextLimit.toLocaleString()} tokens. ${healthStatus === 'Heavy' ? 'High latency expected.' : ''}`}>
-                <div className="flex flex-col gap-1 w-32 md:w-48 px-2 py-1 cursor-help">
-                    <div className="flex justify-between items-center text-[10px] uppercase tracking-wider font-bold">
-                        <span className="flex items-center gap-1">
-                            Context {isCounting && <RefreshCw size={8} className="animate-spin ml-1" />}
-                        </span>
-                        <span className={healthStatus === 'Critical' ? 'text-red-400' : healthStatus === 'Heavy' ? 'text-amber-400' : 'text-emerald-400'}>
-                            {Math.round(contextUsagePercent)}%
-                        </span>
-                    </div>
-                    <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                        <motion.div
-                            initial={{ width: 0 }}
-                            animate={{ width: `${contextUsagePercent}%` }}
-                            className={`h-full ${healthColor}`}
-                            transition={{ duration: 0.5 }}
-                        />
-                    </div>
-                </div>
-            </Tooltip>
-
-            {/* Optimize Action (Only if heavy) */}
-            <AnimatePresence>
-                {healthStatus !== 'Healthy' && (
-                    <motion.button
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.8 }}
-                        onClick={handleOptimizeContext}
-                        className="flex items-center gap-1 px-2 py-1 rounded bg-amber-900/20 border border-amber-500/20 text-amber-400 hover:bg-amber-900/40 transition-colors"
-                    >
-                        <AlertCircle size={12} />
-                        <span>Check</span>
-                    </motion.button>
-                )}
-            </AnimatePresence>
-
-            {/* Stats */}
-            <div className="flex items-center gap-4 px-2 overflow-x-auto whitespace-nowrap border-l border-white/5 pl-4">
-                {settings.thinkingBudget > 0 && providerInfo.providerId === 'gemini' && (
-                    <div className="flex items-center gap-1.5 text-slate-300">
-                        <BrainCircuit size={14} className="text-purple-400" />
-                        <span className="hidden md:inline">{settings.thinkingBudget.toLocaleString()} think</span>
-                    </div>
-                )}
-
-                {settings.useGrounding && providerInfo.providerId === 'gemini' && (
-                    <div className="flex items-center gap-1.5 text-slate-300">
-                        <Search size={14} className="text-blue-400" />
-                        <span className="hidden md:inline">Grounding</span>
-                    </div>
-                )}
-
-                {/* Cost Estimator */}
-                <Tooltip content={`Total Session Usage:\nInput: ${tokenUsage?.input.toLocaleString()}\nOutput: ${tokenUsage?.output.toLocaleString()}\nGrounding: ${tokenUsage?.groundingRequests || 0}`}>
-                    <div className="flex items-center gap-1.5 text-emerald-400 bg-emerald-950/20 px-2 py-1 rounded border border-emerald-500/10 cursor-help">
-                        <DollarSign size={12} />
-                        <span>{costString}</span>
-                    </div>
-                </Tooltip>
-            </div>
-
-            {/* Configure Button */}
-            <div className="ml-auto flex items-center gap-2">
-                <Tooltip content="Adjust intelligence, speed, and thinking depth.">
+                {/* Right section: Configure and Close buttons - always on right */}
+                <div className="flex items-center gap-1 shrink-0 md:ml-auto md:border-l border-white/5 md:pl-3">
                     <button
                         onClick={() => setIsSettingsOpen(true)}
-                        className="flex items-center gap-2 hover:bg-white/10 transition-colors px-3 py-2 rounded-lg text-slate-300 hover:text-white group border border-transparent hover:border-white/10"
+                        className="flex items-center justify-center gap-1.5 hover:bg-white/10 active:bg-white/20 transition-colors p-2 md:px-2.5 md:py-1.5 rounded-lg text-slate-300 hover:text-white group border border-transparent hover:border-white/10 min-h-[36px] md:min-h-0"
+                        aria-label="Configure"
                     >
                         <Settings size={14} className="group-hover:rotate-45 transition-transform duration-500" />
-                        <span>Configure</span>
+                        <span className="hidden md:inline text-xs">Configure</span>
                     </button>
-                </Tooltip>
-                <Tooltip content="Hide this bar. Re-enable in Settings > General.">
                     <button
                         onClick={handleDismiss}
-                        className="p-2 hover:bg-white/10 transition-colors rounded-lg text-slate-500 hover:text-slate-300 border border-transparent hover:border-white/10"
+                        className="p-2 hover:bg-white/10 active:bg-white/20 transition-colors rounded-lg text-slate-500 hover:text-slate-300 border border-transparent hover:border-white/10 min-h-[36px] md:min-h-0"
+                        aria-label="Hide status bar"
                     >
                         <X size={14} />
                     </button>
-                </Tooltip>
+                </div>
             </div>
         </div>
     );

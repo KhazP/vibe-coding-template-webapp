@@ -214,12 +214,12 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-[#050505]/90 backdrop-blur-xl border-b border-white/5 p-4 flex items-center justify-between shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className="relative w-8 h-8 bg-gradient-to-br from-primary-600 to-primary-900 rounded-lg flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] border border-white/10 shrink-0">
-            <Zap className="text-white relative z-10" size={16} />
+        <Link to="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <div className="relative w-8 h-8 rounded-lg flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] border border-white/10 shrink-0 overflow-hidden">
+            <img src="/favicon.svg" alt="Vibe-Coding Workflow" className="w-full h-full object-cover" />
           </div>
-          <span className="font-bold text-sm text-white leading-tight tracking-tight font-display">Vibe Workflow</span>
-        </div>
+          <span className="font-bold text-sm text-white leading-tight tracking-tight font-display">Vibe-Coding Workflow</span>
+        </Link>
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/5">
           {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
@@ -338,15 +338,15 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       {/* Glass Sidebar (Desktop) */}
       <aside className="w-72 hidden md:flex flex-col fixed h-full z-30 border-r border-white/5 bg-[#050505]/60 backdrop-blur-2xl">
         <div className="p-8 pb-4">
-          <div className="flex items-center gap-3 mb-12">
-            <div className="relative w-10 h-10 bg-gradient-to-br from-primary-600 to-primary-900 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] border border-white/10 shrink-0">
-              <Zap className="text-white relative z-10" size={20} />
+          <Link to="/" className="flex items-center gap-3 mb-12 hover:opacity-80 transition-opacity">
+            <div className="relative w-10 h-10 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(16,185,129,0.2)] border border-white/10 shrink-0 overflow-hidden">
+              <img src="/favicon.svg" alt="Vibe-Coding Workflow" className="w-full h-full object-cover" />
             </div>
             <div className="min-w-0">
-              <h1 className="font-bold text-sm text-white leading-tight tracking-tight font-display">Vibe Prompt Template</h1>
-              <p className="text-[10px] text-primary-400/80 font-mono tracking-widest uppercase mt-1">Workflow 2025</p>
+              <h1 className="font-bold text-sm text-white leading-tight tracking-tight font-display">Vibe-Coding Workflow</h1>
+              <p className="text-[10px] text-primary-400/80 font-mono tracking-widest uppercase mt-1">2025</p>
             </div>
-          </div>
+          </Link>
 
           <LayoutGroup id="sidebar">
             {/* Projects Section */}
@@ -423,7 +423,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
       {/* Main Content Area */}
       <main className="flex-1 relative z-20 h-screen overflow-y-auto overflow-x-hidden scroll-smooth pt-20 md:pt-0 md:ml-72 transition-all duration-500 ease-in-out">
-        <div className="max-w-6xl mx-auto p-4 md:p-12 pb-32">
+        <div className="max-w-6xl mx-auto p-4 md:p-12 pb-16 md:pb-24">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
             <div className="hidden md:block">

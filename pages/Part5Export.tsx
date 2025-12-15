@@ -453,7 +453,7 @@ Your AI agent will use this as its primary context.
             <ModelStatus />
 
             {/* Main Two Column Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 items-start">
 
                 {/* Left Column: The Kit */}
                 <div className="space-y-6">
@@ -544,15 +544,16 @@ Your AI agent will use this as its primary context.
                             </div>
                         </div>
 
-                        <div className="flex gap-2">
-                            <Button onClick={handleExport} className="flex-1 group">
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <Button onClick={handleExport} className="flex-1 group min-h-[48px] md:min-h-0">
                                 {isZipDefault ? <Download size={18} className="group-hover:-translate-y-1 transition-transform" /> : <Copy size={18} />}
                                 {isZipDefault ? "Download Kit (.zip)" : "Copy Full Markdown"}
                             </Button>
 
                             {/* Secondary Option Button */}
-                            <Button onClick={isZipDefault ? handleCopyAllMarkdown : handleDownloadZip} variant="secondary" className="px-3" tooltip={isZipDefault ? "Copy Markdown" : "Download ZIP"}>
+                            <Button onClick={isZipDefault ? handleCopyAllMarkdown : handleDownloadZip} variant="secondary" className="px-4 sm:px-3 min-h-[48px] md:min-h-0" tooltip={isZipDefault ? "Copy Markdown" : "Download ZIP"}>
                                 {isZipDefault ? <Copy size={18} /> : <Download size={18} />}
+                                <span className="sm:hidden ml-2">{isZipDefault ? "Copy Markdown" : "Download ZIP"}</span>
                             </Button>
                         </div>
                     </GlassCard>
@@ -568,11 +569,11 @@ Your AI agent will use this as its primary context.
                     </div>
 
                     <GlassCard className="h-full flex flex-col">
-                        {/* Protocol Tabs */}
-                        <div className="flex border-b border-white/10 mb-6 overflow-x-auto custom-scrollbar pb-1">
+                        {/* Protocol Tabs - Mobile optimized */}
+                        <div className="flex border-b border-white/10 mb-4 md:mb-6 overflow-x-auto scrollbar-none -mx-2 px-2 md:mx-0 md:px-0">
                             <button
                                 onClick={() => setActiveTab('index')}
-                                className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap ${activeTab === 'index' ? 'border-blue-400 text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+                                className={`px-3 md:px-4 py-3 md:py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap min-h-[44px] md:min-h-0 ${activeTab === 'index' ? 'border-blue-400 text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-300 active:text-slate-200'}`}
                             >
                                 Index
                             </button>
@@ -580,7 +581,7 @@ Your AI agent will use this as its primary context.
                                 <button
                                     key={t.id}
                                     onClick={() => setActiveTab(t.id)}
-                                    className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap ${activeTab === t.id ? 'border-primary-400 text-primary-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}
+                                    className={`px-3 md:px-4 py-3 md:py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-colors whitespace-nowrap min-h-[44px] md:min-h-0 ${activeTab === t.id ? 'border-primary-400 text-primary-400' : 'border-transparent text-slate-500 hover:text-slate-300 active:text-slate-200'}`}
                                 >
                                     {t.name}
                                 </button>

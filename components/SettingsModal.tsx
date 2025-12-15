@@ -446,13 +446,13 @@ const SettingsModal: React.FC = () => {
         return (
             <button
                 onClick={() => setActiveTab(id)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-r-xl transition-all duration-200 w-full text-left border-l-2 ${activeTab === id
+                className={`flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 rounded-xl md:rounded-r-xl md:rounded-l-none transition-all duration-200 md:w-full text-left md:border-l-2 border-0 md:border-l-2 shrink-0 min-h-[44px] ${activeTab === id
                     ? isReset
-                        ? 'bg-red-500/20 text-red-300 border-red-400 shadow-[inset_0_0_12px_rgba(239,68,68,0.15)]'
-                        : 'bg-primary-500/20 text-primary-300 border-primary-400 shadow-[inset_0_0_12px_rgba(16,185,129,0.15)]'
+                        ? 'bg-red-500/20 text-red-300 md:border-red-400 border-red-400 shadow-[inset_0_0_12px_rgba(239,68,68,0.15)]'
+                        : 'bg-primary-500/20 text-primary-300 md:border-primary-400 border-primary-400 shadow-[inset_0_0_12px_rgba(16,185,129,0.15)]'
                     : isReset
-                        ? 'text-red-500/60 hover:text-red-400 hover:bg-red-500/5 border-transparent'
-                        : 'text-slate-500 hover:text-slate-200 hover:bg-white/5 border-transparent'
+                        ? 'text-red-500/60 hover:text-red-400 hover:bg-red-500/5 md:border-transparent'
+                        : 'text-slate-500 hover:text-slate-200 hover:bg-white/5 md:border-transparent'
                     }`}
             >
                 {React.cloneElement(icon as React.ReactElement<any>, {
@@ -461,55 +461,53 @@ const SettingsModal: React.FC = () => {
                         ? isReset ? 'text-red-400' : 'text-primary-400'
                         : isReset ? 'text-red-500/60' : 'text-slate-500'
                 })}
-                <span className={`font-medium text-sm ${activeTab === id ? (isReset ? 'text-red-300' : 'text-primary-300') : ''}`}>{label}</span>
+                <span className={`font-medium text-xs md:text-sm whitespace-nowrap ${activeTab === id ? (isReset ? 'text-red-300' : 'text-primary-300') : ''}`}>{label}</span>
             </button>
         );
     };
 
     return (
         <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="Global Settings" maxWidth="max-w-5xl">
-            <div className="flex flex-col md:flex-row gap-6 md:h-[600px]">
-                {/* Sidebar Navigation */}
-                <div className="w-full md:w-48 shrink-0 flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-visible pb-2 md:pb-0 md:pr-4 md:border-r border-white/10">
-                    <TabButton id="ai" icon={<BrainCircuit size={18} />} label="AI Brain" />
+            <div className="flex flex-col md:flex-row gap-3 md:gap-6 md:h-[600px] max-h-[75vh] md:max-h-none">
+                {/* Sidebar Navigation - Horizontal scroll on mobile, vertical on desktop */}
+                <div className="w-full md:w-48 shrink-0 flex flex-row md:flex-col gap-1 md:gap-2 overflow-x-auto scrollbar-none -mx-1 px-1 md:mx-0 md:px-0 pb-2 md:pb-0 md:pr-4 md:border-r border-b md:border-b-0 border-white/10">
+                    <TabButton id="ai" icon={<BrainCircuit size={18} />} label="AI" />
                     <TabButton id="general" icon={<Layout size={18} />} label="General" />
                     <TabButton id="export" icon={<Download size={18} />} label="Export" />
-                    <div className="flex-1" />
+                    <div className="hidden md:flex flex-1" />
                     <TabButton id="reset" icon={<RotateCcw size={18} />} label="Reset" />
                 </div>
 
                 {/* Content Area */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 -mr-2 pb-4">
+                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 -mr-2 pb-2">
 
                     {/* --- AI Config Tab --- */}
                     {activeTab === 'ai' && (
-                        <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
-                            <div className="flex items-start gap-4 p-4 bg-primary-900/10 border border-primary-500/20 rounded-xl">
-                                <Zap className="text-primary-400 shrink-0 mt-1" size={20} />
-                                <div>
-                                    <p className="text-sm text-slate-300">
-                                        Configure the <strong>Global Brain</strong>. These settings control intelligence, speed, and reasoning depth.
-                                    </p>
-                                </div>
+                        <div className="space-y-4 md:space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+                            <div className="flex items-start gap-3 p-3 bg-primary-900/10 border border-primary-500/20 rounded-xl">
+                                <Zap className="text-primary-400 shrink-0 mt-0.5" size={18} />
+                                <p className="text-xs md:text-sm text-slate-300">
+                                    Configure the <strong>Global Brain</strong>. These settings control intelligence, speed, and reasoning depth.
+                                </p>
                             </div>
 
                             {/* Provider Header with Logo */}
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-slate-900 border border-white/10 flex items-center justify-center">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-slate-900 border border-white/10 flex items-center justify-center shrink-0">
                                         <img
                                             src={PROVIDERS[activeProvider].logoPath}
                                             alt={PROVIDERS[activeProvider].displayName}
-                                            className="w-6 h-6 object-contain"
+                                            className="w-5 h-5 md:w-6 md:h-6 object-contain"
                                         />
                                     </div>
                                     <div>
-                                        <h3 className="text-sm font-bold text-white">{PROVIDERS[activeProvider].displayName}</h3>
-                                        <p className="text-xs text-slate-400">Select model tier below</p>
+                                        <h3 className="text-xs md:text-sm font-bold text-white">{PROVIDERS[activeProvider].displayName}</h3>
+                                        <p className="text-[10px] md:text-xs text-slate-400">Select model tier below</p>
                                     </div>
                                 </div>
-                                {/* Provider Switch Buttons */}
-                                <div className="flex gap-1 bg-slate-900/50 rounded-lg p-1 border border-white/5">
+                                {/* Provider Switch Buttons - Scrollable on mobile */}
+                                <div className="flex gap-1 bg-slate-900/50 rounded-lg p-1 border border-white/5 overflow-x-auto scrollbar-none">
                                     {(['gemini', 'openai', 'anthropic', 'openrouter'] as ProviderId[]).map((pid) => {
                                         const hasKey = providerKeys[pid];
                                         const isActive = activeProvider === pid;
@@ -519,9 +517,9 @@ const SettingsModal: React.FC = () => {
                                                 key={pid}
                                                 onClick={() => handleProviderChange(pid)}
                                                 disabled={!hasKey}
-                                                className={`p-2 rounded-md transition-all ${isActive
+                                                className={`p-2 rounded-md transition-all min-w-[36px] min-h-[36px] flex items-center justify-center ${isActive
                                                     ? 'bg-primary-500/20 border border-primary-500/30'
-                                                    : 'hover:bg-white/5'
+                                                    : 'hover:bg-white/5 active:bg-white/10'
                                                     } ${!hasKey ? 'opacity-75 grayscale pointer-events-none cursor-not-allowed' : ''}`}
                                                 title={hasKey ? PROVIDERS[pid].displayName : `${PROVIDERS[pid].displayName} (No API Key)`}
                                             >
@@ -558,8 +556,8 @@ const SettingsModal: React.FC = () => {
 
                             ) : (
                                 <div>
-                                    <label className="block text-sm font-bold text-slate-200 mb-4">Model Tier</label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <label className="block text-xs md:text-sm font-bold text-slate-200 mb-3">Model Tier</label>
+                                    <div className="grid grid-cols-3 gap-2 md:gap-3">
                                         {(['fast', 'mid', 'complex'] as const).map((tier) => {
                                             const tierModels = providerModels.filter(m => m.tier === tier);
                                             const model = tierModels[0];
@@ -583,33 +581,33 @@ const SettingsModal: React.FC = () => {
                                                         // Update global settings.modelName for ALL providers
                                                         updateSettings({ modelName: model.id, preset: 'custom' });
                                                     }}
-                                                    className={`relative text-left p-4 rounded-xl border transition-all duration-300 group ${isActive
+                                                    className={`relative text-left p-2 md:p-3 rounded-lg md:rounded-xl border transition-all duration-300 group ${isActive
                                                         ? 'bg-primary-500/10 border-primary-500 ring-1 ring-primary-500/50 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
                                                         : 'bg-slate-900/50 border-white/10 hover:border-white/20 hover:bg-slate-800'
                                                         }`}
                                                 >
                                                     {/* Tier Header */}
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-lg">{tierInfo.icon}</span>
-                                                            <span className={`text-sm font-bold ${isActive ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <div className="flex items-center gap-1 md:gap-2">
+                                                            <span className="text-sm md:text-lg">{tierInfo.icon}</span>
+                                                            <span className={`text-xs md:text-sm font-bold ${isActive ? 'text-white' : 'text-slate-300 group-hover:text-white'}`}>
                                                                 {tierInfo.label}
                                                             </span>
                                                         </div>
-                                                        {isActive && <Check size={16} className="text-primary-400" />}
+                                                        {isActive && <Check size={14} className="text-primary-400" />}
                                                     </div>
 
                                                     {/* Model Name */}
-                                                    <p className="text-xs text-slate-400 mb-2 truncate" title={model.displayName}>
+                                                    <p className="text-[10px] md:text-xs text-slate-400 mb-1 truncate" title={model.displayName}>
                                                         {model.displayName}
                                                     </p>
 
                                                     {/* Cost Indicator */}
-                                                    <div className="flex items-center gap-1.5 mt-auto">
-                                                        <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-[9px] md:text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-1 py-0.5 rounded">
                                                             ${model.inputCostPerMillion.toFixed(2)}/1M
                                                         </span>
-                                                        <span className="text-[10px] text-slate-600">in</span>
+                                                        <span className="text-[9px] md:text-[10px] text-slate-600 hidden md:inline">in</span>
                                                     </div>
                                                 </button>
                                             );

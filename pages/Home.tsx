@@ -102,22 +102,22 @@ const Home: React.FC = () => {
           initial={{ opacity: 0, y: 40, filter: 'blur(10px)' }}
           animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
           transition={{ duration: 0.8, ease: "easeOut" }}
-          className="mb-20 text-center md:text-left pt-10"
+          className="mb-12 md:mb-20 text-center md:text-left pt-6 md:pt-10"
         >
-          <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-surface/80 border border-white/10 text-primary-300 text-xs font-mono tracking-widest uppercase mb-8 shadow-lg shadow-black/50">
+          <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-surface/80 border border-white/10 text-primary-300 text-xs font-mono tracking-widest uppercase mb-6 md:mb-8 shadow-lg shadow-black/50">
             <span className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
             Vibe-Coding V2.1
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-bold text-white mb-8 leading-[1.1] font-display tracking-tight">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-white mb-6 md:mb-8 leading-[1.1] font-display tracking-tight">
             KhazP / <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 via-secondary-400 to-primary-600 drop-shadow-[0_0_30px_rgba(16,185,129,0.3)]">
               vibe-coding-prompt-template
             </span>
           </h1>
 
-          <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
-            <p className="text-xl text-slate-400 max-w-2xl leading-relaxed font-light">
+          <div className="flex flex-col md:flex-row gap-4 md:gap-6 items-start md:items-center">
+            <p className="text-lg md:text-xl text-slate-400 max-w-2xl leading-relaxed font-light">
               Automate the boring parts. Generate research, PRDs, and architecture in minutes with <span className="text-slate-200 font-medium">Gemini, OpenAI, or Claude</span>.
             </p>
           </div>
@@ -127,7 +127,7 @@ const Home: React.FC = () => {
           variants={container}
           initial="hidden"
           animate="show"
-          className="grid md:grid-cols-3 gap-6 mb-24"
+          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-16 md:mb-24"
         >
           {personas.map((p) => {
             const isActive = state.persona === p.id;
@@ -170,12 +170,12 @@ const Home: React.FC = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
         >
-          <div className="border-t border-white/10 pt-12">
-            <h3 className="flex items-center gap-3 text-sm font-bold text-slate-500 uppercase tracking-widest mb-10 font-mono">
+          <div className="border-t border-white/10 pt-8 md:pt-12">
+            <h3 className="flex items-center gap-3 text-sm font-bold text-slate-500 uppercase tracking-widest mb-6 md:mb-10 font-mono">
               <Wand2 className="text-primary-500" size={16} />
               Automated Pipeline
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
+            <div className="flex md:grid md:grid-cols-5 gap-6 md:gap-8 overflow-x-auto scrollbar-none -mx-4 px-4 md:mx-0 md:px-0 pb-4 md:pb-0">
               {[
                 {
                   step: "01",
@@ -208,15 +208,15 @@ const Home: React.FC = () => {
                   tooltip: "One-click download of all artifacts with specific instructions for your IDE."
                 }
               ].map((s, i) => (
-                <Tooltip key={i} content={s.tooltip} className="h-full block">
+                <Tooltip key={i} content={s.tooltip} className="h-full block shrink-0 min-w-[200px] md:min-w-0">
                   <div className="group cursor-default h-full flex flex-col">
-                    <div className="flex items-center gap-4 mb-3">
+                    <div className="flex items-center gap-3 md:gap-4 mb-3">
                       <span className="flex items-center justify-center w-8 h-8 rounded-full bg-surface border border-white/10 text-xs font-mono text-primary-500 group-hover:bg-primary-500 group-hover:text-black transition-colors duration-300 shrink-0">
                         {s.step}
                       </span>
-                      <strong className="text-slate-200 font-display text-lg tracking-tight leading-tight">{s.title}</strong>
+                      <strong className="text-slate-200 font-display text-base md:text-lg tracking-tight leading-tight">{s.title}</strong>
                     </div>
-                    <p className="text-sm text-slate-500 pl-12 border-l border-white/5 group-hover:border-primary-500/30 transition-colors duration-300 flex-1 leading-relaxed">
+                    <p className="text-sm text-slate-500 pl-11 md:pl-12 border-l border-white/5 group-hover:border-primary-500/30 transition-colors duration-300 flex-1 leading-relaxed">
                       {s.desc}
                     </p>
                   </div>
