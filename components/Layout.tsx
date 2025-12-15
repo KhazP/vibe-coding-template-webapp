@@ -226,88 +226,114 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </div>
 
       {/* Mobile Menu Overlay */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
+      {isMobileMenuOpen && (
+        <>
+          {/* Backdrop - closes menu on click */}
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 top-[65px] z-30 bg-[#050505] p-4 overflow-y-auto md:hidden pb-24"
+            key="mobile-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="fixed inset-0 top-[65px] z-20 bg-black/60 backdrop-blur-sm md:hidden"
+            aria-hidden="true"
+          />
+          {/* Menu Content */}
+          <motion.div
+            key="mobile-menu-content"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="fixed inset-0 top-[65px] z-30 bg-[#050505] p-4 overflow-y-auto md:hidden pb-24 max-w-xs border-r border-white/10"
           >
-            <div className="space-y-6">
-              {/* Projects Section */}
-              <div>
-                <div className="text-xs font-mono text-slate-600 uppercase tracking-widest mb-3 px-6">Workspace</div>
-                <nav className="space-y-1">
-                  <NavItem
-                    to="/projects"
-                    icon={<FolderOpen />}
-                    label="My Projects"
-                    isActive={location.pathname === '/projects'}
-                    isHovered={hoveredPath === '/projects'}
-                    onHover={() => setHoveredPath('/projects')}
-                    onLeave={() => setHoveredPath(null)}
-                  />
-                </nav>
-              </div>
-
-              {/* Pipeline Section */}
-              <div>
-                <div className="text-xs font-mono text-slate-600 uppercase tracking-widest mb-3 px-6">Pipeline</div>
-                <nav className="space-y-1">
-                  {renderNavItems()}
-                </nav>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-6 border-t border-white/5 space-y-3">
-                <a
-                  href="https://www.buymeacoffee.com/alpyalayg"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-full"
+            <motion.div
+              className="space-y-6"
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: { transition: { staggerChildren: 0.04, delayChildren: 0.1 } }
+              }}
+            >
+              <LayoutGroup id="mobile-menu">
+                {/* Projects Section */}
+                <motion.div
+                  variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0 } }}
                 >
-                  <Button
-                    variant="secondary"
-                    className="w-full text-sm h-12 justify-start border-white/10 hover:brightness-110 px-4 text-white hover:text-white"
-                    style={{ backgroundColor: '#0d4921' }}
+                  <div className="text-xs font-mono text-slate-600 uppercase tracking-widest mb-3 px-6">Workspace</div>
+                  <nav className="space-y-1">
+                    <NavItem
+                      to="/projects"
+                      icon={<FolderOpen />}
+                      label="My Projects"
+                      isActive={location.pathname === '/projects'}
+                      isHovered={hoveredPath === '/projects'}
+                      onHover={() => setHoveredPath('/projects')}
+                      onLeave={() => setHoveredPath(null)}
+                    />
+                  </nav>
+                </motion.div>
+
+                {/* Pipeline Section */}
+                <motion.div
+                  variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0 } }}
+                >
+                  <div className="text-xs font-mono text-slate-600 uppercase tracking-widest mb-3 px-6">Pipeline</div>
+                  <nav className="space-y-1">
+                    {renderNavItems()}
+                  </nav>
+                </motion.div>
+
+                {/* Action Buttons */}
+                <motion.div
+                  variants={{ hidden: { opacity: 0, x: -16 }, visible: { opacity: 1, x: 0 } }}
+                  className="pt-6 border-t border-white/5 space-y-3"
+                >
+                  <a
+                    href="https://www.buymeacoffee.com/alpyalayg"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full"
                   >
-                    <span className="text-lg">☕</span> <span className="ml-2">Buy me a coffee</span>
-                  </Button>
-                </a>
-                <a
-                  href="https://github.com/KhazP/vibe-coding-prompt-template"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block w-full"
-                >
+                    <Button
+                      variant="secondary"
+                      className="w-full text-sm h-12 justify-start border-white/10 hover:brightness-110 px-4 text-white hover:text-white"
+                      style={{ backgroundColor: '#0d4921' }}
+                    >
+                      <span className="text-lg">☕</span> <span className="ml-2">Buy me a coffee</span>
+                    </Button>
+                  </a>
+                  <a
+                    href="https://github.com/KhazP/vibe-coding-prompt-template"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full"
+                  >
+                    <Button
+                      variant="secondary"
+                      className="w-full text-sm h-12 justify-start bg-white/5 border-white/10 hover:bg-white/10 px-4 text-slate-400 hover:text-white"
+                    >
+                      <Github size={18} /> <span className="ml-2">Star on GitHub</span>
+                    </Button>
+                  </a>
                   <Button
                     variant="secondary"
+                    onClick={() => { setIsSettingsOpen(true); setIsMobileMenuOpen(false); }}
                     className="w-full text-sm h-12 justify-start bg-white/5 border-white/10 hover:bg-white/10 px-4 text-slate-400 hover:text-white"
                   >
-                    <Github size={18} /> <span className="ml-2">Star on GitHub</span>
+                    <Settings size={18} /> <span className="ml-2">Settings</span>
                   </Button>
-                </a>
-                <Button
-                  variant="secondary"
-                  onClick={() => { setIsSettingsOpen(true); setIsMobileMenuOpen(false); }}
-                  className="w-full text-sm h-12 justify-start bg-white/5 border-white/10 hover:bg-white/10 px-4 text-slate-400 hover:text-white"
-                >
-                  <Settings size={18} /> <span className="ml-2">Settings</span>
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => { setIsApiKeyModalOpen(true); setIsMobileMenuOpen(false); }}
-                  className="w-full text-sm h-12 justify-start bg-white/5 border-white/10 hover:bg-white/10 px-4 text-slate-400 hover:text-white"
-                >
-                  <Key size={18} /> <span className="ml-2">API Key</span>
-                </Button>
-              </div>
-            </div>
+                  <Button
+                    variant="secondary"
+                    onClick={() => { setIsApiKeyModalOpen(true); setIsMobileMenuOpen(false); }}
+                    className="w-full text-sm h-12 justify-start bg-white/5 border-white/10 hover:bg-white/10 px-4 text-slate-400 hover:text-white"
+                  >
+                    <Key size={18} /> <span className="ml-2">API Key</span>
+                  </Button>
+                </motion.div>
+              </LayoutGroup>
+            </motion.div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </>
+      )}
 
       {/* Glass Sidebar (Desktop) */}
       <aside className="w-72 hidden md:flex flex-col fixed h-full z-30 border-r border-white/5 bg-[#050505]/60 backdrop-blur-2xl">
@@ -414,10 +440,10 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                   variant="secondary"
                   onClick={saveProject}
                   className={`h-8 text-xs px-3 transition-all duration-300 ${saveStatus === 'saving' ? 'bg-slate-700/50 border-slate-600' :
-                      saveStatus === 'saved' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.15)]' :
-                        saveStatus === 'unsaved' ? 'bg-amber-900/20 border-amber-500/40 text-amber-400' :
-                          saveStatus === 'error' ? 'bg-red-900/30 border-red-500/50 text-red-400' :
-                            'bg-white/5 border-white/10 hover:bg-white/10'
+                    saveStatus === 'saved' ? 'bg-emerald-900/30 border-emerald-500/50 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.15)]' :
+                      saveStatus === 'unsaved' ? 'bg-amber-900/20 border-amber-500/40 text-amber-400' :
+                        saveStatus === 'error' ? 'bg-red-900/30 border-red-500/50 text-red-400' :
+                          'bg-white/5 border-white/10 hover:bg-white/10'
                     }`}
                   disabled={saveStatus === 'saving'}
                 >
@@ -461,6 +487,6 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </main>
 
       <SettingsModal />
-    </div>
+    </div >
   );
 };

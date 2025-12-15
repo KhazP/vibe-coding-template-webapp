@@ -127,7 +127,7 @@ const Part1Research: React.FC = React.memo(() => {
       <ModelStatus />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="space-y-6">
+        <div className="space-y-6 pb-24 md:pb-0">
 
           {/* Research Method Segmented Toggle */}
           <div className="space-y-4">
@@ -174,7 +174,7 @@ const Part1Research: React.FC = React.memo(() => {
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Standard Mode Tile */}
                     <button
                       onClick={() => setResearchMode('standard')}
@@ -559,8 +559,8 @@ const Part1Research: React.FC = React.memo(() => {
             </>
           )}
 
-          {/* Action Area */}
-          <div className="pt-4 border-t border-white/5">
+          {/* Action Area - Sticky on mobile for easy access */}
+          <div className="pt-4 border-t border-white/5 md:static fixed bottom-0 left-0 right-0 md:border-t md:bg-transparent md:p-0 md:pb-0 bg-slate-950/95 backdrop-blur-xl p-4 pb-6 z-40 border-t border-white/10 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] md:shadow-none">
             {researchMethod === 'in-app' ? (
               <Button
                 onClick={handleRunResearch}

@@ -299,7 +299,7 @@ Your AI agent will use this as its primary context.
           </div>
 
           {/* Context Indicator */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className={`text-xs px-3 py-2 rounded-lg flex items-center gap-2 border ${prdOutput ? 'bg-orange-900/20 border-orange-800 text-orange-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
               {prdOutput ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
               {prdOutput ? "PRD Context Attached" : "Missing PRD Context"}

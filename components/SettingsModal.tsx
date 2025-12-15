@@ -559,7 +559,7 @@ const SettingsModal: React.FC = () => {
                             ) : (
                                 <div>
                                     <label className="block text-sm font-bold text-slate-200 mb-4">Model Tier</label>
-                                    <div className="grid grid-cols-3 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                         {(['fast', 'mid', 'complex'] as const).map((tier) => {
                                             const tierModels = providerModels.filter(m => m.tier === tier);
                                             const model = tierModels[0];
