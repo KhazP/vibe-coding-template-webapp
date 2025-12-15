@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useProject } from '../context/ProjectContext';
 import { Button, PersonaError, StepNavigation } from '../components/UI';
 import { ProjectInput, ProjectTextArea, ProjectSelect } from '../components/FormFields';
 import { ArtifactSection } from '../components/ArtifactSection';
 import { generatePRDPrompt } from '../utils/templates';
-import { Sparkles, CheckCircle, AlertCircle, Edit2, Loader2, Link } from 'lucide-react';
+import { Sparkles, CheckCircle, AlertCircle, Edit2, Loader2, Link as LinkIcon, ArrowLeft, ArrowRight } from 'lucide-react';
 import { ModelStatus } from '../components/ModelStatus';
 import { Persona } from '../types';
 import { useToast } from '../components/Toast';
@@ -105,7 +106,7 @@ const Part2PRD: React.FC = React.memo(() => {
   };
 
   const hasIdea = !!answers['project_description'];
-  const fromResearchBadge = <span className="text-[10px] text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-500/20 flex items-center gap-1"><Link size={8} /> From Research</span>;
+  const fromResearchBadge = <span className="text-[10px] text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-500/20 flex items-center gap-1"><LinkIcon size={8} /> From Research</span>;
 
   if (!persona) return <PersonaError />;
 
@@ -119,7 +120,7 @@ const Part2PRD: React.FC = React.memo(() => {
       <ModelStatus />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div className="space-y-6">
+        <div className="space-y-6 pb-24 md:pb-0">
 
           {persona === Persona.VibeCoder && (
             <>
@@ -348,24 +349,55 @@ const Part2PRD: React.FC = React.memo(() => {
             </>
           )}
 
-          {/* Context Indicator */}
-          <div className={`text-xs px-3 py-2 rounded-lg flex items-center gap-2 border ${researchOutput ? 'bg-blue-900/20 border-blue-800 text-blue-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
-            {researchOutput ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
-            {researchOutput ? "Research Context Attached" : "No Research Context found (skipping Part 1)"}
-          </div>
+          {/* Action Area - Sticky on mobile for easy access */}
+          <div className="pt-4 border-t border-white/5 md:static fixed bottom-0 left-0 right-0 md:border-t md:bg-transparent md:p-0 md:pb-0 bg-slate-950/95 backdrop-blur-xl p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] z-40 border-t border-white/10 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] md:shadow-none space-y-3">
+            {/* Mobile Navigation Row - Only visible on mobile */}
+            <div className="flex md:hidden items-center justify-between gap-2">
+              <Link to="/research" className="flex-1">
+                <Button variant="secondary" className="w-full text-xs py-2 h-9">
+                  <ArrowLeft size={14} /> Research
+                </Button>
+              </Link>
 
-          <Button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="w-full bg-gradient-to-r from-blue-600 to-primary-600 hover:from-blue-500 hover:to-primary-500 border-0"
-            tooltip="Generate a comprehensive PRD based on your inputs."
-          >
-            {isGenerating ? (
-              <><Loader2 className="animate-spin" size={18} /> {generationPhase || 'Generating PRD...'}</>
-            ) : (
-              <><Sparkles size={18} /> Generate PRD with {providerDisplayName}</>
-            )}
-          </Button>
+              {/* View Results Button - appears when PRD is complete */}
+              {prdOutput && (
+                <button
+                  onClick={() => {
+                    const maxBtn = document.querySelector('[title="Fullscreen Editor"]') as HTMLButtonElement;
+                    if (maxBtn) maxBtn.click();
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 h-9 text-xs font-medium bg-blue-600/20 text-blue-300 border border-blue-500/30 rounded-xl hover:bg-blue-600/30 transition-colors"
+                >
+                  <Sparkles size={14} /> View PRD
+                </button>
+              )}
+
+              <Link to="/tech" className={`flex-1 ${!state.prdOutput ? 'pointer-events-none opacity-50' : ''}`}>
+                <Button variant="primary" className="w-full text-xs py-2 h-9" disabled={!state.prdOutput}>
+                  Tech <ArrowRight size={14} />
+                </Button>
+              </Link>
+            </div>
+
+            {/* Context Indicator - hidden on mobile */}
+            <div className={`hidden md:flex text-xs px-3 py-2 rounded-lg items-center gap-2 border ${researchOutput ? 'bg-blue-900/20 border-blue-800 text-blue-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+              {researchOutput ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+              {researchOutput ? "Research Context Attached" : "No Research Context found (skipping Part 1)"}
+            </div>
+
+            <Button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="w-full bg-gradient-to-r from-blue-600 to-primary-600 hover:from-blue-500 hover:to-primary-500 border-0"
+              tooltip="Generate a comprehensive PRD based on your inputs."
+            >
+              {isGenerating ? (
+                <><Loader2 className="animate-spin" size={18} /> {generationPhase || 'Generating PRD...'}</>
+              ) : (
+                <><Sparkles size={18} /> Generate PRD with {providerDisplayName}</>
+              )}
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-4">

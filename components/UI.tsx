@@ -312,7 +312,7 @@ export const FieldWrapper: React.FC<{
         </label>
         {tooltip && (
           <Tooltip content={tooltip} position={tooltipPosition}>
-            <Info size={12} className="text-slate-600 hover:text-primary-400 cursor-help transition-colors" />
+            <Info size={12} className="text-slate-600 hover:text-primary-400 active:text-white cursor-help transition-colors" />
           </Tooltip>
         )}
       </div>
@@ -664,11 +664,15 @@ interface MagicWandMenuProps {
 }
 
 const MagicWandMenu: React.FC<MagicWandMenuProps> = ({ position, onSelect, isLoading, onClose }) => {
+  // Check if mobile
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
   if (isLoading) {
     return (
       <div
-        className="fixed z-[9999] p-2 bg-slate-900 border border-primary-500/50 rounded-lg shadow-xl flex items-center gap-2 pointer-events-none"
-        style={{ left: position.x, top: position.y }}
+        className={`fixed z-[9999] p-3 bg-slate-900 border border-primary-500/50 rounded-xl shadow-xl flex items-center gap-2 pointer-events-none ${isMobile ? 'bottom-20 left-1/2 -translate-x-1/2' : ''
+          }`}
+        style={isMobile ? {} : { left: position.x, top: position.y }}
       >
         <Loader2 size={16} className="animate-spin text-primary-400" />
         <span className="text-xs text-white">Refining...</span>
@@ -676,6 +680,37 @@ const MagicWandMenu: React.FC<MagicWandMenuProps> = ({ position, onSelect, isLoa
     );
   }
 
+  // Mobile: bottom sheet style
+  if (isMobile) {
+    return (
+      <div className="fixed z-[9999] bottom-0 left-0 right-0 bg-slate-900 border-t border-white/10 rounded-t-2xl shadow-2xl animate-in slide-in-from-bottom duration-200 safe-area-pb">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+          <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+            <Sparkles size={12} className="text-primary-400" /> Magic Wand
+          </span>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10" aria-label="Close menu">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-2 p-3">
+          <button onClick={() => onSelect('Make shorter')} className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-slate-200 bg-primary-500/10 hover:bg-primary-500/20 border border-primary-500/20 rounded-xl transition-colors">
+            <Scissors size={16} /> Shorter
+          </button>
+          <button onClick={() => onSelect('Make professional')} className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-slate-200 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded-xl transition-colors">
+            <Briefcase size={16} /> Pro
+          </button>
+          <button onClick={() => onSelect('Fix grammar')} className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-slate-200 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-xl transition-colors">
+            <Check size={16} /> Grammar
+          </button>
+          <button onClick={() => onSelect('Expand')} className="flex items-center justify-center gap-2 px-4 py-3 text-sm text-slate-200 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 rounded-xl transition-colors">
+            <Plus size={16} /> Expand
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop: popup style
   return (
     <div
       className="fixed z-[9999] bg-slate-900 border border-white/10 rounded-lg shadow-2xl overflow-hidden flex flex-col min-w-[160px] animate-in fade-in zoom-in-95 duration-200"
@@ -992,6 +1027,32 @@ export const CopyBlock: React.FC<{
     setMenuPos(null);
   };
 
+  // Touch handler for mobile text selection
+  const handleTouchEnd = () => {
+    // Small delay to let selection finalize on touch devices
+    setTimeout(() => {
+      if (!editorRef.current) return;
+      const target = editorRef.current;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+
+      if (start !== end) {
+        const selectedText = target.value.substring(start, end);
+        if (selectedText.trim().length > 0 && onInlineRefine) {
+          setSelection({ start, end, text: selectedText });
+          // Position menu at center-bottom of screen for mobile
+          const rect = target.getBoundingClientRect();
+          setMenuPos({ x: rect.width / 2, y: rect.height - 100 });
+
+          if (showHint) {
+            setShowHint(false);
+            localStorage.setItem('VIBE_WAND_HINT_SEEN', 'true');
+          }
+        }
+      }
+    }, 100);
+  };
+
   const executeInlineRefinement = async (instruction: string) => {
     if (!selection || !onInlineRefine) return;
 
@@ -1244,14 +1305,15 @@ export const CopyBlock: React.FC<{
               className="fixed inset-0 z-[9999] bg-[#050505] flex flex-col"
             >
               {/* Editor Toolbar */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#09090b] relative z-50">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-white/5 rounded-lg border border-white/10">
-                    <Type size={18} className="text-primary-400" />
+              <div className="flex items-center justify-between px-3 md:px-6 py-3 md:py-4 border-b border-white/10 bg-[#09090b] relative z-50 gap-2">
+                {/* Left: File info - compact on mobile */}
+                <div className="flex items-center gap-2 md:gap-4 min-w-0 flex-1">
+                  <div className="p-1.5 md:p-2 bg-white/5 rounded-lg border border-white/10 shrink-0">
+                    <Type size={16} className="text-primary-400" />
                   </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-200">{fileName}</h3>
-                    <div className="flex items-center gap-3 text-[10px] text-slate-400 font-mono">
+                  <div className="min-w-0">
+                    <h3 className="text-xs md:text-sm font-bold text-slate-200 truncate">{fileName}</h3>
+                    <div className="hidden md:flex items-center gap-3 text-[10px] text-slate-400 font-mono">
                       <span>{editValue.length} chars</span>
                       <span>•</span>
                       <span>{Math.ceil(editValue.length / 4)} tokens</span>
@@ -1259,17 +1321,19 @@ export const CopyBlock: React.FC<{
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                {/* Right: Actions */}
+                <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
+                  {/* Search - hidden on mobile */}
                   <button
                     onClick={() => setShowSearch(!showSearch)}
-                    className={`p-2 rounded-lg border transition-colors flex items-center gap-2 ${showSearch ? 'bg-primary-500/10 border-primary-500/30 text-primary-400' : 'bg-slate-800 border-white/10 text-slate-400 hover:text-white'}`}
+                    className={`hidden md:flex p-2 rounded-lg border transition-colors items-center gap-2 ${showSearch ? 'bg-primary-500/10 border-primary-500/30 text-primary-400' : 'bg-slate-800 border-white/10 text-slate-400 hover:text-white'}`}
                     title="Find (Ctrl+F)"
                     aria-label="Find"
                   >
                     <Search size={14} />
                   </button>
 
-                  {/* Split Screen Toggle */}
+                  {/* Split Screen Toggle - desktop only */}
                   <div className="hidden md:flex bg-slate-800 rounded-lg p-1 border border-white/10">
                     <button
                       onClick={() => setSplitView(false)}
@@ -1301,25 +1365,26 @@ export const CopyBlock: React.FC<{
                     </button>
                   )}
 
+                  {/* Cancel/Save buttons */}
                   {onEdit && (
-                    <div className="flex items-center gap-2 mx-4 border-l border-white/10 pl-4">
-                      <Button variant="secondary" onClick={handleCancelEdit} className="h-8 text-xs bg-white/5 hover:bg-white/10">
+                    <>
+                      <Button variant="secondary" onClick={handleCancelEdit} className="h-8 text-xs px-2 md:px-3 bg-white/5 hover:bg-white/10">
                         Cancel
                       </Button>
-                      <Button onClick={handleSaveEdit} className="h-8 text-xs bg-primary-600 hover:bg-primary-500 text-white">
-                        <Save size={14} className="mr-1.5" /> Save
+                      <Button onClick={handleSaveEdit} className="h-8 text-xs px-2 md:px-3 bg-primary-600 hover:bg-primary-500 text-white">
+                        <Save size={14} className="md:mr-1.5" />
+                        <span className="hidden md:inline">Save</span>
                       </Button>
-                    </div>
+                    </>
                   )}
 
-                  <div className="flex items-center gap-2">
-                    <Button variant="secondary" onClick={handleCopy} className="h-8 w-8 p-0 flex items-center justify-center bg-white/5 hover:bg-white/10" aria-label="Copy to clipboard">
-                      {copied ? <Check size={14} className="text-emerald-400" /> : <Clipboard size={14} />}
-                    </Button>
-                    <Button variant="secondary" onClick={() => setIsFullscreen(false)} className="h-8 w-8 p-0 flex items-center justify-center bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white" aria-label="Exit fullscreen">
-                      <Minimize2 size={16} />
-                    </Button>
-                  </div>
+                  {/* Copy and Close - always visible */}
+                  <Button variant="secondary" onClick={handleCopy} className="h-8 w-8 p-0 flex items-center justify-center bg-white/5 hover:bg-white/10" aria-label="Copy to clipboard">
+                    {copied ? <Check size={14} className="text-emerald-400" /> : <Clipboard size={14} />}
+                  </Button>
+                  <Button variant="secondary" onClick={() => setIsFullscreen(false)} className="h-8 w-8 p-0 flex items-center justify-center bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white" aria-label="Exit fullscreen">
+                    <Minimize2 size={16} />
+                  </Button>
                 </div>
               </div>
 
@@ -1440,7 +1505,9 @@ export const CopyBlock: React.FC<{
                       onChange={(e) => setEditValue(e.target.value)}
                       onMouseUp={handleMouseUp}
                       onMouseDown={handleMouseDown}
-                      className="absolute inset-0 w-full h-full p-8 md:p-12 bg-transparent text-slate-200 font-mono text-sm md:text-base resize-none focus:outline-none leading-relaxed custom-scrollbar selection:bg-primary-500/30 z-10"
+                      onTouchEnd={handleTouchEnd}
+                      onTouchStart={() => setMenuPos(null)}
+                      className="absolute inset-0 w-full h-full p-6 md:p-12 bg-transparent text-slate-200 font-mono text-sm md:text-base resize-none focus:outline-none leading-relaxed custom-scrollbar selection:bg-primary-500/30 z-10"
                       spellCheck={false}
                       placeholder="Start typing..."
                       readOnly={!onEdit}
@@ -1470,14 +1537,14 @@ export const CopyBlock: React.FC<{
                     />
                   )}
 
-                  {/* Hint Overlay */}
+                  {/* Hint Overlay - hidden on mobile */}
                   <AnimatePresence>
                     {showHint && isFullscreen && (
                       <motion.div
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0 }}
-                        className="absolute bottom-12 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-primary-600/90 text-white text-xs font-bold rounded-full shadow-lg backdrop-blur-sm pointer-events-none flex items-center gap-2 border border-white/20"
+                        className="hidden md:flex absolute bottom-12 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-primary-600/90 text-white text-xs font-bold rounded-full shadow-lg backdrop-blur-sm pointer-events-none items-center gap-2 border border-white/20"
                       >
                         <Sparkles size={14} className="animate-pulse text-yellow-300" />
                         <span>Select words to use Magic Wand</span>

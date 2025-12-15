@@ -1,11 +1,12 @@
 
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useProject } from '../context/ProjectContext';
 import { Button, PersonaError, StepNavigation } from '../components/UI';
 import { ProjectInput, ProjectTextArea, ProjectSelect } from '../components/FormFields';
 import { ArtifactSection } from '../components/ArtifactSection';
 import { generateTechDesignPrompt } from '../utils/templates';
-import { Sparkles, CheckCircle, AlertCircle, Loader2, Link } from 'lucide-react';
+import { Sparkles, CheckCircle, AlertCircle, Loader2, Link as LinkIcon, ArrowLeft, ArrowRight } from 'lucide-react';
 import { ModelStatus } from '../components/ModelStatus';
 import { Persona } from '../types';
 import { useToast } from '../components/Toast';
@@ -130,7 +131,7 @@ const Part3Tech: React.FC = React.memo(() => {
     }
   };
 
-  const contextBadge = <span className="text-[10px] text-purple-400 bg-purple-900/30 px-1.5 py-0.5 rounded border border-purple-500/20 flex items-center gap-1"><Link size={8} /> From Research/PRD</span>;
+  const contextBadge = <span className="text-[10px] text-purple-400 bg-purple-900/30 px-1.5 py-0.5 rounded border border-purple-500/20 flex items-center gap-1"><LinkIcon size={8} /> From Research/PRD</span>;
 
   if (!persona) return <PersonaError />;
 
@@ -144,7 +145,7 @@ const Part3Tech: React.FC = React.memo(() => {
       <ModelStatus />
 
       <div className="grid md:grid-cols-2 gap-8">
-        <div className="space-y-6">
+        <div className="space-y-6 pb-24 md:pb-0">
 
           {persona === Persona.VibeCoder && (
             <>
@@ -380,24 +381,55 @@ const Part3Tech: React.FC = React.memo(() => {
             </>
           )}
 
-          {/* Context Indicator */}
-          <div className={`text-xs px-3 py-2 rounded-lg flex items-center gap-2 border ${prdOutput ? 'bg-purple-900/20 border-purple-800 text-purple-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
-            {prdOutput ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
-            {prdOutput ? "PRD Context Attached" : "No PRD Context found (skipping Part 2)"}
-          </div>
+          {/* Action Area - Sticky on mobile for easy access */}
+          <div className="pt-4 border-t border-white/5 md:static fixed bottom-0 left-0 right-0 md:border-t md:bg-transparent md:p-0 md:pb-0 bg-slate-950/95 backdrop-blur-xl p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] z-40 border-t border-white/10 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] md:shadow-none space-y-3">
+            {/* Mobile Navigation Row - Only visible on mobile */}
+            <div className="flex md:hidden items-center justify-between gap-2">
+              <Link to="/prd" className="flex-1">
+                <Button variant="secondary" className="w-full text-xs py-2 h-9">
+                  <ArrowLeft size={14} /> PRD
+                </Button>
+              </Link>
 
-          <Button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="w-full bg-gradient-to-r from-purple-600 to-primary-600 hover:from-purple-500 hover:to-primary-500 border-0"
-            tooltip="Generate a robust technical design document."
-          >
-            {isGenerating ? (
-              <><Loader2 className="animate-spin" size={18} /> {generationPhase || 'Designing...'}</>
-            ) : (
-              <><Sparkles size={18} /> Generate Tech Design with {providerDisplayName}</>
-            )}
-          </Button>
+              {/* View Results Button - appears when Tech Design is complete */}
+              {state.techOutput && (
+                <button
+                  onClick={() => {
+                    const maxBtn = document.querySelector('[title="Fullscreen Editor"]') as HTMLButtonElement;
+                    if (maxBtn) maxBtn.click();
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 h-9 text-xs font-medium bg-purple-600/20 text-purple-300 border border-purple-500/30 rounded-xl hover:bg-purple-600/30 transition-colors"
+                >
+                  <Sparkles size={14} /> View Tech
+                </button>
+              )}
+
+              <Link to="/agent" className={`flex-1 ${!state.techOutput ? 'pointer-events-none opacity-50' : ''}`}>
+                <Button variant="primary" className="w-full text-xs py-2 h-9" disabled={!state.techOutput}>
+                  Agent <ArrowRight size={14} />
+                </Button>
+              </Link>
+            </div>
+
+            {/* Context Indicator - hidden on mobile */}
+            <div className={`hidden md:flex text-xs px-3 py-2 rounded-lg items-center gap-2 border ${prdOutput ? 'bg-purple-900/20 border-purple-800 text-purple-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+              {prdOutput ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+              {prdOutput ? "PRD Context Attached" : "No PRD Context found (skipping Part 2)"}
+            </div>
+
+            <Button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="w-full bg-gradient-to-r from-purple-600 to-primary-600 hover:from-purple-500 hover:to-primary-500 border-0"
+              tooltip="Generate a robust technical design document."
+            >
+              {isGenerating ? (
+                <><Loader2 className="animate-spin" size={18} /> {generationPhase || 'Designing...'}</>
+              ) : (
+                <><Sparkles size={18} /> Generate Tech Design with {providerDisplayName}</>
+              )}
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-4">

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useProject } from '../context/ProjectContext';
 import { Button, PersonaError, Skeleton, StepNavigation, CopyBlock, TextArea, GlassCard, Tooltip } from '../components/UI';
 import { ProjectInput, ProjectTextArea, ProjectSelect } from '../components/FormFields';
 import { ArtifactSection } from '../components/ArtifactSection';
 import { generateResearchPrompt } from '../utils/templates';
 import { Persona } from '../types';
-import { Sparkles, Globe, Loader2, Zap, ExternalLink, ArrowDown, CheckCircle2, ArrowRight, Info, BrainCircuit, ChevronDown } from 'lucide-react';
+import { Sparkles, Globe, Loader2, Zap, ExternalLink, ArrowDown, ArrowLeft, CheckCircle2, ArrowRight, Info, BrainCircuit, ChevronDown } from 'lucide-react';
 import { ModelStatus } from '../components/ModelStatus';
 import { useToast } from '../components/Toast';
 import { getProviderSettings } from '../utils/providerStorage';
@@ -560,7 +561,36 @@ const Part1Research: React.FC = React.memo(() => {
           )}
 
           {/* Action Area - Sticky on mobile for easy access */}
-          <div className="pt-4 border-t border-white/5 md:static fixed bottom-0 left-0 right-0 md:border-t md:bg-transparent md:p-0 md:pb-0 bg-slate-950/95 backdrop-blur-xl p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] z-40 border-t border-white/10 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] md:shadow-none">
+          <div className="pt-4 border-t border-white/5 md:static fixed bottom-0 left-0 right-0 md:border-t md:bg-transparent md:p-0 md:pb-0 bg-slate-950/95 backdrop-blur-xl p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] z-40 border-t border-white/10 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] md:shadow-none space-y-3">
+            {/* Mobile Navigation Row - Only visible on mobile */}
+            <div className="flex md:hidden items-center justify-between gap-2">
+              <Link to="/" className="flex-1">
+                <Button variant="secondary" className="w-full text-xs py-2 h-9">
+                  <ArrowLeft size={14} /> Start
+                </Button>
+              </Link>
+
+              {/* View Results Button - appears when research is complete */}
+              {researchOutput && (
+                <button
+                  onClick={() => {
+                    // Find and click the fullscreen button in the artifact section
+                    const maxBtn = document.querySelector('[title="Fullscreen Editor"]') as HTMLButtonElement;
+                    if (maxBtn) maxBtn.click();
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 h-9 text-xs font-medium bg-blue-600/20 text-blue-300 border border-blue-500/30 rounded-xl hover:bg-blue-600/30 transition-colors"
+                >
+                  <Sparkles size={14} /> View Results
+                </button>
+              )}
+
+              <Link to="/prd" className={`flex-1 ${!researchOutput ? 'pointer-events-none opacity-50' : ''}`}>
+                <Button variant="primary" className="w-full text-xs py-2 h-9" disabled={!researchOutput}>
+                  PRD <ArrowRight size={14} />
+                </Button>
+              </Link>
+            </div>
+
             {researchMethod === 'in-app' ? (
               <Button
                 onClick={handleRunResearch}

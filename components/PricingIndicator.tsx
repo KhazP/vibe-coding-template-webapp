@@ -93,8 +93,8 @@ export const PricingIndicator: React.FC<PricingIndicatorProps> = ({
             <span className="text-slate-600">estimated</span>
 
             {showBreakdown && (
-                <Tooltip content={breakdownText} position="top">
-                    <Info size={12} className="text-slate-500 hover:text-slate-400 cursor-help ml-1" />
+                <Tooltip content={breakdownText} position="left">
+                    <Info size={12} className="text-slate-500 hover:text-slate-400 active:text-white cursor-help ml-1 transition-colors" />
                 </Tooltip>
             )}
         </motion.div>

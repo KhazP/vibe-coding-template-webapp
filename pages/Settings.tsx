@@ -89,8 +89,8 @@ const Settings: React.FC = () => {
                                     key={preset.id}
                                     onClick={() => handlePresetSelect(preset.id as PresetMode)}
                                     className={`relative text-left p-4 rounded-xl border transition-all duration-300 flex flex-col gap-2 group ${isActive
-                                            ? 'bg-primary-500/10 border-primary-500 ring-1 ring-primary-500/50 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
-                                            : 'bg-slate-900/50 border-white/10 hover:border-white/20 hover:bg-slate-800'
+                                        ? 'bg-primary-500/10 border-primary-500 ring-1 ring-primary-500/50 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                                        : 'bg-slate-900/50 border-white/10 hover:border-white/20 hover:bg-slate-800'
                                         }`}
                                 >
                                     <div className="flex justify-between items-start w-full">
@@ -285,7 +285,7 @@ const Settings: React.FC = () => {
                                         Thinking Budget (Tokens)
                                     </label>
                                     <Tooltip content="Tokens reserved for internal reasoning before answering.">
-                                        <span className="text-slate-600 hover:text-primary-400 cursor-help transition-colors">ⓘ</span>
+                                        <span className="text-slate-600 hover:text-primary-400 active:text-white cursor-help transition-colors">ⓘ</span>
                                     </Tooltip>
                                 </div>
                                 <div className="flex items-center gap-4">

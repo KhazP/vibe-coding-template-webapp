@@ -170,39 +170,44 @@ const Projects: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {projects.map((project) => (
             <GlassCard
               key={project.id}
-              className={`group cursor-pointer transition-all duration-300 ${project.id === currentProjectId ? 'border-primary-500/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'hover:border-white/20'
+              className={`group cursor-pointer transition-all duration-300 !p-4 md:!p-5 ${project.id === currentProjectId ? 'border-primary-500/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'hover:border-white/20'
                 }`}
             >
               <div onClick={() => handleOpen(project.id)}>
-                <div className="flex justify-between items-start mb-4">
-                  <div className="p-2 rounded-lg bg-surface/80 border border-white/5 text-primary-400">
-                    <FolderOpen size={20} />
+                {/* Header row with icon, title and active badge */}
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="p-1.5 md:p-2 rounded-lg bg-surface/80 border border-white/5 text-primary-400 shrink-0">
+                    <FolderOpen size={18} className="md:w-5 md:h-5" />
                   </div>
-                  {project.id === currentProjectId && (
-                    <span className="px-2 py-1 rounded text-[10px] bg-emerald-900/30 text-emerald-400 border border-emerald-500/30 font-mono uppercase tracking-wider">
-                      Active
-                    </span>
-                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base md:text-lg font-bold text-white truncate">{project.name}</h3>
+                      {project.id === currentProjectId && (
+                        <span className="px-1.5 py-0.5 rounded text-[9px] md:text-[10px] bg-emerald-900/30 text-emerald-400 border border-emerald-500/30 font-mono uppercase tracking-wider shrink-0">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    {/* Meta info */}
+                    <div className="flex items-center gap-3 text-[11px] md:text-xs text-slate-400 mt-1">
+                      <div className="flex items-center gap-1">
+                        <User size={10} />
+                        <span>{getPersonaLabel(project.persona)}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Calendar size={10} />
+                        <span>{formatDate(project.lastModified)}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <h3 className="text-lg font-bold text-white mb-2 truncate pr-8">{project.name}</h3>
-
-                <div className="flex items-center gap-4 text-xs text-slate-400 mb-6">
-                  <div className="flex items-center gap-1">
-                    <User size={12} />
-                    <span>{getPersonaLabel(project.persona)}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Calendar size={12} />
-                    <span>{formatDate(project.lastModified)}</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-1.5 mt-auto pt-4 border-t border-white/5 items-center">
+                {/* Footer with status dots and actions */}
+                <div className="flex gap-1.5 pt-3 border-t border-white/5 items-center">
                   {/* Research Indicator */}
                   <div
                     className={`h-2 w-2 rounded-full ${project.researchOutput ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]' : 'bg-slate-800'}`}
@@ -227,14 +232,14 @@ const Projects: React.FC = () => {
                   <div className="ml-auto flex items-center gap-1">
                     <button
                       onClick={(e) => handleExport(e, project)}
-                      className="p-2 text-slate-600 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                      className="p-1.5 md:p-2 text-slate-600 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                       title="Export Project JSON"
                     >
                       <Download size={14} />
                     </button>
                     <button
                       onClick={(e) => handleDeleteClick(e, project.id)}
-                      className="p-2 text-slate-600 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
+                      className="p-1.5 md:p-2 text-slate-600 hover:text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
                       title="Delete Project"
                     >
                       <Trash2 size={14} />

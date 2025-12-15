@@ -12,7 +12,7 @@ import { generateAgentsMdPrompt, generateToolConfig } from '../utils/templates';
 import { Persona, ToolDefinition } from '../types';
 import { TOOLS, TOOL_IDS, FILE_NAMES } from '../utils/constants';
 import { getLaunchProtocol, LAUNCH_PROTOCOL_INDEX } from '../utils/launchProtocols';
-import { Check, Loader2, Sparkles, CheckCircle, AlertCircle, Download, FileArchive, ArrowRight, UserCheck, Terminal, Bot, Layout, Info, Link2, AlertTriangle } from 'lucide-react';
+import { Check, Loader2, Sparkles, CheckCircle, AlertCircle, Download, FileArchive, ArrowRight, ArrowLeft, UserCheck, Terminal, Bot, Layout, Info, Link2, AlertTriangle } from 'lucide-react';
 import { ModelStatus } from '../components/ModelStatus';
 import { Link } from 'react-router-dom';
 import JSZip from 'jszip';
@@ -216,7 +216,7 @@ Your AI agent will use this as its primary context.
 
       <div className="grid md:grid-cols-2 gap-8">
         {/* Configuration Section */}
-        <div className="space-y-6">
+        <div className="space-y-6 pb-24 md:pb-0">
 
           {/* 1. Universal Standard */}
           <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
@@ -298,41 +298,72 @@ Your AI agent will use this as its primary context.
             </div>
           </div>
 
-          {/* Context Indicator */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className={`text-xs px-3 py-2 rounded-lg flex items-center gap-2 border ${prdOutput ? 'bg-orange-900/20 border-orange-800 text-orange-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
-              {prdOutput ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
-              {prdOutput ? "PRD Context Attached" : "Missing PRD Context"}
-            </div>
-            <div className={`text-xs px-3 py-2 rounded-lg flex items-center gap-2 border ${techOutput ? 'bg-orange-900/20 border-orange-800 text-orange-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
-              {techOutput ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
-              {techOutput ? "Tech Design Attached" : "Missing Tech Design"}
-            </div>
-          </div>
+          {/* Action Area - Sticky on mobile for easy access */}
+          <div className="pt-4 border-t border-white/5 md:static fixed bottom-0 left-0 right-0 md:border-t md:bg-transparent md:p-0 md:pb-0 bg-slate-950/95 backdrop-blur-xl p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] z-40 border-t border-white/10 shadow-[0_-4px_20px_rgba(0,0,0,0.5)] md:shadow-none space-y-3">
+            {/* Mobile Navigation Row - Only visible on mobile */}
+            <div className="flex md:hidden items-center justify-between gap-2">
+              <Link to="/tech" className="flex-1">
+                <Button variant="secondary" className="w-full text-xs py-2 h-9">
+                  <ArrowLeft size={14} /> Tech
+                </Button>
+              </Link>
 
-          {/* Warning if no tools selected */}
-          {tools.length === 0 && (
-            <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-sm">
-              <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-              <div>
-                <strong className="font-semibold">No tools selected</strong>
-                <p className="opacity-80 mt-1 text-xs">We will only generate the core <code>{FILE_NAMES.AGENTS_MD}</code> file. No tool-specific configuration files (like <code>.cursorrules</code>) will be created.</p>
+              {/* View Results Button - appears when Agent config is complete */}
+              {generated && (
+                <button
+                  onClick={() => {
+                    const maxBtn = document.querySelector('[title="Fullscreen Editor"]') as HTMLButtonElement;
+                    if (maxBtn) maxBtn.click();
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 h-9 text-xs font-medium bg-orange-600/20 text-orange-300 border border-orange-500/30 rounded-xl hover:bg-orange-600/30 transition-colors"
+                >
+                  <Sparkles size={14} /> View Config
+                </button>
+              )}
+
+              <Link to="/export" className={`flex-1 ${!generated ? 'pointer-events-none opacity-50' : ''}`}>
+                <Button variant="primary" className="w-full text-xs py-2 h-9" disabled={!generated}>
+                  Export <ArrowRight size={14} />
+                </Button>
+              </Link>
+            </div>
+
+            {/* Context Indicator - hidden on mobile */}
+            <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className={`text-xs px-3 py-2 rounded-lg flex items-center gap-2 border ${prdOutput ? 'bg-orange-900/20 border-orange-800 text-orange-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                {prdOutput ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+                {prdOutput ? "PRD Context Attached" : "Missing PRD Context"}
+              </div>
+              <div className={`text-xs px-3 py-2 rounded-lg flex items-center gap-2 border ${techOutput ? 'bg-orange-900/20 border-orange-800 text-orange-400' : 'bg-slate-900 border-slate-800 text-slate-500'}`}>
+                {techOutput ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+                {techOutput ? "Tech Design Attached" : "Missing Tech Design"}
               </div>
             </div>
-          )}
 
-          <Button
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="w-full bg-gradient-to-r from-orange-600 to-primary-600 hover:from-orange-500 hover:to-primary-500 border-0"
-            tooltip="Generate AGENTS.md and selected adapters."
-          >
-            {isGenerating ? (
-              <><Loader2 className="animate-spin" size={18} /> Generating...</>
-            ) : (
-              <><Sparkles size={18} /> Generate Universal Config</>
+            {/* Warning if no tools selected - hidden on mobile sticky */}
+            {tools.length === 0 && (
+              <div className="hidden md:flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-sm">
+                <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                <div>
+                  <strong className="font-semibold">No tools selected</strong>
+                  <p className="opacity-80 mt-1 text-xs">We will only generate the core <code>{FILE_NAMES.AGENTS_MD}</code> file. No tool-specific configuration files (like <code>.cursorrules</code>) will be created.</p>
+                </div>
+              </div>
             )}
-          </Button>
+
+            <Button
+              onClick={handleGenerate}
+              disabled={isGenerating}
+              className="w-full bg-gradient-to-r from-orange-600 to-primary-600 hover:from-orange-500 hover:to-primary-500 border-0"
+              tooltip="Generate AGENTS.md and selected adapters."
+            >
+              {isGenerating ? (
+                <><Loader2 className="animate-spin" size={18} /> Generating...</>
+              ) : (
+                <><Sparkles size={18} /> Generate Universal Config</>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Output Section */}

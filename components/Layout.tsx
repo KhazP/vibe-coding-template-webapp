@@ -8,6 +8,7 @@ import SettingsModal from './SettingsModal';
 import { Tooltip, Breadcrumbs, Button } from './UI';
 import { ApiKeyGate } from './ApiKeyGate';
 import FlowFieldBackground from './FlowFieldBackground';
+import { PWAInstallPrompt } from './PWAInstallPrompt';
 
 const NavItem: React.FC<{
   to: string;
@@ -487,6 +488,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
       </main>
 
       <SettingsModal />
+      <PWAInstallPrompt />
     </div >
   );
 };

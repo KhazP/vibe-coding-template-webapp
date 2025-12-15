@@ -491,23 +491,10 @@ const SettingsModal: React.FC = () => {
                                 </p>
                             </div>
 
-                            {/* Provider Header with Logo */}
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl bg-slate-900 border border-white/10 flex items-center justify-center shrink-0">
-                                        <img
-                                            src={PROVIDERS[activeProvider].logoPath}
-                                            alt={PROVIDERS[activeProvider].displayName}
-                                            className="w-5 h-5 md:w-6 md:h-6 object-contain"
-                                        />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xs md:text-sm font-bold text-white">{PROVIDERS[activeProvider].displayName}</h3>
-                                        <p className="text-[10px] md:text-xs text-slate-400">Select model tier below</p>
-                                    </div>
-                                </div>
-                                {/* Provider Switch Buttons - Scrollable on mobile */}
-                                <div className="flex gap-1 bg-slate-900/50 rounded-lg p-1 border border-white/5 overflow-x-auto scrollbar-none">
+                            {/* Provider Selector - Compact single row */}
+                            <div className="flex items-center gap-2 mb-4">
+                                {/* Provider Switch Icons */}
+                                <div className="flex gap-1 bg-slate-900/50 rounded-lg p-1 border border-white/5">
                                     {(['gemini', 'openai', 'anthropic', 'openrouter'] as ProviderId[]).map((pid) => {
                                         const hasKey = providerKeys[pid];
                                         const isActive = activeProvider === pid;
@@ -517,10 +504,10 @@ const SettingsModal: React.FC = () => {
                                                 key={pid}
                                                 onClick={() => handleProviderChange(pid)}
                                                 disabled={!hasKey}
-                                                className={`p-2 rounded-md transition-all min-w-[36px] min-h-[36px] flex items-center justify-center ${isActive
+                                                className={`p-1.5 md:p-2 rounded-md transition-all flex items-center justify-center ${isActive
                                                     ? 'bg-primary-500/20 border border-primary-500/30'
                                                     : 'hover:bg-white/5 active:bg-white/10'
-                                                    } ${!hasKey ? 'opacity-75 grayscale pointer-events-none cursor-not-allowed' : ''}`}
+                                                    } ${!hasKey ? 'opacity-50 grayscale pointer-events-none cursor-not-allowed' : ''}`}
                                                 title={hasKey ? PROVIDERS[pid].displayName : `${PROVIDERS[pid].displayName} (No API Key)`}
                                             >
                                                 <img
@@ -532,6 +519,8 @@ const SettingsModal: React.FC = () => {
                                         )
                                     })}
                                 </div>
+                                {/* Active Provider Label */}
+                                <span className="text-xs md:text-sm font-medium text-white">{PROVIDERS[activeProvider].displayName}</span>
                             </div>
 
                             {activeProvider === 'openrouter' ? (
@@ -616,13 +605,11 @@ const SettingsModal: React.FC = () => {
 
                                     {/* Selected Model Details */}
                                     {currentModelConfig && (
-                                        <div className="mt-4 p-3 bg-slate-950/50 rounded-lg border border-slate-800/50 flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="text-xs text-slate-400 truncate max-w-[300px]">
-                                                    {currentModelConfig.description}
-                                                </div>
+                                        <div className="mt-4 p-3 bg-slate-950/50 rounded-lg border border-slate-800/50 flex flex-col md:flex-row md:items-center gap-2 md:justify-between">
+                                            <div className="text-xs text-slate-400 line-clamp-2 md:line-clamp-1">
+                                                {currentModelConfig.description}
                                             </div>
-                                            <div className="flex items-center gap-3 shrink-0">
+                                            <div className="flex items-center gap-3 shrink-0 text-right">
                                                 <span className="text-[10px] text-slate-600">
                                                     {(currentModelConfig.inputContextLimit / 1000).toFixed(0)}k ctx
                                                 </span>
@@ -773,7 +760,7 @@ const SettingsModal: React.FC = () => {
                                                                     <BrainCircuit size={16} className="text-purple-400" />
                                                                     <label className="text-sm font-medium text-slate-300">Thinking Budget</label>
                                                                     <Tooltip content="Tokens reserved for reasoning.">
-                                                                        <span className="text-slate-600 hover:text-primary-400 cursor-help text-xs">ⓘ</span>
+                                                                        <span className="text-slate-600 hover:text-primary-400 active:text-white cursor-help text-xs">ⓘ</span>
                                                                     </Tooltip>
                                                                     <span className="ml-auto text-xs font-mono text-slate-400">
                                                                         {settings.thinkingBudget > 0 ? `${(settings.thinkingBudget / 1024).toFixed(0)}k` : 'Off'}

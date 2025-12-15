@@ -138,46 +138,34 @@ export const ModelStatus: React.FC = () => {
     if (isDismissed) return null;
 
     return (
-        <div className="bg-glass-100 backdrop-blur-xl border border-glass-border rounded-2xl p-2 md:p-2 text-xs font-mono text-slate-400 mb-4 md:mb-8 shadow-sm relative">
+        <div className="bg-glass-100 backdrop-blur-xl border border-glass-border rounded-xl md:rounded-2xl p-2 md:px-3 md:py-2 text-xs font-mono text-slate-400 mb-4 md:mb-8 shadow-sm relative">
             {/* Subtle gradient sheen */}
-            <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent opacity-50 pointer-events-none rounded-2xl" />
+            <div className="absolute inset-0 bg-gradient-to-r from-white/5 to-transparent opacity-50 pointer-events-none rounded-xl md:rounded-2xl" />
 
-            {/* Mobile Layout: compact rows | Desktop: Single row with config on right */}
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-2 md:gap-4">
+            {/* Single row layout for both mobile and desktop */}
+            <div className="relative z-10 flex items-center justify-between gap-2 md:gap-3">
 
-                {/* Left section: Provider + Context Bar */}
-                <div className="flex items-center gap-2 md:gap-3 flex-wrap flex-1">
-                    {/* Provider & Model Label - Compact on mobile */}
+                {/* Left group: Model + Context */}
+                <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+                    {/* Provider & Model */}
                     <Tooltip content={`Provider: ${providerInfo.provider.displayName}\nModel: ${providerInfo.modelId}\nInput: $${providerInfo.modelConfig?.inputCostPerMillion || '?'}/1M\nOutput: $${providerInfo.modelConfig?.outputCostPerMillion || '?'}/1M`}>
-                        <div className="flex items-center gap-1.5 md:gap-2 px-2 py-1 md:py-1.5 bg-slate-800/50 rounded-lg border border-white/5 cursor-help min-h-[36px] md:min-h-0">
+                        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-slate-800/50 rounded-lg border border-white/5 cursor-help shrink-0">
                             <img
                                 src={providerInfo.provider.logoPath}
                                 alt={providerInfo.provider.displayName}
                                 className="w-4 h-4 object-contain"
                             />
-                            <span className="text-slate-200 max-w-[90px] md:max-w-[120px] truncate text-xs" title={providerInfo.modelDisplayName}>
+                            <span className="text-slate-200 max-w-[70px] md:max-w-[120px] truncate text-xs" title={providerInfo.modelDisplayName}>
                                 {providerInfo.modelDisplayName}
                             </span>
-                            {providerInfo.modelConfig && (
-                                <span className="hidden md:inline text-[10px] text-emerald-400/70 font-mono">
-                                    ${providerInfo.modelConfig.inputCostPerMillion}/1M
-                                </span>
-                            )}
                         </div>
                     </Tooltip>
 
-                    {/* Context Health Bar */}
-                    <Tooltip content={`Current Context: ${tokenCount.toLocaleString()} / ${modelContextLimit.toLocaleString()} tokens. ${healthStatus === 'Heavy' ? 'High latency expected.' : ''}`}>
-                        <div className="flex flex-col gap-0.5 flex-1 min-w-[80px] md:w-40 px-1 cursor-help">
-                            <div className="flex justify-between items-center text-[10px] uppercase tracking-wider font-bold">
-                                <span className="flex items-center gap-1">
-                                    Context {isCounting && <RefreshCw size={8} className="animate-spin ml-1" />}
-                                </span>
-                                <span className={healthStatus === 'Critical' ? 'text-red-400' : healthStatus === 'Heavy' ? 'text-amber-400' : 'text-emerald-400'}>
-                                    {Math.round(contextUsagePercent)}%
-                                </span>
-                            </div>
-                            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    {/* Context Bar - simplified */}
+                    <Tooltip content={`Context: ${tokenCount.toLocaleString()} / ${modelContextLimit.toLocaleString()} tokens`}>
+                        <div className="flex items-center gap-2 min-w-[100px] md:min-w-[140px] cursor-help">
+                            <span className="text-[10px] uppercase tracking-wider font-bold text-slate-500 hidden md:inline">Context</span>
+                            <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
                                 <motion.div
                                     initial={{ width: 0 }}
                                     animate={{ width: `${contextUsagePercent}%` }}
@@ -185,62 +173,49 @@ export const ModelStatus: React.FC = () => {
                                     transition={{ duration: 0.5 }}
                                 />
                             </div>
+                            <span className={`text-[10px] font-bold shrink-0 ${healthStatus === 'Critical' ? 'text-red-400' : healthStatus === 'Heavy' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                {Math.round(contextUsagePercent)}%
+                            </span>
+                            {isCounting && <RefreshCw size={10} className="animate-spin text-slate-500" />}
                         </div>
                     </Tooltip>
-
-                    {/* Optimize Action (Only if heavy) */}
-                    <AnimatePresence>
-                        {healthStatus !== 'Healthy' && (
-                            <motion.button
-                                initial={{ opacity: 0, scale: 0.8 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.8 }}
-                                onClick={handleOptimizeContext}
-                                className="flex items-center gap-1 px-2 py-1 rounded bg-amber-900/20 border border-amber-500/20 text-amber-400 hover:bg-amber-900/40 transition-colors min-h-[36px] md:min-h-0"
-                            >
-                                <AlertCircle size={12} />
-                                <span className="text-xs">Check</span>
-                            </motion.button>
-                        )}
-                    </AnimatePresence>
                 </div>
 
-                {/* Middle section: Stats (desktop: visible, mobile: compact row) */}
-                <div className="flex items-center gap-2 md:gap-3 overflow-x-auto scrollbar-none border-t md:border-t-0 md:border-l border-white/5 pt-1.5 md:pt-0 md:pl-3">
+                {/* Center group: Stats (visible on desktop, selectively on mobile) */}
+                <div className="hidden md:flex items-center gap-3 border-l border-white/5 pl-3">
                     {settings.thinkingBudget > 0 && providerInfo.providerId === 'gemini' && (
-                        <div className="flex items-center gap-1 text-slate-300 shrink-0">
+                        <div className="flex items-center gap-1 text-slate-300">
                             <BrainCircuit size={12} className="text-purple-400" />
                             <span className="text-xs">{(settings.thinkingBudget / 1024).toFixed(0)}k</span>
                         </div>
                     )}
 
                     {settings.useGrounding && providerInfo.providerId === 'gemini' && (
-                        <div className="flex items-center gap-1 text-slate-300 shrink-0">
+                        <div className="flex items-center gap-1 text-slate-300">
                             <Search size={12} className="text-blue-400" />
                         </div>
                     )}
 
-                    {/* Cost Estimator */}
-                    <Tooltip content={`Total Session Usage:\nInput: ${tokenUsage?.input.toLocaleString()}\nOutput: ${tokenUsage?.output.toLocaleString()}\nGrounding: ${tokenUsage?.groundingRequests || 0}`}>
-                        <div className="flex items-center gap-1 text-emerald-400 bg-emerald-950/20 px-1.5 py-1 rounded border border-emerald-500/10 cursor-help shrink-0">
+                    {/* Cost */}
+                    <Tooltip content={`Session: In ${tokenUsage?.input.toLocaleString()} / Out ${tokenUsage?.output.toLocaleString()}`}>
+                        <div className="flex items-center gap-1 text-emerald-400 bg-emerald-950/30 px-2 py-1 rounded border border-emerald-500/10 cursor-help">
                             <DollarSign size={10} />
                             <span className="text-xs">${costString}</span>
                         </div>
                     </Tooltip>
-
-                    {/* Mobile price indicator */}
-                    {providerInfo.modelConfig && (
-                        <div className="flex md:hidden items-center gap-1 text-[10px] text-emerald-400/70 font-mono shrink-0">
-                            <span>${providerInfo.modelConfig.inputCostPerMillion}/1M in</span>
-                        </div>
-                    )}
                 </div>
 
-                {/* Right section: Configure and Close buttons - always on right */}
-                <div className="flex items-center gap-1 shrink-0 md:ml-auto md:border-l border-white/5 md:pl-3">
+                {/* Right group: Actions */}
+                <div className="flex items-center gap-1 shrink-0">
+                    {/* Mobile-only cost badge */}
+                    <div className="md:hidden flex items-center gap-1 text-emerald-400 bg-emerald-950/30 px-1.5 py-1 rounded text-xs">
+                        <DollarSign size={10} />
+                        ${costString}
+                    </div>
+
                     <button
                         onClick={() => setIsSettingsOpen(true)}
-                        className="flex items-center justify-center gap-1.5 hover:bg-white/10 active:bg-white/20 transition-colors p-2 md:px-2.5 md:py-1.5 rounded-lg text-slate-300 hover:text-white group border border-transparent hover:border-white/10 min-h-[36px] md:min-h-0"
+                        className="flex items-center justify-center gap-1.5 hover:bg-white/10 active:bg-white/20 transition-colors p-2 md:px-2.5 md:py-1.5 rounded-lg text-slate-300 hover:text-white group"
                         aria-label="Configure"
                     >
                         <Settings size={14} className="group-hover:rotate-45 transition-transform duration-500" />
@@ -248,13 +223,33 @@ export const ModelStatus: React.FC = () => {
                     </button>
                     <button
                         onClick={handleDismiss}
-                        className="p-2 hover:bg-white/10 active:bg-white/20 transition-colors rounded-lg text-slate-500 hover:text-slate-300 border border-transparent hover:border-white/10 min-h-[36px] md:min-h-0"
+                        className="p-2 hover:bg-white/10 active:bg-white/20 transition-colors rounded-lg text-slate-500 hover:text-slate-300"
                         aria-label="Hide status bar"
                     >
                         <X size={14} />
                     </button>
                 </div>
             </div>
+
+            {/* Health warning - shown below when context is heavy */}
+            <AnimatePresence>
+                {healthStatus !== 'Healthy' && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mt-2 pt-2 border-t border-white/5"
+                    >
+                        <button
+                            onClick={handleOptimizeContext}
+                            className="flex items-center gap-2 text-amber-400 text-xs hover:underline"
+                        >
+                            <AlertCircle size={12} />
+                            <span>Context is {healthStatus.toLowerCase()}. Consider shortening outputs.</span>
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
