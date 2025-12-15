@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => {
         includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png'],
         manifest: {
           name: 'Vibe-Coding Workflow',
-          short_name: 'Vibe-Coding',
+          short_name: 'Vibe Workflow',
           description: 'AI-powered workflow for vibe coding. Research, PRD, Tech Design, and Agent Config generation.',
           theme_color: '#10b981',
           background_color: '#050505',
