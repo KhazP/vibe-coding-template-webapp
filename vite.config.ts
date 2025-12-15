@@ -10,10 +10,23 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       host: '0.0.0.0',
     },
+    build: {
+      chunkSizeWarningLimit: 3000,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+            'ui-vendor': ['lucide-react', 'framer-motion'],
+            'syntax-highlighter': ['react-syntax-highlighter'],
+            'ai-sdk': ['@google/genai', '@anthropic-ai/sdk'],
+          }
+        }
+      }
+    },
     plugins: [
       react(),
       VitePWA({
-        registerType: 'prompt', // Changed from autoUpdate to prevent data loss
+        registerType: 'prompt',
         includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon.png'],
         manifest: {
           name: 'Vibe-Coding Workflow',
@@ -54,7 +67,8 @@ export default defineConfig(({ mode }) => {
           clientsClaim: true,
           skipWaiting: true,
           cleanupOutdatedCaches: true,
-          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}']
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+          maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4MB
         },
         devOptions: {
           enabled: true
