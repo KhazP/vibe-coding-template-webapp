@@ -75,6 +75,14 @@ Instead of manually copy-pasting prompts into ChatGPT or Claude, this web app au
 - **Zero backend** – all AI calls go directly from your browser to the provider
 - **We never see your keys** – no server, no database, no tracking
 
+### 🗄️ Admin Dashboard Data
+The optional admin dashboard uses **Supabase** to store:
+- Admin authentication credentials only
+- Aggregate, anonymized usage metrics (e.g., total generations count)
+
+**Never stored:** Your API keys, prompts, generated content, or any personal data.  
+👉 [View the source code](context/ProjectContext.tsx#L765-L776) to verify exactly what data is sent.
+
 ---
 
 ##  The 5-Step Workflow
@@ -149,6 +157,7 @@ The tool generates optimized configuration files for the following editors:
 | **Styling** | Vanilla CSS + Framer Motion |
 | **PWA** | Vite PWA Plugin + Workbox |
 | **Persistence** | LocalStorage (zero backend) |
+| **Admin Dashboard** | [Supabase](#-admin-dashboard-data) (Auth, PostgreSQL, RLS) |
 | **Deployment** | Vercel-ready with optimized caching |
 
 ---
