@@ -9,6 +9,7 @@ import { Tooltip, Breadcrumbs, Button } from './UI';
 import { ApiKeyGate } from './ApiKeyGate';
 import FlowFieldBackground from './FlowFieldBackground';
 import { PWAInstallPrompt } from './PWAInstallPrompt';
+import { PWAUpdatePrompt } from './PWAUpdatePrompt';
 
 const NavItem: React.FC<{
   to: string;
@@ -489,6 +490,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 
       <SettingsModal />
       <PWAInstallPrompt />
+      <PWAUpdatePrompt />
     </div >
   );
 };
