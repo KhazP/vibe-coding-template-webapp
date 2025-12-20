@@ -20,8 +20,8 @@ export const STORAGE_KEYS = {
 } as const;
 
 export const MODELS = {
-  GEMINI_PRO: 'gemini-3-pro',
-  GEMINI_FLASH: 'gemini-2.5-flash',
+  GEMINI_PRO: 'gemini-3-pro-preview',
+  GEMINI_FLASH: 'gemini-3-flash-preview',
   DEEP_RESEARCH: 'deep-research-pro-preview-12-2025',
 } as const;
 
@@ -41,7 +41,7 @@ export const MODEL_CONFIGS = {
     isFlash: false
   },
   [MODELS.GEMINI_FLASH]: {
-    label: 'Gemini 2.5 Flash (Faster/Cheaper)',
+    label: 'Gemini 3 Flash Preview (Faster/Cheaper)',
     maxThinkingBudget: 24576,
     supportsGrounding: true,
     description: 'Optimized for speed (up to 24k tokens).',
@@ -92,7 +92,7 @@ export const PRESETS = {
     id: 'fast',
     label: 'Fast',
     badge: 'Flash',
-    description: 'Optimized for speed. Uses Gemini 2.5 Flash with moderate thinking.',
+    description: 'Optimized for speed. Uses Gemini 3 Flash with moderate thinking.',
     config: {
       modelName: MODELS.GEMINI_FLASH,
       thinkingBudget: 8192,

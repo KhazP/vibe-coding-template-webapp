@@ -144,8 +144,8 @@ export const PROVIDER_MODELS: Record<ProviderId, ModelConfig[]> = {
     gemini: [
         // Complex tier
         {
-            id: 'gemini-3-pro',
-            displayName: 'Gemini 3 Pro',
+            id: 'gemini-3-pro-preview',
+            displayName: 'Gemini 3 Pro Preview',
             tier: 'complex',
             providerId: 'gemini',
             inputCostPerMillion: 2.00,
@@ -162,7 +162,7 @@ export const PROVIDER_MODELS: Record<ProviderId, ModelConfig[]> = {
         },
         // Mid tier
         {
-            id: 'gemini-2.5-pro',
+            id: 'gemini-2.5-pro-preview-05-06',
             displayName: 'Gemini 2.5 Pro',
             tier: 'mid',
             providerId: 'gemini',
@@ -180,15 +180,15 @@ export const PROVIDER_MODELS: Record<ProviderId, ModelConfig[]> = {
         },
         // Fast tier
         {
-            id: 'gemini-2.5-flash',
-            displayName: 'Gemini 2.5 Flash',
+            id: 'gemini-3-flash-preview',
+            displayName: 'Gemini 3 Flash Preview',
             tier: 'fast',
             providerId: 'gemini',
             inputCostPerMillion: 0.30,
             outputCostPerMillion: 2.50,
             inputContextLimit: 1000000,
             outputContextLimit: 65536,
-            description: 'Speed-optimized MoE model. Lowest cost in Gemini family.',
+            description: 'Speed-optimized model. Lowest cost in Gemini family.',
             supportsThinking: true,
         },
     ],
@@ -352,8 +352,11 @@ export const getModelsForProvider = (providerId: ProviderId): ModelConfig[] => {
  * Includes legacy model name aliases for backwards compatibility
  */
 const MODEL_ID_ALIASES: Record<string, string> = {
-    'gemini-3-pro-preview': 'gemini-3-pro',
-    'gemini-2.5-pro-preview': 'gemini-2.5-pro',
+    // Legacy aliases for backwards compatibility
+    'gemini-3-pro': 'gemini-3-pro-preview',
+    'gemini-2.5-pro': 'gemini-2.5-pro-preview-05-06',
+    'gemini-2.5-flash': 'gemini-3-flash-preview',
+    'gemini-2.5-pro-preview': 'gemini-2.5-pro-preview-05-06',
 };
 
 export const getModelById = (modelId: string): ModelConfig | undefined => {
